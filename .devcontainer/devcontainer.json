@@ -1,0 +1,52 @@
+{
+    "name": "web-app-template (React + .NET + SQL)",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csdevkit",
+                "ms-azuretools.vscode-docker",
+                "ms-vscode.vscode-node-azure-pack",
+                "ms-vscode.js-debug",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "bradlc.vscode-tailwindcss"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "editor.formatOnSave": true,
+                "files.insertFinalNewline": true
+            }
+        }
+    },
+    "containerEnv": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://0.0.0.0:5165",
+        "DB_CONNECTION": "Server=sql,1433;Database=AppDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;"
+    },
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "postStartCommand": "bash .devcontainer/wait-for-sql.sh && npm run start",
+    "remoteUser": "vscode",
+    "forwardPorts": [
+        5165
+    ],
+    "portsAttributes": {
+        "5165": {
+            "label": "Web App (ASP.NET + Vite Proxy)",
+            "onAutoForward": "ignore"
+        },
+        "5173": {
+            "label": "Vite Dev Server (Internal - Use 5165)",
+            "onAutoForward": "openBrowser"
+        },
+        "14333": {
+            "label": "SQL Server (Internal)",
+            "onAutoForward": "ignore"
+        }
+    },
+    "otherPortsAttributes": {
+        "onAutoForward": "ignore"
+    }
+}
