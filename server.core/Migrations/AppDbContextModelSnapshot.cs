@@ -24,14 +24,16 @@ namespace server.core.Migrations
 
             modelBuilder.Entity("Server.Core.Domain.AppUser", b =>
                 {
-                    b.Property<int>("AppUserId")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AppUserId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
 
                     b.Property<string>("DisplayName")
                         .HasMaxLength(200)
@@ -52,6 +54,7 @@ namespace server.core.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("IamId")
+                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("char(10)");
 
@@ -64,9 +67,11 @@ namespace server.core.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("UpdatedUtc")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
 
-                    b.HasKey("AppUserId");
+                    b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .HasDatabaseName("IX_AppUser_Email");

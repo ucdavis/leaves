@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Server.Core.Domain;
 
@@ -7,14 +9,15 @@ namespace Server.Core.Domain;
 public class AppUser
 {
     [Key]
-    public int AppUserId { get; set; }
+    public int Id { get; set; }
 
     [Required]
     public Guid EntraObjectId { get; set; }
 
+    [Required]
     [Column(TypeName = "char(10)")]
     [MaxLength(10)]
-    public string? IamId { get; set; }
+    public required string IamId { get; set; } 
 
     [Column(TypeName = "char(8)")]
     [MaxLength(8)]
@@ -43,4 +46,34 @@ public class AppUser
     [Required]
     [Column(TypeName = "datetime2")]
     public DateTime UpdatedUtc { get; set; }
+
+    public static void Configure(EntityTypeBuilder<AppUser> entity)
+    {
+        entity.HasKey(e => e.Id);
+        entity.Property(e => e.Id).ValueGeneratedOnAdd();
+        entity.Property(e => e.IsActive).HasDefaultValue(true);
+        entity.Property(e => e.CreatedUtc)
+            .HasDefaultValueSql("sysutcdatetime()")
+            .ValueGeneratedOnAdd();
+        entity.Property(e => e.UpdatedUtc)
+            .HasDefaultValueSql("sysutcdatetime()")
+            .ValueGeneratedOnAdd();
+
+        entity.HasIndex(e => e.EntraObjectId)
+            .IsUnique()
+            .HasDatabaseName("UX_AppUser_EntraObjectId");
+
+        entity.HasIndex(e => e.IamId)
+            .IsUnique()
+            .HasFilter("[IamId] IS NOT NULL")
+            .HasDatabaseName("UX_AppUser_IamId");
+
+        entity.HasIndex(e => e.EmployeeId)
+            .IsUnique()
+            .HasFilter("[EmployeeId] IS NOT NULL")
+            .HasDatabaseName("UX_AppUser_EmployeeId");
+
+        entity.HasIndex(e => e.Email)
+            .HasDatabaseName("IX_AppUser_Email");
+    }
 }

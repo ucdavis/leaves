@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace server.core.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AppUser : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,22 +15,22 @@ namespace server.core.Migrations
                 name: "AppUser",
                 columns: table => new
                 {
-                    AppUserId = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     EntraObjectId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IamId = table.Column<string>(type: "char(10)", maxLength: 10, nullable: true),
+                    IamId = table.Column<string>(type: "char(10)", maxLength: 10, nullable: false),
                     EmployeeId = table.Column<string>(type: "char(8)", maxLength: 8, nullable: true),
                     DisplayName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(320)", maxLength: 320, nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     FirstLoginUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     LastLoginUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "sysutcdatetime()"),
+                    UpdatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "sysutcdatetime()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AppUser", x => x.AppUserId);
+                    table.PrimaryKey("PK_AppUser", x => x.Id);
                 });
 
             migrationBuilder.CreateIndex(
