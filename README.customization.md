@@ -58,11 +58,11 @@ The Azure deployment bootstrap in section 5 automates a different Entra applicat
 
 ## 5. Azure Deployment Setup
 
-Replace all placeholder deployment names before the first cloud deployment. The defaults are intentionally generic:
+Replace all placeholder deployment names before the first cloud deployment. The defaults are:
 
-- `APP_NAME=webapp`
-- `RESOURCE_GROUP=rg-webapp-test` for `test`
-- `RESOURCE_GROUP=rg-webapp-prod` for `prod`
+- `APP_NAME=leaves`
+- `RESOURCE_GROUP=rg-leaves-test` for `test`
+- `RESOURCE_GROUP=rg-leaves-prod` for `prod`
 
 The Azure deployment templates only allow `test` and `prod`. Resource groups must end with the matching environment suffix, and deployments must pass the expected subscription ID guard before resources are created.
 
@@ -125,7 +125,7 @@ az deployment sub create \
     resourceGroupName="rg-<app-name>-test"
 ```
 
-For example, with the default `APP_NAME=webapp`, use `deployment_name="github-oidc-webapp"`. Repeat with `env="prod"`, a production deployment name such as `deployment_name="github-oidc-<app-name>-prod"`, and a `-prod` resource group for production. The bootstrap output should include `deploymentGuardPassed=true`, `clientId`, `tenantId`, `subscriptionId`, `principalId`, `resourceGroupName`, and `federatedCredentialSubject`.
+For example, with the default `APP_NAME=leaves`, use `deployment_name="github-oidc-leaves"`. Repeat with `env="prod"`, a production deployment name such as `deployment_name="github-oidc-leaves-prod"`, and a `-prod` resource group for production. The bootstrap output should include `deploymentGuardPassed=true`, `clientId`, `tenantId`, `subscriptionId`, `principalId`, `resourceGroupName`, and `federatedCredentialSubject`.
 
 If you did not set `--name`, Azure CLI usually names the deployment after the template file, for example `github-oidc`. Find recent subscription deployments with:
 

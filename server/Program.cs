@@ -55,8 +55,8 @@ try
     {
         const string message = "No database connection string configured. Set the DB_CONNECTION environment variable or " +
                                "configure ConnectionStrings:DefaultConnection. For host-based local development use " +
-                               "Server=localhost,14333;Database=AppDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;. " +
-                               "Inside the DevContainer use Server=sql,1433;Database=AppDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;.";
+                               "Server=localhost,14333;Database=LeavesDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;. " +
+                               "Inside the DevContainer use Server=sql,1433;Database=LeavesDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;.";
 
         throw new InvalidOperationException(message);
     }
