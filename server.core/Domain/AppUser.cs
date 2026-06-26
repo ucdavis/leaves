@@ -41,24 +41,17 @@ public class AppUser
 
     [Required]
     [Column(TypeName = "datetime2")]
-    public DateTime CreatedUtc { get; set; }
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
     [Required]
     [Column(TypeName = "datetime2")]
-    public DateTime UpdatedUtc { get; set; }
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public static void Configure(EntityTypeBuilder<AppUser> entity)
     {
         entity.HasKey(e => e.Id);
         entity.Property(e => e.Id).ValueGeneratedOnAdd();
         entity.Property(e => e.IsActive).HasDefaultValue(true);
-        entity.Property(e => e.CreatedUtc)
-            .HasDefaultValueSql("sysutcdatetime()")
-            .ValueGeneratedOnAdd();
-        entity.Property(e => e.UpdatedUtc)
-            .HasDefaultValueSql("sysutcdatetime()")
-            .ValueGeneratedOnAdd();
-
         entity.HasIndex(e => e.EntraObjectId)
             .IsUnique()
             .HasDatabaseName("UX_AppUser_EntraObjectId");

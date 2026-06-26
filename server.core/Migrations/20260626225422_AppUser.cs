@@ -25,8 +25,8 @@ namespace server.core.Migrations
                     IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     FirstLoginUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     LastLoginUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "sysutcdatetime()"),
-                    UpdatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "sysutcdatetime()")
+                    CreatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {

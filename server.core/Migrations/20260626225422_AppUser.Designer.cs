@@ -12,7 +12,7 @@ using Server.Core.Data;
 namespace server.core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260626222952_AppUser")]
+    [Migration("20260626225422_AppUser")]
     partial class AppUser
     {
         /// <inheritdoc />
@@ -34,9 +34,7 @@ namespace server.core.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("sysutcdatetime()");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("DisplayName")
                         .HasMaxLength(200)
@@ -70,9 +68,7 @@ namespace server.core.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("UpdatedUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("sysutcdatetime()");
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 

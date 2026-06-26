@@ -31,9 +31,7 @@ namespace server.core.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("sysutcdatetime()");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("DisplayName")
                         .HasMaxLength(200)
@@ -67,9 +65,7 @@ namespace server.core.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("UpdatedUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("sysutcdatetime()");
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
