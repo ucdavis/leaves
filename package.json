@@ -1,10 +1,10 @@
 {
-  "name": "web-app-template",
+  "name": "leaves",
   "private": true,
   "scripts": {
-    "db:up": "docker compose -p web-app-template_devcontainer -f .devcontainer/docker-compose.yml up -d sql",
-    "db:down": "docker compose -p web-app-template_devcontainer -f .devcontainer/docker-compose.yml stop sql",
-    "db:logs": "docker compose -p web-app-template_devcontainer -f .devcontainer/docker-compose.yml logs -f sql",
+    "db:up": "docker compose -p leaves_devcontainer -f .devcontainer/docker-compose.yml up -d sql",
+    "db:down": "docker compose -p leaves_devcontainer -f .devcontainer/docker-compose.yml stop sql",
+    "db:logs": "docker compose -p leaves_devcontainer -f .devcontainer/docker-compose.yml logs -f sql",
     "start": "npm-run-all --parallel start:server start:client:when-server-ready",
     "start:server": "dotnet watch run --project server/server.csproj --launch-profile http-cli",
     "start:client": "cd client && npm run dev:open",

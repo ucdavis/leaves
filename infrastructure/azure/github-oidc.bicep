@@ -3,7 +3,7 @@ targetScope = 'subscription'
 extension microsoftGraphV1_0
 
 @description('Base application name used for generated Azure and Entra names.')
-param appName string = 'webapp'
+param appName string = 'leaves'
 
 @description('GitHub repository in owner/name format.')
 param repository string = 'owner/repository'

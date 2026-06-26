@@ -14,7 +14,7 @@ Required for infrastructure deployments:
   SQL_ADMIN_PASSWORD     SQL admin password used by Azure SQL.
 
 Common configuration:
-  APP_NAME               Base Azure resource name. Default: webapp
+  APP_NAME               Base Azure resource name. Default: leaves
   AZURE_SUBSCRIPTION_ID  Expected subscription. Default: current az account
   AZURE_LOCATION         Azure region used when creating the resource group. Default: westus2
   RESOURCE_GROUP         Target resource group. Default: rg-${APP_NAME}-${DEPLOY_ENV}
@@ -93,7 +93,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 
 DEPLOY_ENV="${DEPLOY_ENV:-}"
-APP_NAME="${APP_NAME:-webapp}"
+APP_NAME="${APP_NAME:-leaves}"
 AZURE_LOCATION="${AZURE_LOCATION:-westus2}"
 RESOURCE_GROUP="${RESOURCE_GROUP:-rg-${APP_NAME}-${DEPLOY_ENV}}"
 DEPLOY_INFRA="${DEPLOY_INFRA:-true}"
@@ -102,7 +102,7 @@ RUN_TESTS="${RUN_TESTS:-true}"
 SQL_ADMIN_LOGIN="${SQL_ADMIN_LOGIN:-sqladmin}"
 PUBLISH_ROOT="${PUBLISH_ROOT:-$repo_root/publish}"
 PUBLISH_WEB_DIR="${PUBLISH_WEB_DIR:-$PUBLISH_ROOT/web}"
-PACKAGE_PATH="${PACKAGE_PATH:-$PUBLISH_ROOT/webapp.zip}"
+PACKAGE_PATH="${PACKAGE_PATH:-$PUBLISH_ROOT/leaves.zip}"
 
 case "$DEPLOY_ENV" in
   test|prod) ;;
