@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Server.Core.Data;
-using Server.Core.Domain;
 
 public interface IDbInitializer
 {
@@ -37,25 +36,7 @@ public class DbInitializer : IDbInitializer
 
     private async Task SeedDevelopmentAsync(CancellationToken ct)
     {
-        if (!await _db.WeatherForecasts.AnyAsync(ct))
-        {
-            var forecasts = new[]
-            {
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(-5)), TemperatureC = 18, Summary = "Cool" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(-4)), TemperatureC = 22, Summary = "Mild" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)), TemperatureC = 35, Summary = "Hot" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(-2)), TemperatureC = 15, Summary = "Chilly" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(-1)), TemperatureC = 8, Summary = "Freezing" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 25, Summary = "Warm" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(1)), TemperatureC = 28, Summary = "Balmy" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(2)), TemperatureC = 12, Summary = "Cold" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(3)), TemperatureC = 32, Summary = "Scorching" },
-                new WeatherForecast { Date = DateOnly.FromDateTime(DateTime.Now.AddDays(4)), TemperatureC = 20, Summary = "Pleasant" }
-            };
-
-            _db.WeatherForecasts.AddRange(forecasts);
-            await _db.SaveChangesAsync(ct);
-        }
+        await Task.CompletedTask;
     }
 
     // just a placeholder for any production-safe seeding
