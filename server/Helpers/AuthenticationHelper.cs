@@ -98,6 +98,11 @@ public static class AuthenticationHelper
     /// </summary>
     private static async Task OnValidatePrincipal(Microsoft.AspNetCore.Authentication.Cookies.CookieValidatePrincipalContext ctx)
     {
+        if (ctx.Principal?.HasClaim("dev_persona", "true") == true)
+        {
+            return;
+        }
+
         // On every request with a cookie, check if the user's roles/claims need updating
         // We could use a cache here or roleVersion or timestamp or something, but for simplicity we'll just hit the DB every time
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();

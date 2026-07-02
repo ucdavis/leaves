@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,8 @@ public class AppUser
     [Required]
     [Column(TypeName = "datetime2")]
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+
+    public ICollection<AppAdminAssignment> CreatedAdminAssignments { get; set; } = new List<AppAdminAssignment>();
 
     public static void Configure(EntityTypeBuilder<AppUser> entity)
     {
