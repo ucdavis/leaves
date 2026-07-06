@@ -156,7 +156,12 @@ function DevLoginPage({
 }
 
 function normalizeReturnUrl(returnUrl: string | null) {
-  if (!returnUrl || !returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+  if (
+    !returnUrl ||
+    !returnUrl.startsWith('/') ||
+    returnUrl.startsWith('//') ||
+    returnUrl.includes('\\')
+  ) {
     return '/';
   }
 

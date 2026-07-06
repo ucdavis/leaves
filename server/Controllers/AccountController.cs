@@ -71,7 +71,7 @@ public class AccountController : Controller
         };
     }
 
-    private static string NormalizeReturnUrl(string? returnUrl, string fallbackPath)
+    private string NormalizeReturnUrl(string? returnUrl, string fallbackPath)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
@@ -79,7 +79,7 @@ public class AccountController : Controller
         }
 
         var trimmed = returnUrl.Trim();
-        if (!trimmed.StartsWith('/') || trimmed.StartsWith("//", StringComparison.Ordinal))
+        if (!Url.IsLocalUrl(trimmed))
         {
             return fallbackPath;
         }

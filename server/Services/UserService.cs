@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
@@ -67,8 +69,9 @@ public class UserService : IUserService
         }
 
         var now = DateTime.UtcNow;
+        var isNewUser = existingUser == null;
         var shouldSaveUser = false;
-        if (existingUser == null)
+        if (isNewUser)
         {
             existingUser = new AppUser
             {
@@ -87,37 +90,43 @@ public class UserService : IUserService
         }
         else
         {
-            if (!string.IsNullOrWhiteSpace(displayName) &&
-                !string.Equals(existingUser.DisplayName, displayName, StringComparison.Ordinal))
-            {
-                existingUser.DisplayName = displayName;
-                shouldSaveUser = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(email) &&
-                !string.Equals(existingUser.Email, email, StringComparison.OrdinalIgnoreCase))
-            {
-                existingUser.Email = email;
-                shouldSaveUser = true;
-            }
-
-            if (!existingUser.IsActive)
-            {
-                existingUser.IsActive = true;
-                shouldSaveUser = true;
-            }
-
-            if (recordSignIn)
-            {
-                existingUser.LastLoginUtc = now;
-                existingUser.UpdatedUtc = now;
-                shouldSaveUser = true;
-            }
+            shouldSaveUser = ApplyExistingUserUpdates(
+                existingUser,
+                displayName,
+                email,
+                resolvedAuthorizationKey,
+                recordSignIn,
+                now);
         }
 
         if (shouldSaveUser)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (isNewUser && IsConcurrentInsert(ex))
+            {
+                _logger.LogDebug(
+                    "User {EntraObjectId} was created concurrently; reloading and applying updates.",
+                    entraObjectId);
+
+                _dbContext.Entry(existingUser!).State = EntityState.Detached;
+
+                var concurrentUser = await _dbContext.AppUsers
+                    .SingleAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
+
+                if (ApplyExistingUserUpdates(
+                    concurrentUser,
+                    displayName,
+                    email,
+                    resolvedAuthorizationKey,
+                    recordSignIn,
+                    now))
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                }
+            }
         }
     }
 
@@ -200,6 +209,59 @@ public class UserService : IUserService
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
+    private static bool ApplyExistingUserUpdates(
+        AppUser user,
+        string? displayName,
+        string? email,
+        string? resolvedAuthorizationKey,
+        bool recordSignIn,
+        DateTime now)
+    {
+        var shouldSaveUser = false;
+
+        if (!string.IsNullOrWhiteSpace(displayName) &&
+            !string.Equals(user.DisplayName, displayName, StringComparison.Ordinal))
+        {
+            user.DisplayName = displayName;
+            shouldSaveUser = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(email) &&
+            !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            user.Email = email;
+            shouldSaveUser = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(resolvedAuthorizationKey) &&
+            string.IsNullOrWhiteSpace(user.IamId))
+        {
+            user.IamId = resolvedAuthorizationKey;
+            shouldSaveUser = true;
+        }
+
+        if (!user.IsActive)
+        {
+            user.IsActive = true;
+            shouldSaveUser = true;
+        }
+
+        if (recordSignIn)
+        {
+            user.LastLoginUtc = now;
+            user.UpdatedUtc = now;
+            shouldSaveUser = true;
+        }
+
+        return shouldSaveUser;
+    }
+
+    private static bool IsConcurrentInsert(DbUpdateException exception)
+    {
+        return exception.InnerException is SqlException sqlException &&
+               (sqlException.Number == 2601 || sqlException.Number == 2627);
+    }
+
     private string ResolveAuthorizationKey(ClaimsPrincipal principal, string? email, Guid entraObjectId)
     {
         var directClaim =
@@ -220,10 +282,11 @@ public class UserService : IUserService
             }
         }
 
-        // Until Leaves has a real IAM lookup like Walter, use a stable synthetic key
-        // so first-login provisioning and admin assignment can still work.
-        return $"u{entraObjectId:N}"[..10];
+        // Temporary fallback until we can resolve a real IAM key for every Entra account.
+        // Keep it deterministic so AppUser/AppAdminAssignment lookups stay stable.
+        return BuildSyntheticAuthorizationKey(entraObjectId);
     }
+
     private static string? NormalizeAuthorizationKey(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -239,5 +302,11 @@ public class UserService : IUserService
 
         var normalized = compact.Trim().ToLowerInvariant();
         return normalized.Length <= 10 ? normalized : null;
+    }
+
+    private static string BuildSyntheticAuthorizationKey(Guid entraObjectId)
+    {
+        var hash = SHA256.HashData(entraObjectId.ToByteArray());
+        return Convert.ToHexString(hash.AsSpan(0, 5)).ToLowerInvariant();
     }
 }
