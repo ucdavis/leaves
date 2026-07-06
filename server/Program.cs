@@ -37,6 +37,10 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddNotificationServices(builder.Configuration);
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    });
 
     // Add response caching for pages that opt-in
     // https://learn.microsoft.com/en-us/aspnet/core/performance/caching/middleware?view=aspnetcore-9.0

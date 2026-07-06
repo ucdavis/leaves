@@ -6,6 +6,7 @@ import {
 import { HttpError } from '../../lib/api.ts';
 import { RouterContext } from '../../main.tsx';
 import { meQueryOptions } from '../../queries/user.ts';
+import { AuthenticatedShell } from '@/shared/auth/AuthenticatedShell.tsx';
 import { UserProvider } from '@/shared/auth/UserContext.tsx';
 
 export const Route = createFileRoute('/(authenticated)')({
@@ -14,7 +15,9 @@ export const Route = createFileRoute('/(authenticated)')({
   },
   component: () => (
     <UserProvider>
-      <Outlet />
+      <AuthenticatedShell>
+        <Outlet />
+      </AuthenticatedShell>
     </UserProvider>
   ),
   errorComponent: AuthenticatedRouteError,
@@ -32,7 +35,7 @@ function AuthenticatedRouteError({ error }: ErrorComponentProps<unknown>) {
             You are signed in, but your account is not authorized to use this
             application.
           </p>
-          <a className="btn btn-primary mt-6" href="/login">
+          <a className="btn btn-primary mt-6" href="/login?returnUrl=/">
             Sign in with a different account
           </a>
         </section>

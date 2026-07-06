@@ -71,18 +71,6 @@ public class AccountController : Controller
         };
     }
 
-    [HttpGet("logout")]
-    [ApiExplorerSettings(IgnoreApi = true)]
-    public IActionResult Logout(string? returnUrl)
-    {
-        var safeReturnUrl = NormalizeReturnUrl(returnUrl, "/about");
-
-        return SignOut(
-            new AuthenticationProperties { RedirectUri = safeReturnUrl },
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            OpenIdConnectDefaults.AuthenticationScheme);
-    }
-
     private static string NormalizeReturnUrl(string? returnUrl, string fallbackPath)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))

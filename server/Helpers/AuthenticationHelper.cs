@@ -79,14 +79,29 @@ public static class AuthenticationHelper
     private static async Task OnTokenValidated(Microsoft.AspNetCore.Authentication.OpenIdConnect.TokenValidatedContext ctx)
     {
         // Load up the roles on first login (can also change other user info/claims here if needed)
-        var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-        var userId = ctx.Principal!.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var principal = ctx.Principal;
+        if (principal == null)
+        {
+            return;
+        }
 
-        if (string.IsNullOrEmpty(userId)) return;
+        var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
+        var hasUserId = principal.TryGetUserId(out var userId);
+
+        if (!hasUserId) return;
+
+        await userService.EnsureUserProfileAsync(
+            principal,
+            recordSignIn: true,
+            cancellationToken: ctx.HttpContext.RequestAborted);
 
         var roles = await userService.GetRolesForUser(userId);
 
-        var identity = (ClaimsIdentity)ctx.Principal.Identity!;
+        if (principal.Identity is not ClaimsIdentity identity)
+        {
+            return;
+        }
+
         foreach (var role in roles)
         {
             identity.AddClaim(new Claim(ClaimTypes.Role, role));
@@ -98,7 +113,13 @@ public static class AuthenticationHelper
     /// </summary>
     private static async Task OnValidatePrincipal(Microsoft.AspNetCore.Authentication.Cookies.CookieValidatePrincipalContext ctx)
     {
-        if (ctx.Principal?.HasClaim("dev_persona", "true") == true)
+        var principal = ctx.Principal;
+        if (principal?.HasClaim("dev_persona", "true") == true)
+        {
+            return;
+        }
+
+        if (principal == null)
         {
             return;
         }
@@ -106,7 +127,11 @@ public static class AuthenticationHelper
         // On every request with a cookie, check if the user's roles/claims need updating
         // We could use a cache here or roleVersion or timestamp or something, but for simplicity we'll just hit the DB every time
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-        var updated = await userService.UpdateUserPrincipalIfNeeded(ctx.Principal!);
+        await userService.EnsureUserProfileAsync(
+            principal,
+            recordSignIn: false,
+            cancellationToken: ctx.HttpContext.RequestAborted);
+        var updated = await userService.UpdateUserPrincipalIfNeeded(principal);
 
         if (updated != null)
         {
