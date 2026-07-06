@@ -6,11 +6,13 @@ namespace Server.Core.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<AppAdminAssignment> AppAdminAssignments => Set<AppAdminAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         AppUser.Configure(modelBuilder.Entity<AppUser>());
+        AppAdminAssignment.Configure(modelBuilder.Entity<AppAdminAssignment>());
     }
 }
