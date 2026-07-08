@@ -49,6 +49,7 @@ public class AppUser
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<AppAdminAssignment> CreatedAdminAssignments { get; set; } = new List<AppAdminAssignment>();
+    public ICollection<Cluster> CreatedClusters { get; set; } = new List<Cluster>();
 
     public static void Configure(EntityTypeBuilder<AppUser> entity)
     {
