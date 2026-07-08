@@ -15,6 +15,8 @@ public interface IUserService
         bool recordSignIn = true,
         CancellationToken cancellationToken = default);
 
+    Task<string?> GetDisplayNameForUser(string userId);
+
     Task<List<string>> GetRolesForUser(string userId);
 
     Task<ClaimsPrincipal?> UpdateUserPrincipalIfNeeded(ClaimsPrincipal principal);
@@ -55,9 +57,9 @@ public class UserService : IUserService
             principal.FindFirst("preferred_username")?.Value
             ?? principal.FindFirst(ClaimTypes.Email)?.Value;
         var displayName =
-            principal.Identity?.Name
-            ?? principal.FindFirst("name")?.Value
-            ?? principal.FindFirst(ClaimTypes.Name)?.Value;
+            principal.FindFirst("name")?.Value
+            ?? principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? principal.Identity?.Name;
 
         var existingUser = await _dbContext.AppUsers
             .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
@@ -128,6 +130,20 @@ public class UserService : IUserService
                 }
             }
         }
+    }
+
+    public async Task<string?> GetDisplayNameForUser(string userId)
+    {
+        if (!Guid.TryParse(userId, out var entraObjectId))
+        {
+            return null;
+        }
+
+        return await _dbContext.AppUsers
+            .AsNoTracking()
+            .Where(appUser => appUser.EntraObjectId == entraObjectId)
+            .Select(appUser => appUser.DisplayName)
+            .SingleOrDefaultAsync();
     }
 
     public async Task<List<string>> GetRolesForUser(string userId)
