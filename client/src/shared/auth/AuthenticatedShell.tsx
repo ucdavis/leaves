@@ -4,11 +4,6 @@ import { useUser } from './UserContext.tsx';
 
 const navigationItems = [
   { label: 'Home', to: '/' },
-  { label: 'My ID', to: '/me' },
-  { label: 'Table', to: '/fetch' },
-  { label: 'Form', to: '/form' },
-  { label: 'Notification', to: '/notification' },
-  { label: 'Style Guide', to: '/styles' },
 ] as const;
 
 export const AuthenticatedShell = ({
@@ -22,7 +17,7 @@ export const AuthenticatedShell = ({
   });
   const isAdmin = user.roles.some((role) => role.toLowerCase() === 'admin');
   const items = isAdmin
-    ? [...navigationItems, { label: 'Admin', to: '/admin/status' as const }]
+    ? [...navigationItems, { label: 'Admin', to: '/admin' as const }]
     : navigationItems;
   const showSecondaryNav = !pathname.startsWith('/admin');
   const initials = user.name

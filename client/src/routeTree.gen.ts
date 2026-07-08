@@ -9,25 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
 import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)/index'
-import { Route as authenticatedTableExportRouteImport } from './routes/(authenticated)/table-export'
-import { Route as authenticatedStylesRouteImport } from './routes/(authenticated)/styles'
-import { Route as authenticatedNotificationRouteImport } from './routes/(authenticated)/notification'
-import { Route as authenticatedMeRouteImport } from './routes/(authenticated)/me'
-import { Route as authenticatedFormRouteImport } from './routes/(authenticated)/form'
-import { Route as authenticatedFetchRouteImport } from './routes/(authenticated)/fetch'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
 import { Route as authenticatedAdminUsersRouteImport } from './routes/(authenticated)/admin.users'
 import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
 import { Route as authenticatedAdminDepartmentsRouteImport } from './routes/(authenticated)/admin.departments'
 
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
   id: '/(authenticated)',
   getParentRoute: () => rootRouteImport,
@@ -35,38 +23,6 @@ const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
 const authenticatedIndexRoute = authenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedTableExportRoute =
-  authenticatedTableExportRouteImport.update({
-    id: '/table-export',
-    path: '/table-export',
-    getParentRoute: () => authenticatedRouteRoute,
-  } as any)
-const authenticatedStylesRoute = authenticatedStylesRouteImport.update({
-  id: '/styles',
-  path: '/styles',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedNotificationRoute =
-  authenticatedNotificationRouteImport.update({
-    id: '/notification',
-    path: '/notification',
-    getParentRoute: () => authenticatedRouteRoute,
-  } as any)
-const authenticatedMeRoute = authenticatedMeRouteImport.update({
-  id: '/me',
-  path: '/me',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedFormRoute = authenticatedFormRouteImport.update({
-  id: '/form',
-  path: '/form',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedFetchRoute = authenticatedFetchRouteImport.update({
-  id: '/fetch',
-  path: '/fetch',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
 const authenticatedAdminRoute = authenticatedAdminRouteImport.update({
@@ -93,28 +49,14 @@ const authenticatedAdminDepartmentsRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/about': typeof AboutRoute
   '/admin': typeof authenticatedAdminRouteWithChildren
-  '/fetch': typeof authenticatedFetchRoute
-  '/form': typeof authenticatedFormRoute
-  '/me': typeof authenticatedMeRoute
-  '/notification': typeof authenticatedNotificationRoute
-  '/styles': typeof authenticatedStylesRoute
-  '/table-export': typeof authenticatedTableExportRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
   '/admin/users': typeof authenticatedAdminUsersRoute
 }
 export interface FileRoutesByTo {
-  '/about': typeof AboutRoute
   '/admin': typeof authenticatedAdminRouteWithChildren
-  '/fetch': typeof authenticatedFetchRoute
-  '/form': typeof authenticatedFormRoute
-  '/me': typeof authenticatedMeRoute
-  '/notification': typeof authenticatedNotificationRoute
-  '/styles': typeof authenticatedStylesRoute
-  '/table-export': typeof authenticatedTableExportRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
@@ -123,14 +65,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(authenticated)': typeof authenticatedRouteRouteWithChildren
-  '/about': typeof AboutRoute
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
-  '/(authenticated)/fetch': typeof authenticatedFetchRoute
-  '/(authenticated)/form': typeof authenticatedFormRoute
-  '/(authenticated)/me': typeof authenticatedMeRoute
-  '/(authenticated)/notification': typeof authenticatedNotificationRoute
-  '/(authenticated)/styles': typeof authenticatedStylesRoute
-  '/(authenticated)/table-export': typeof authenticatedTableExportRoute
   '/(authenticated)/': typeof authenticatedIndexRoute
   '/(authenticated)/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/(authenticated)/admin/status': typeof authenticatedAdminStatusRoute
@@ -139,43 +74,17 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/about'
     | '/admin'
-    | '/fetch'
-    | '/form'
-    | '/me'
-    | '/notification'
-    | '/styles'
-    | '/table-export'
     | '/'
     | '/admin/departments'
     | '/admin/status'
     | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/about'
-    | '/admin'
-    | '/fetch'
-    | '/form'
-    | '/me'
-    | '/notification'
-    | '/styles'
-    | '/table-export'
-    | '/'
-    | '/admin/departments'
-    | '/admin/status'
-    | '/admin/users'
+  to: '/admin' | '/' | '/admin/departments' | '/admin/status' | '/admin/users'
   id:
     | '__root__'
     | '/(authenticated)'
-    | '/about'
     | '/(authenticated)/admin'
-    | '/(authenticated)/fetch'
-    | '/(authenticated)/form'
-    | '/(authenticated)/me'
-    | '/(authenticated)/notification'
-    | '/(authenticated)/styles'
-    | '/(authenticated)/table-export'
     | '/(authenticated)/'
     | '/(authenticated)/admin/departments'
     | '/(authenticated)/admin/status'
@@ -184,18 +93,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   authenticatedRouteRoute: typeof authenticatedRouteRouteWithChildren
-  AboutRoute: typeof AboutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(authenticated)': {
       id: '/(authenticated)'
       path: ''
@@ -208,48 +109,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof authenticatedIndexRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/table-export': {
-      id: '/(authenticated)/table-export'
-      path: '/table-export'
-      fullPath: '/table-export'
-      preLoaderRoute: typeof authenticatedTableExportRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/styles': {
-      id: '/(authenticated)/styles'
-      path: '/styles'
-      fullPath: '/styles'
-      preLoaderRoute: typeof authenticatedStylesRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/notification': {
-      id: '/(authenticated)/notification'
-      path: '/notification'
-      fullPath: '/notification'
-      preLoaderRoute: typeof authenticatedNotificationRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/me': {
-      id: '/(authenticated)/me'
-      path: '/me'
-      fullPath: '/me'
-      preLoaderRoute: typeof authenticatedMeRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/form': {
-      id: '/(authenticated)/form'
-      path: '/form'
-      fullPath: '/form'
-      preLoaderRoute: typeof authenticatedFormRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/fetch': {
-      id: '/(authenticated)/fetch'
-      path: '/fetch'
-      fullPath: '/fetch'
-      preLoaderRoute: typeof authenticatedFetchRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/admin': {
@@ -300,23 +159,11 @@ const authenticatedAdminRouteWithChildren =
 
 interface authenticatedRouteRouteChildren {
   authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
-  authenticatedFetchRoute: typeof authenticatedFetchRoute
-  authenticatedFormRoute: typeof authenticatedFormRoute
-  authenticatedMeRoute: typeof authenticatedMeRoute
-  authenticatedNotificationRoute: typeof authenticatedNotificationRoute
-  authenticatedStylesRoute: typeof authenticatedStylesRoute
-  authenticatedTableExportRoute: typeof authenticatedTableExportRoute
   authenticatedIndexRoute: typeof authenticatedIndexRoute
 }
 
 const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
   authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
-  authenticatedFetchRoute: authenticatedFetchRoute,
-  authenticatedFormRoute: authenticatedFormRoute,
-  authenticatedMeRoute: authenticatedMeRoute,
-  authenticatedNotificationRoute: authenticatedNotificationRoute,
-  authenticatedStylesRoute: authenticatedStylesRoute,
-  authenticatedTableExportRoute: authenticatedTableExportRoute,
   authenticatedIndexRoute: authenticatedIndexRoute,
 }
 
@@ -325,7 +172,6 @@ const authenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   authenticatedRouteRoute: authenticatedRouteRouteWithChildren,
-  AboutRoute: AboutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
