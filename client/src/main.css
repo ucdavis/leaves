@@ -1,3 +1,22 @@
 @import "tailwindcss";
 @plugin "daisyui";
 @import '@ucdavis/gunrock-tailwind/imports.css';
+
+:root {
+  --admin-blue: #002855;
+  --admin-gold: #daaa00;
+  --admin-gold-deep: #9f7a00;
+  --admin-sand: #f8f7f4;
+  --admin-border: #e2dfd8;
+  --admin-ink: #1f2933;
+  --admin-ink-muted: #645d57;
+  --admin-ink-soft: #8c8279;
+}
+
+body {
+  color: var(--admin-ink);
+}
+
+.admin-tab {
+  text-decoration: none;
+}

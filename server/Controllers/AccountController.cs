@@ -41,7 +41,7 @@ public class AccountController : Controller
         var normalizedAs = asOption?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(normalizedAs))
         {
-            return Redirect(BuildDevLoginUrl(safeReturnUrl, error: null));
+            return RenderDevLoginPage(safeReturnUrl, error: null);
         }
 
         return normalizedAs switch
@@ -67,7 +67,7 @@ public class AccountController : Controller
                 userId: "dev-unauthorized",
                 safeReturnUrl: safeReturnUrl,
                 roles: []),
-            _ => Redirect(BuildDevLoginUrl(safeReturnUrl, $"Unknown login option '{asOption}'.")),
+            _ => RenderDevLoginPage(safeReturnUrl, $"Unknown login option '{asOption}'."),
         };
     }
 
@@ -121,20 +121,63 @@ public class AccountController : Controller
             : null;
     }
 
-    private static string BuildDevLoginUrl(string safeReturnUrl, string? error)
+    private ContentResult RenderDevLoginPage(string safeReturnUrl, string? error)
     {
-        var query = new List<string>
-        {
-            "devLogin=1",
-            $"returnUrl={Uri.EscapeDataString(safeReturnUrl)}",
-        };
+        var encodedReturnUrl = Uri.EscapeDataString(safeReturnUrl);
+        var safeReturnUrlText = WebUtility.HtmlEncode(safeReturnUrl);
+        var errorMarkup = string.IsNullOrWhiteSpace(error)
+            ? string.Empty
+            : $"""
+              <div style="margin-top: 24px; border-radius: 16px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; padding: 16px 18px; font-size: 14px;">
+                {WebUtility.HtmlEncode(error)}
+              </div>
+              """;
 
-        if (!string.IsNullOrWhiteSpace(error))
-        {
-            query.Add($"error={Uri.EscapeDataString(error)}");
-        }
+        var html = $$"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Leaves Dev Login</title>
+        </head>
+        <body style="margin: 0; background: #f5f7fb; color: #1f2937; font-family: Arial, sans-serif;">
+          <main style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 16px;">
+            <section style="width: 100%; max-width: 720px; border-radius: 24px; border: 1px solid #dbe4f0; background: #ffffff; padding: 32px; box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);">
+              <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #0f4c81;">Local Development</div>
+              <h1 style="margin: 12px 0 0; font-size: 36px; line-height: 1.1;">Choose a login</h1>
+              <p style="margin: 16px 0 0; max-width: 560px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Pick a persona to test role-based behavior in Leaves, or continue with your real Entra sign-in.
+              </p>
+              {{errorMarkup}}
+              <div style="display: grid; gap: 14px; margin-top: 28px;">
+                {{BuildDevLoginOption("Login as Admin", "Grants the local Admin role for testing admin-only UI.", $"/login?as=admin&returnUrl={encodedReturnUrl}")}}
+                {{BuildDevLoginOption("Login as Requester", "Simulates a standard signed-in requester with no admin role.", $"/login?as=requester&returnUrl={encodedReturnUrl}")}}
+                {{BuildDevLoginOption("Login as Unauthorized User", "Signs in without app roles so you can verify unauthorized states.", $"/login?as=unauthorized&returnUrl={encodedReturnUrl}")}}
+                {{BuildDevLoginOption("Login as Self", "Runs the normal Entra sign-in flow with your real account.", $"/login?as=self&returnUrl={encodedReturnUrl}")}}
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px;">
+                <a href="{{safeReturnUrlText}}" style="display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #0f4c81; color: #ffffff; text-decoration: none; font-weight: 700; padding: 12px 18px;">
+                  Continue to {{safeReturnUrlText}}
+                </a>
+              </div>
+            </section>
+          </main>
+        </body>
+        </html>
+        """;
 
-        return $"/about?{string.Join("&", query)}";
+        return Content(html, "text/html");
+    }
+
+    private static string BuildDevLoginOption(string label, string description, string href)
+    {
+        return $$"""
+        <a href="{{WebUtility.HtmlEncode(href)}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
+          <div style="font-size: 18px; font-weight: 700; color: #111827;">{{WebUtility.HtmlEncode(label)}}</div>
+          <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">{{WebUtility.HtmlEncode(description)}}</div>
+        </a>
+        """;
     }
 
     private IActionResult SignInAsDevPersona(

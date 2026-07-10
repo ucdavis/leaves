@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Claims;
 
 namespace Server.Helpers;
 
@@ -19,7 +20,10 @@ public static class LoggingMiddlewareHelper
 
             // user info (name/ID if authenticated)
             var userName = ctx.User.Identity?.IsAuthenticated == true
-                ? (ctx.User.Identity?.Name ?? "authenticated")
+                ? (ctx.User.FindFirstValue("name")
+                   ?? ctx.User.FindFirstValue(ClaimTypes.Name)
+                   ?? ctx.User.Identity?.Name
+                   ?? "authenticated")
                 : "anonymous";
 
             // client IP (respects ForwardedHeaders above)
