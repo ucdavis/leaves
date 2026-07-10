@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace server.core.Migrations
 {
     /// <inheritdoc />
-    public partial class TablesForAdminPages : Migration
+    public partial class InitialAdminTables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

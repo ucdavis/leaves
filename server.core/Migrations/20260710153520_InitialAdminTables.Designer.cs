@@ -12,8 +12,8 @@ using Server.Core.Data;
 namespace server.core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260709202211_TablesForAdminPages")]
-    partial class TablesForAdminPages
+    [Migration("20260710153520_InitialAdminTables")]
+    partial class InitialAdminTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
