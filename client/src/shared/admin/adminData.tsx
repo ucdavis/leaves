@@ -1,9 +1,14 @@
 import {
   createContext,
   useContext,
-  useState,
   type ReactNode,
 } from 'react';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { fetchJson } from '@/lib/api.ts';
 
 export type AdminRole = 'faculty' | 'chair' | 'cao' | 'admin';
 export type AdminDesignation = 'fy' | 'ay' | 'nfa' | 'chair' | 'cao' | 'admin';
@@ -31,7 +36,6 @@ export type DepartmentRoutingEmail = {
 
 export type AdminDepartment = {
   approvalMode: ApprovalMode;
-  autoDebitEnabled: boolean;
   chairUserId: string | null;
   clusterId: string | null;
   code: string;
@@ -55,55 +59,23 @@ export type AdminDataSource = {
   updatedAt: string | null;
 };
 
-export type AdminImportRecord = {
-  filename: string;
-  id: string;
-  notes: string;
-  rows: number;
-  source: string;
-  status: 'planned' | 'seeded' | 'deferred';
-  updatedAt: string;
-};
-
 type CreateUserInput = {
-  departmentId: string;
-  designation: AdminDesignation;
+  active?: boolean;
   email: string;
   employeeId: string;
   iamId: string;
   name: string;
-  position: string;
 };
 
 type UpdateUserInput = Partial<
-  Pick<
-    AdminUser,
-    | 'active'
-    | 'departmentId'
-    | 'designation'
-    | 'email'
-    | 'employeeId'
-    | 'iamId'
-    | 'name'
-    | 'position'
-  >
+  Pick<AdminUser, 'active' | 'email' | 'employeeId' | 'iamId' | 'name'>
 >;
 
 type UpdateDepartmentInput = Partial<
-  Pick<
-    AdminDepartment,
-    | 'approvalMode'
-    | 'autoDebitEnabled'
-    | 'clusterId'
-    | 'dispositionRequired'
-  >
+  Pick<AdminDepartment, 'approvalMode' | 'clusterId'>
 >;
 
 type AdminStatusSnapshot = {
-  autoDebit: {
-    active: number;
-    eligible: number;
-  };
   departments: {
     clustered: number;
     total: number;
@@ -117,7 +89,7 @@ type AdminStatusSnapshot = {
     pendingRequests: number;
   };
   requests: {
-    bySource: Record<'auto-debit' | 'cognos' | 'manual', number>;
+    bySource: Record<'cognos' | 'manual', number>;
     byType: Record<string, number>;
     pending: number;
     total: number;
@@ -132,27 +104,34 @@ type AdminStatusSnapshot = {
   };
 };
 
-type AdminDataContextValue = {
+type AdminDashboardResponse = {
   clusters: AdminCluster[];
-  createUser: (input: CreateUserInput) => void;
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
   readonlyReason: string;
-  removeRoutingEmail: (departmentId: string, emailId: string) => void;
-  renameCluster: (clusterId: string, name: string) => void;
-  renameDepartment: (departmentId: string, name: string) => void;
-  setClusterCao: (clusterId: string, userId: string | null) => void;
-  setDepartmentChair: (departmentId: string, userId: string | null) => void;
+  statusSnapshot: AdminStatusSnapshot;
+  users: Array<AdminUser & { departmentId: string | null }>;
+};
+
+type AdminDataContextValue = {
+  clusters: AdminCluster[];
+  createUser: (input: CreateUserInput) => Promise<void>;
+  dataSources: AdminDataSource[];
+  departments: AdminDepartment[];
+  readonlyReason: string;
+  removeRoutingEmail: (departmentId: string, emailId: string) => Promise<void>;
+  renameCluster: (clusterId: string, name: string) => Promise<void>;
+  renameDepartment: (departmentId: string, name: string) => Promise<void>;
   statusSnapshot: AdminStatusSnapshot;
   updateDepartment: (
     departmentId: string,
     updates: UpdateDepartmentInput
-  ) => void;
-  updateUser: (userId: string, updates: UpdateUserInput) => void;
+  ) => Promise<void>;
+  updateUser: (userId: string, updates: UpdateUserInput) => Promise<void>;
   upsertRoutingEmail: (
     departmentId: string,
     email: Omit<DepartmentRoutingEmail, 'id'> & { id?: string }
-  ) => void;
+  ) => Promise<void>;
   users: AdminUser[];
 };
 
@@ -174,312 +153,71 @@ const designationLabels: Record<AdminDesignation, string> = {
   nfa: 'Non-Faculty Academic',
 };
 
-const initialClusters: AdminCluster[] = [
-  {
-    caoUserId: 'user-lin',
-    id: 'cluster-animal',
-    name: 'Animal Sciences Cluster',
-  },
-  {
-    caoUserId: 'user-owens',
-    id: 'cluster-land',
-    name: 'Land & Environment Cluster',
-  },
-];
-
-const initialDepartments: AdminDepartment[] = [
-  {
-    approvalMode: 'approval',
-    autoDebitEnabled: true,
-    chairUserId: 'user-patel',
-    clusterId: 'cluster-animal',
-    code: '030010',
-    dispositionRequired: true,
-    id: 'dept-animal-science',
-    name: 'Animal Science',
-    routingEmails: [
-      { address: 'aggieservice-animal@ucdavis.edu', id: 'route-1', kind: 'to' },
-      { address: 'leave-ops@ucdavis.edu', id: 'route-2', kind: 'cc' },
-    ],
-  },
-  {
-    approvalMode: 'notification',
-    autoDebitEnabled: false,
-    chairUserId: 'user-garcia',
-    clusterId: 'cluster-animal',
-    code: '030385',
-    dispositionRequired: false,
-    id: 'dept-vet-med',
-    name: 'Population Health & Reproduction',
-    routingEmails: [
-      { address: 'aggieservice-vet@ucdavis.edu', id: 'route-3', kind: 'to' },
-    ],
-  },
-  {
-    approvalMode: 'approval',
-    autoDebitEnabled: true,
-    chairUserId: 'user-chen',
-    clusterId: 'cluster-land',
-    code: '030005',
-    dispositionRequired: true,
-    id: 'dept-plant-sciences',
-    name: 'Plant Sciences',
-    routingEmails: [
-      { address: 'aggieservice-plants@ucdavis.edu', id: 'route-4', kind: 'to' },
-    ],
-  },
-  {
-    approvalMode: 'auto',
-    autoDebitEnabled: false,
-    chairUserId: null,
-    clusterId: null,
-    code: '030001',
-    dispositionRequired: false,
-    id: 'dept-agronomy',
-    name: 'Agricultural Experiment Stations',
-    routingEmails: [],
-  },
-];
-
-const initialUsers: AdminUser[] = [
-  {
-    active: true,
-    departmentId: 'dept-animal-science',
-    designation: 'admin',
-    email: 'admin@ucdavis.edu',
-    employeeId: '10294837',
-    iamId: 'adminherd',
-    id: 'user-admin',
-    name: 'Maya Thompson',
-    position: 'Application Administrator',
-    role: 'admin',
-  },
-  {
-    active: true,
-    departmentId: 'dept-animal-science',
-    designation: 'chair',
-    email: 'apatel@ucdavis.edu',
-    employeeId: '10294838',
-    iamId: 'apatel',
-    id: 'user-patel',
-    name: 'Asha Patel',
-    position: 'Department Chair',
-    role: 'chair',
-  },
-  {
-    active: true,
-    departmentId: 'dept-animal-science',
-    designation: 'cao',
-    email: 'jlin@ucdavis.edu',
-    employeeId: '10294839',
-    iamId: 'jlin',
-    id: 'user-lin',
-    name: 'Jordan Lin',
-    position: 'Chief Administrative Officer',
-    role: 'cao',
-  },
-  {
-    active: true,
-    departmentId: 'dept-vet-med',
-    designation: 'chair',
-    email: 'egarcia@ucdavis.edu',
-    employeeId: '10294840',
-    iamId: 'egarcia',
-    id: 'user-garcia',
-    name: 'Elena Garcia',
-    position: 'Department Chair',
-    role: 'chair',
-  },
-  {
-    active: true,
-    departmentId: 'dept-plant-sciences',
-    designation: 'chair',
-    email: 'kchen@ucdavis.edu',
-    employeeId: '10294841',
-    iamId: 'kchen',
-    id: 'user-chen',
-    name: 'Kai Chen',
-    position: 'Department Chair',
-    role: 'chair',
-  },
-  {
-    active: true,
-    departmentId: 'dept-plant-sciences',
-    designation: 'cao',
-    email: 'mowens@ucdavis.edu',
-    employeeId: '10294842',
-    iamId: 'mowens',
-    id: 'user-owens',
-    name: 'Morgan Owens',
-    position: 'Chief Administrative Officer',
-    role: 'cao',
-  },
-  {
-    active: true,
-    departmentId: 'dept-animal-science',
-    designation: 'fy',
-    email: 'lwilson@ucdavis.edu',
-    employeeId: '10294843',
-    iamId: 'lwilson',
-    id: 'user-wilson',
-    name: 'Lena Wilson',
-    position: 'Professor',
-    role: 'faculty',
-  },
-  {
-    active: true,
-    departmentId: 'dept-animal-science',
-    designation: 'ay',
-    email: '',
-    employeeId: '10294844',
-    iamId: 'rshah',
-    id: 'user-shah',
-    name: 'Riya Shah',
-    position: 'Assistant Professor',
-    role: 'faculty',
-  },
-  {
-    active: true,
-    departmentId: 'dept-vet-med',
-    designation: 'fy',
-    email: 'nroberts@ucdavis.edu',
-    employeeId: '10294845',
-    iamId: 'nroberts',
-    id: 'user-roberts',
-    name: 'Noah Roberts',
-    position: 'Professor',
-    role: 'faculty',
-  },
-  {
-    active: true,
-    departmentId: 'dept-plant-sciences',
-    designation: 'nfa',
-    email: 'sbaker@ucdavis.edu',
-    employeeId: '10294846',
-    iamId: 'sbaker',
-    id: 'user-baker',
-    name: 'Sofia Baker',
-    position: 'Specialist',
-    role: 'faculty',
-  },
-  {
-    active: false,
-    departmentId: 'dept-agronomy',
-    designation: 'fy',
-    email: 'tnguyen@ucdavis.edu',
-    employeeId: '10294847',
-    iamId: 'tnguyen',
-    id: 'user-nguyen',
-    name: 'Theo Nguyen',
-    position: 'Professor',
-    role: 'faculty',
-  },
-];
-
-const initialDataSources: AdminDataSource[] = [
-  {
-    detail: '',
-    id: 'cognos',
-    label: 'Cognos leave history',
-    status: 'deferred',
-    updatedAt: null,
-  },
-  {
-    detail: '',
-    id: 'roster',
-    label: 'People roster',
-    status: 'planned',
-    updatedAt: '2026-07-01T16:00:00Z',
-  },
-  {
-    detail: '',
-    id: 'assignments',
-    label: 'Department assignments',
-    status: 'planned',
-    updatedAt: '2026-07-02T18:30:00Z',
-  },
-  {
-    detail: '',
-    id: 'balances',
-    label: 'Balance snapshots',
-    status: 'deferred',
-    updatedAt: null,
-  },
-];
+const adminDashboardQueryOptions = () => ({
+  queryFn: () => fetchJson<AdminDashboardResponse>('/api/admin/dashboard'),
+  queryKey: ['admin', 'dashboard'] as const,
+});
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 
-function buildStatusSnapshot(
-  users: AdminUser[],
-  departments: AdminDepartment[],
-  clusters: AdminCluster[]
-): AdminStatusSnapshot {
-  const activeUsers = users.filter((user) => user.active);
-  const fyFaculty = activeUsers.filter((user) => user.designation === 'fy').length;
-  const ayFaculty = activeUsers.filter((user) => user.designation === 'ay').length;
-  const admins = activeUsers.filter((user) => user.role === 'admin').length;
-  const chairs = activeUsers.filter((user) => user.role === 'chair').length;
-  const caos = activeUsers.filter((user) => user.role === 'cao').length;
-  const missingEmails = activeUsers.filter((user) => !user.email.trim()).length;
-  const excludedUsers = users.filter((user) => !user.active).length;
-  const departmentsWithFaculty = departments.filter((department) =>
-    activeUsers.some(
-      (user) =>
-        user.departmentId === department.id &&
-        ['fy', 'ay', 'nfa'].includes(user.designation)
-    )
-  ).length;
+function normalizeApprovalMode(mode: string): ApprovalMode {
+  if (mode === 'approval' || mode === 'auto') {
+    return mode;
+  }
 
+  return 'notification';
+}
+
+function normalizeRole(role: string): AdminRole {
+  if (role === 'admin' || role === 'chair' || role === 'cao') {
+    return role;
+  }
+
+  return 'faculty';
+}
+
+function normalizeDesignation(designation: string): AdminDesignation {
+  if (
+    designation === 'admin' ||
+    designation === 'ay' ||
+    designation === 'cao' ||
+    designation === 'chair' ||
+    designation === 'nfa'
+  ) {
+    return designation;
+  }
+
+  return 'fy';
+}
+
+function normalizeDashboardResponse(
+  response: AdminDashboardResponse
+): AdminDashboardResponse {
   return {
-    autoDebit: {
-      active: departments.filter((department) => department.autoDebitEnabled)
-        .length,
-      eligible: fyFaculty + chairs,
-    },
-    departments: {
-      clustered: departments.filter((department) => department.clusterId).length,
-      total: departments.length,
-      withFaculty: departmentsWithFaculty,
-    },
-    issues: {
-      approachingVacationCap: 3,
-      excludedUsers,
-      facultyAtVacationCap: 1,
-      missingEmails,
-      pendingRequests: 4,
-    },
-    requests: {
-      bySource: {
-        'auto-debit': 8,
-        cognos: 11,
-        manual: 27,
-      },
-      byType: {
-        FamilyCare: 6,
-        Sabbatical: 3,
-        Sick: 14,
-        Vacation: 23,
-      },
-      pending: 4,
-      total: 46,
-    },
-    users: {
-      admins,
-      ayFaculty,
-      caos,
-      chairs,
-      fyFaculty,
-      total: activeUsers.length,
-    },
+    ...response,
+    departments: response.departments.map((department) => ({
+      ...department,
+      approvalMode: normalizeApprovalMode(department.approvalMode),
+      chairUserId: department.chairUserId ?? null,
+      clusterId: department.clusterId ?? null,
+      routingEmails: department.routingEmails.map((email) => ({
+        ...email,
+        kind: email.kind === 'cc' ? 'cc' : 'to',
+      })),
+    })),
+    users: response.users.map((user) => ({
+      ...user,
+      departmentId: user.departmentId ?? '',
+      designation: normalizeDesignation(user.designation),
+      role: normalizeRole(user.role),
+    })),
   };
 }
 
-function buildRoutingEmailId() {
-  return `route-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function toTitleCaseLabel(designation: AdminDesignation) {
-  return designationLabels[designation];
+async function invalidateAdminDashboard(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
+  await queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
 }
 
 export function getRoleFromDesignation(
@@ -489,216 +227,198 @@ export function getRoleFromDesignation(
 }
 
 export function getDesignationLabel(designation: AdminDesignation) {
-  return toTitleCaseLabel(designation);
+  return designationLabels[designation];
 }
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState(initialUsers);
-  const [departments, setDepartments] = useState(initialDepartments);
-  const [clusters, setClusters] = useState(initialClusters);
+  const queryClient = useQueryClient();
+  const dashboardQuery = useQuery(adminDashboardQueryOptions());
 
-  const readonlyReason =
-    'These pages are intentionally backed by in-memory preview data until the people, assignment, and balance tables exist in leaves.';
+  const createUserMutation = useMutation({
+    mutationFn: async (input: CreateUserInput) => {
+      await fetchJson<void>('/api/admin/users', {
+        body: JSON.stringify({
+          active: input.active ?? true,
+          email: input.email,
+          employeeId: input.employeeId,
+          iamId: input.iamId,
+          name: input.name,
+        }),
+        method: 'POST',
+      });
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
 
-  const createUser = (input: CreateUserInput) => {
-    const designation = input.designation;
-    const nextUser: AdminUser = {
-      active: true,
-      departmentId: input.departmentId,
-      designation,
-      email: input.email,
-      employeeId: input.employeeId,
-      iamId: input.iamId,
-      id: `user-${input.iamId.toLowerCase()}`,
-      name: input.name,
-      position: input.position,
-      role: getRoleFromDesignation(designation),
-    };
+  const updateUserMutation = useMutation({
+    mutationFn: async ({
+      updates,
+      userId,
+    }: {
+      updates: UpdateUserInput;
+      userId: string;
+    }) => {
+      await fetchJson<void>(`/api/admin/users/${userId}`, {
+        body: JSON.stringify({
+          active: updates.active,
+          email: updates.email,
+          emailSet: Object.hasOwn(updates, 'email'),
+          employeeId: updates.employeeId,
+          employeeIdSet: Object.hasOwn(updates, 'employeeId'),
+          iamId: updates.iamId,
+          iamIdSet: Object.hasOwn(updates, 'iamId'),
+          name: updates.name,
+          nameSet: Object.hasOwn(updates, 'name'),
+        }),
+        method: 'PATCH',
+      });
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
 
-    setUsers((currentUsers) => [...currentUsers, nextUser]);
-  };
+  const renameClusterMutation = useMutation({
+    mutationFn: async ({
+      clusterId,
+      name,
+    }: {
+      clusterId: string;
+      name: string;
+    }) => {
+      await fetchJson<void>(`/api/admin/clusters/${clusterId}`, {
+        body: JSON.stringify({ name }),
+        method: 'PATCH',
+      });
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
 
-  const updateUser = (userId: string, updates: UpdateUserInput) => {
-    setUsers((currentUsers) =>
-      currentUsers.map((user) => {
-        if (user.id !== userId) {
-          return user;
-        }
+  const updateDepartmentMutation = useMutation({
+    mutationFn: async ({
+      departmentId,
+      updates,
+    }: {
+      departmentId: string;
+      updates: UpdateDepartmentInput & { name?: string };
+    }) => {
+      const clusterIdWasProvided = Object.hasOwn(updates, 'clusterId');
+      await fetchJson<void>(`/api/admin/departments/${departmentId}`, {
+        body: JSON.stringify({
+          approvalMode: updates.approvalMode,
+          clusterId: updates.clusterId ? Number(updates.clusterId) : null,
+          clusterIdSet: clusterIdWasProvided,
+          name: updates.name,
+        }),
+        method: 'PATCH',
+      });
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
 
-        const designation = updates.designation ?? user.designation;
+  const upsertRoutingEmailMutation = useMutation({
+    mutationFn: async ({
+      departmentId,
+      email,
+    }: {
+      departmentId: string;
+      email: Omit<DepartmentRoutingEmail, 'id'> & { id?: string };
+    }) => {
+      await fetchJson<void>(`/api/admin/departments/${departmentId}/routing-emails`, {
+        body: JSON.stringify({ address: email.address }),
+        method: 'POST',
+      });
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
 
-        return {
-          ...user,
-          ...updates,
-          designation,
-          role: getRoleFromDesignation(designation),
-        };
-      })
+  const removeRoutingEmailMutation = useMutation({
+    mutationFn: async ({
+      departmentId,
+      emailId,
+    }: {
+      departmentId: string;
+      emailId: string;
+    }) => {
+      await fetchJson<void>(
+        `/api/admin/departments/${departmentId}/routing-emails/${emailId}`,
+        { method: 'DELETE' }
+      );
+    },
+    onSuccess: async () => {
+      await invalidateAdminDashboard(queryClient);
+    },
+  });
+
+  if (dashboardQuery.isLoading) {
+    return (
+      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+          Loading admin data
+        </h2>
+        <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+          Pulling the current admin dashboard from the database.
+        </p>
+      </section>
     );
-  };
+  }
 
-  const setDepartmentChair = (departmentId: string, userId: string | null) => {
-    const previousChairId =
-      departments.find((department) => department.id === departmentId)
-        ?.chairUserId ?? null;
-
-    setDepartments((currentDepartments) =>
-      currentDepartments.map((department) =>
-        department.id === departmentId ? { ...department, chairUserId: userId } : department
-      )
+  if (dashboardQuery.isError || !dashboardQuery.data) {
+    return (
+      <section className="rounded-[1.25rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-rose-800">
+          Admin data unavailable
+        </h2>
+        <p className="mt-2 text-sm text-rose-700">
+          The admin pages could not load their database-backed data right now.
+        </p>
+      </section>
     );
+  }
 
-    setUsers((currentUsers) =>
-      currentUsers.map((user) => {
-        if (user.id === previousChairId && user.id !== userId) {
-          return { ...user, designation: 'fy', role: 'faculty' };
-        }
-
-        if (user.id === userId) {
-          return {
-            ...user,
-            active: true,
-            departmentId,
-            designation: 'chair',
-            role: 'chair',
-          };
-        }
-
-        return user;
-      })
-    );
-  };
-
-  const setClusterCao = (clusterId: string, userId: string | null) => {
-    const previousCaoId =
-      clusters.find((cluster) => cluster.id === clusterId)?.caoUserId ?? null;
-    const fallbackDepartmentId =
-      departments.find((department) => department.clusterId === clusterId)?.id ??
-      departments[0]?.id ??
-      '';
-
-    setClusters((currentClusters) =>
-      currentClusters.map((cluster) =>
-        cluster.id === clusterId ? { ...cluster, caoUserId: userId } : cluster
-      )
-    );
-
-    setUsers((currentUsers) =>
-      currentUsers.map((user) => {
-        if (user.id === previousCaoId && user.id !== userId) {
-          return { ...user, designation: 'fy', role: 'faculty' };
-        }
-
-        if (user.id === userId) {
-          return {
-            ...user,
-            active: true,
-            departmentId: fallbackDepartmentId,
-            designation: 'cao',
-            role: 'cao',
-          };
-        }
-
-        return user;
-      })
-    );
-  };
-
-  const updateDepartment = (
-    departmentId: string,
-    updates: UpdateDepartmentInput
-  ) => {
-    setDepartments((currentDepartments) =>
-      currentDepartments.map((department) =>
-        department.id === departmentId ? { ...department, ...updates } : department
-      )
-    );
-  };
-
-  const renameDepartment = (departmentId: string, name: string) => {
-    setDepartments((currentDepartments) =>
-      currentDepartments.map((department) =>
-        department.id === departmentId ? { ...department, name } : department
-      )
-    );
-  };
-
-  const renameCluster = (clusterId: string, name: string) => {
-    setClusters((currentClusters) =>
-      currentClusters.map((cluster) =>
-        cluster.id === clusterId ? { ...cluster, name } : cluster
-      )
-    );
-  };
-
-  const upsertRoutingEmail = (
-    departmentId: string,
-    email: Omit<DepartmentRoutingEmail, 'id'> & { id?: string }
-  ) => {
-    setDepartments((currentDepartments) =>
-      currentDepartments.map((department) => {
-        if (department.id !== departmentId) {
-          return department;
-        }
-
-        const nextEmail: DepartmentRoutingEmail = {
-          ...email,
-          id: email.id ?? buildRoutingEmailId(),
-        };
-        const existingIndex = department.routingEmails.findIndex(
-          (item) => item.id === nextEmail.id
-        );
-
-        if (existingIndex === -1) {
-          return {
-            ...department,
-            routingEmails: [...department.routingEmails, nextEmail],
-          };
-        }
-
-        return {
-          ...department,
-          routingEmails: department.routingEmails.map((item) =>
-            item.id === nextEmail.id ? nextEmail : item
-          ),
-        };
-      })
-    );
-  };
-
-  const removeRoutingEmail = (departmentId: string, emailId: string) => {
-    setDepartments((currentDepartments) =>
-      currentDepartments.map((department) =>
-        department.id === departmentId
-          ? {
-              ...department,
-              routingEmails: department.routingEmails.filter(
-                (email) => email.id !== emailId
-              ),
-            }
-          : department
-      )
-    );
-  };
+  const data = normalizeDashboardResponse(dashboardQuery.data);
 
   return (
     <AdminDataContext.Provider
       value={{
-        clusters,
-        createUser,
-        dataSources: initialDataSources,
-        departments,
-        readonlyReason,
-        removeRoutingEmail,
-        renameCluster,
-        renameDepartment,
-        setClusterCao,
-        setDepartmentChair,
-        statusSnapshot: buildStatusSnapshot(users, departments, clusters),
-        updateDepartment,
-        updateUser,
-        upsertRoutingEmail,
-        users,
+        clusters: data.clusters,
+        createUser: async (input) => {
+          await createUserMutation.mutateAsync(input);
+        },
+        dataSources: data.dataSources,
+        departments: data.departments,
+        readonlyReason: data.readonlyReason,
+        removeRoutingEmail: async (departmentId, emailId) => {
+          await removeRoutingEmailMutation.mutateAsync({ departmentId, emailId });
+        },
+        renameCluster: async (clusterId, name) => {
+          await renameClusterMutation.mutateAsync({ clusterId, name });
+        },
+        renameDepartment: async (departmentId, name) => {
+          await updateDepartmentMutation.mutateAsync({
+            departmentId,
+            updates: { name },
+          });
+        },
+        statusSnapshot: data.statusSnapshot,
+        updateDepartment: async (departmentId, updates) => {
+          await updateDepartmentMutation.mutateAsync({ departmentId, updates });
+        },
+        updateUser: async (userId, updates) => {
+          await updateUserMutation.mutateAsync({ updates, userId });
+        },
+        upsertRoutingEmail: async (departmentId, email) => {
+          await upsertRoutingEmailMutation.mutateAsync({ departmentId, email });
+        },
+        users: data.users,
       }}
     >
       {children}

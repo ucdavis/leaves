@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
-import {
-  getDesignationLabel,
-  type AdminDesignation,
-  type AdminUser,
-  useAdminData,
-} from '@/shared/admin/adminData.tsx';
+import { z } from 'zod';
+import { HttpError } from '@/lib/api.ts';
+import type { AdminUser } from '@/shared/admin/adminData.tsx';
+import { useAdminData } from '@/shared/admin/adminData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/users')({
@@ -17,8 +15,40 @@ type UserRow = AdminUser & {
   departmentName: string;
 };
 
+const userFormSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value.length === 0 || z.email().safeParse(value).success,
+      'Enter a valid email address.'
+    ),
+  employeeId: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value.length === 0 || /^\d{8}$/.test(value),
+      'Employee ID must be exactly 8 digits.'
+    ),
+  iamId: z
+    .string()
+    .trim()
+    .min(1, 'IAM ID is required.')
+    .max(10, 'IAM ID must be 10 characters or fewer.')
+    .regex(
+      /^[a-z][a-z0-9_-]*$/i,
+      'IAM ID must start with a letter and use only letters, numbers, underscores, or hyphens.'
+    ),
+  name: z.string().trim().min(1, 'Display name is required.'),
+});
+
+type UserFormValues = z.infer<typeof userFormSchema>;
+type UserFormField = keyof UserFormValues;
+type UserFormErrors = Partial<Record<UserFormField, string>>;
+
 function AdminUsersRoute() {
-  const { createUser, departments, updateUser, users } = useAdminData();
+  const { createUser, departments, readonlyReason, updateUser, users } =
+    useAdminData();
   const [filterRole, setFilterRole] = useState('');
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [showExcluded, setShowExcluded] = useState(false);
@@ -37,7 +67,7 @@ function AdminUsersRoute() {
     )
     .map((user) => ({
       ...user,
-      departmentName: departmentNames[user.departmentId] ?? user.departmentId,
+      departmentName: departmentNames[user.departmentId] ?? 'Not mapped',
     }));
 
   const activeUsers = users.filter((user) => user.active);
@@ -53,7 +83,9 @@ function AdminUsersRoute() {
             {row.original.name}
           </div>
           <div className="text-xs text-[var(--admin-ink-muted)]">
-            {row.original.position}
+            {row.original.role === 'admin'
+              ? 'Application administrator'
+              : 'App user'}
           </div>
         </div>
       ),
@@ -81,13 +113,13 @@ function AdminUsersRoute() {
       header: 'Department',
     },
     {
-      accessorKey: 'designation',
+      accessorKey: 'role',
       cell: ({ row }) => (
         <span className="inline-flex rounded-full bg-[var(--admin-sand)] px-3 py-1 text-xs font-semibold text-[var(--admin-blue)]">
-          {getDesignationLabel(row.original.designation)}
+          {row.original.role === 'admin' ? 'Admin' : 'Faculty'}
         </span>
       ),
-      header: 'Designation',
+      header: 'Role',
     },
     {
       accessorKey: 'active',
@@ -99,7 +131,7 @@ function AdminUsersRoute() {
               : 'bg-slate-200 text-slate-700'
           }`}
           onClick={() =>
-            updateUser(row.original.id, { active: !row.original.active })
+            void updateUser(row.original.id, { active: !row.original.active })
           }
           type="button"
         >
@@ -132,20 +164,20 @@ function AdminUsersRoute() {
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-3">
         <SummaryCard
-          label="Roster preview"
-          text={`${activeUsers.length} active people shown in the in-memory roster.`}
+          label="Database roster"
+          text={`${activeUsers.length} active people are currently loaded from AppUser.`}
           value={String(activeUsers.length)}
         />
         <SummaryCard
           accent="text-rose-700"
           label="Missing emails"
-          text="Useful for validating the eventual directory sync."
+          text="Useful for checking directory and onboarding completeness."
           value={String(missingEmailCount)}
         />
         <SummaryCard
           accent="text-slate-700"
           label="Excluded users"
-          text="Matches the mockup include/exclude review flow."
+          text="Backed by the persisted AppUser.IsActive flag."
           value={String(excludedCount)}
         />
       </section>
@@ -157,8 +189,11 @@ function AdminUsersRoute() {
               User management
             </h2>
             <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-              This mirrors the mockup’s user grid and edit flow, but edits stay
-              in browser memory for now.
+              This table is now sourced from the database. Department values are
+              inferred from the user&apos;s latest leave request snapshot.
+            </p>
+            <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+              {readonlyReason}
             </p>
           </div>
           <button
@@ -189,8 +224,6 @@ function AdminUsersRoute() {
               >
                 <option value="">All roles</option>
                 <option value="faculty">Faculty</option>
-                <option value="chair">Chair</option>
-                <option value="cao">CAO</option>
                 <option value="admin">Admin</option>
               </select>
 
@@ -225,10 +258,9 @@ function AdminUsersRoute() {
 
       {editingUser ? (
         <UserEditorModal
-          departments={departments}
           onClose={() => setEditingUserId(null)}
           onSave={(updates) => {
-            updateUser(editingUser.id, updates);
+            void updateUser(editingUser.id, updates);
             setEditingUserId(null);
           }}
           user={editingUser}
@@ -237,10 +269,9 @@ function AdminUsersRoute() {
 
       {showCreateModal ? (
         <CreateUserModal
-          departments={departments}
           onClose={() => setShowCreateModal(false)}
-          onCreate={(payload) => {
-            createUser(payload);
+          onCreate={async (payload) => {
+            await createUser(payload);
             setShowCreateModal(false);
           }}
         />
@@ -288,7 +319,7 @@ function ModalFrame({
             {title}
           </h2>
           <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-            Changes stay in local preview state until the real admin API exists.
+            These edits now persist to the AppUser table.
           </p>
         </div>
         {children}
@@ -298,26 +329,14 @@ function ModalFrame({
 }
 
 function UserEditorModal({
-  departments,
   onClose,
   onSave,
   user,
 }: {
-  departments: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSave: (
     updates: Partial<
-      Pick<
-        AdminUser,
-        | 'active'
-        | 'departmentId'
-        | 'designation'
-        | 'email'
-        | 'employeeId'
-        | 'iamId'
-        | 'name'
-        | 'position'
-      >
+      Pick<AdminUser, 'active' | 'email' | 'employeeId' | 'iamId' | 'name'>
     >
   ) => void;
   user: AdminUser;
@@ -326,21 +345,12 @@ function UserEditorModal({
   const [email, setEmail] = useState(user.email);
   const [employeeId, setEmployeeId] = useState(user.employeeId);
   const [iamId, setIamId] = useState(user.iamId);
-  const [departmentId, setDepartmentId] = useState(user.departmentId);
-  const [designation, setDesignation] = useState<AdminDesignation>(
-    user.designation
-  );
-  const [position, setPosition] = useState(user.position);
   const [active, setActive] = useState(user.active);
 
   return (
     <ModalFrame title={`Edit ${user.name}`}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          label="Display name"
-          onChange={setName}
-          value={name}
-        />
+        <FormField label="Display name" onChange={setName} value={name} />
         <FormField label="Email" onChange={setEmail} value={email} />
         <FormField
           label="Employee ID"
@@ -348,31 +358,6 @@ function UserEditorModal({
           value={employeeId}
         />
         <FormField label="IAM ID" onChange={setIamId} value={iamId} />
-        <SelectField
-          label="Department"
-          onChange={setDepartmentId}
-          options={departments.map((department) => ({
-            label: department.name,
-            value: department.id,
-          }))}
-          value={departmentId}
-        />
-        <SelectField
-          label="Designation"
-          onChange={(value) => setDesignation(value as AdminDesignation)}
-          options={[
-            { label: 'FY Faculty', value: 'fy' },
-            { label: 'AY Faculty', value: 'ay' },
-            { label: 'Non-Faculty Academic', value: 'nfa' },
-            { label: 'Chair', value: 'chair' },
-            { label: 'CAO', value: 'cao' },
-            { label: 'Admin', value: 'admin' },
-          ]}
-          value={designation}
-        />
-        <div className="sm:col-span-2">
-          <FormField label="Position" onChange={setPosition} value={position} />
-        </div>
       </div>
 
       <label className="mt-5 flex items-center gap-3 text-sm text-[var(--admin-ink)]">
@@ -394,13 +379,10 @@ function UserEditorModal({
           onClick={() =>
             onSave({
               active,
-              departmentId,
-              designation,
               email,
               employeeId,
               iamId,
               name,
-              position,
             })
           }
           type="button"
@@ -413,67 +395,128 @@ function UserEditorModal({
 }
 
 function CreateUserModal({
-  departments,
   onClose,
   onCreate,
 }: {
-  departments: Array<{ id: string; name: string }>;
   onClose: () => void;
   onCreate: (payload: {
-    departmentId: string;
-    designation: AdminDesignation;
     email: string;
     employeeId: string;
     iamId: string;
     name: string;
-    position: string;
-  }) => void;
+  }) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [iamId, setIamId] = useState('');
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? '');
-  const [designation, setDesignation] = useState<AdminDesignation>('fy');
-  const [position, setPosition] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<UserFormErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function clearFieldError(field: UserFormField) {
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+  }
+
+  async function handleSubmit() {
+    setSubmitError(null);
+
+    const formValues: UserFormValues = {
+      email,
+      employeeId,
+      iamId,
+      name,
+    };
+
+    const result = userFormSchema.safeParse(formValues);
+
+    if (!result.success) {
+      const nextFieldErrors: UserFormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !nextFieldErrors[field as UserFormField]) {
+          nextFieldErrors[field as UserFormField] = issue.message;
+        }
+      }
+
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+
+    setFieldErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await onCreate({
+        email: result.data.email.trim(),
+        employeeId: result.data.employeeId.trim(),
+        iamId: result.data.iamId.trim(),
+        name: result.data.name.trim(),
+      });
+    } catch (error) {
+      setSubmitError(getUserCreateErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <ModalFrame title="Add user">
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Display name" onChange={setName} value={name} />
-        <FormField label="Email" onChange={setEmail} value={email} />
         <FormField
+          error={fieldErrors.name}
+          label="Display name"
+          onChange={(value) => {
+            setName(value);
+            clearFieldError('name');
+          }}
+          value={name}
+        />
+        <FormField
+          error={fieldErrors.email}
+          label="Email"
+          onChange={(value) => {
+            setEmail(value);
+            clearFieldError('email');
+          }}
+          type="email"
+          value={email}
+        />
+        <FormField
+          error={fieldErrors.employeeId}
           label="Employee ID"
-          onChange={setEmployeeId}
+          onChange={(value) => {
+            setEmployeeId(value);
+            clearFieldError('employeeId');
+          }}
           value={employeeId}
         />
-        <FormField label="IAM ID" onChange={setIamId} value={iamId} />
-        <SelectField
-          label="Department"
-          onChange={setDepartmentId}
-          options={departments.map((department) => ({
-            label: department.name,
-            value: department.id,
-          }))}
-          value={departmentId}
+        <FormField
+          error={fieldErrors.iamId}
+          helperText="Use the campus IAM ID / Kerberos-style username."
+          label="IAM ID"
+          onChange={(value) => {
+            setIamId(value);
+            clearFieldError('iamId');
+          }}
+          value={iamId}
         />
-        <SelectField
-          label="Designation"
-          onChange={(value) => setDesignation(value as AdminDesignation)}
-          options={[
-            { label: 'FY Faculty', value: 'fy' },
-            { label: 'AY Faculty', value: 'ay' },
-            { label: 'Non-Faculty Academic', value: 'nfa' },
-            { label: 'Chair', value: 'chair' },
-            { label: 'CAO', value: 'cao' },
-            { label: 'Admin', value: 'admin' },
-          ]}
-          value={designation}
-        />
-        <div className="sm:col-span-2">
-          <FormField label="Position" onChange={setPosition} value={position} />
-        </div>
       </div>
+
+      {submitError ? (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {submitError}
+        </div>
+      ) : null}
 
       <div className="mt-6 flex justify-end gap-3">
         <button className="btn btn-ghost" onClick={onClose} type="button">
@@ -481,34 +524,76 @@ function CreateUserModal({
         </button>
         <button
           className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
-          disabled={!name || !departmentId || !iamId}
-          onClick={() =>
-            onCreate({
-              departmentId,
-              designation,
-              email,
-              employeeId,
-              iamId,
-              name,
-              position,
-            })
-          }
+          disabled={isSubmitting}
+          onClick={() => void handleSubmit()}
           type="button"
         >
-          Create preview user
+          {isSubmitting ? 'Creating...' : 'Create user'}
         </button>
       </div>
     </ModalFrame>
   );
 }
 
+function getUserCreateErrorMessage(error: unknown) {
+  if (error instanceof HttpError) {
+    if (typeof error.body === 'string' && error.body.trim()) {
+      return error.body;
+    }
+
+    if (error.body && typeof error.body === 'object') {
+      const body = error.body as {
+        detail?: string;
+        errors?: Record<string, string[]>;
+        title?: string;
+      };
+
+      const validationMessage = body.errors
+        ? Object.values(body.errors)
+            .flat()
+            .find(Boolean)
+        : null;
+
+      if (validationMessage) {
+        return validationMessage;
+      }
+
+      if (body.detail) {
+        return body.detail;
+      }
+
+      if (body.title) {
+        return body.title;
+      }
+    }
+
+    if (error.status === 409) {
+      return 'A user with that IAM ID, employee ID, or identity already exists.';
+    }
+
+    return 'Unable to create the user. Please review the fields and try again.';
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'Unable to create the user. Please review the fields and try again.';
+}
+
 function FormField({
+  error,
+  helperText,
   label,
   onChange,
+  type,
   value,
 }: {
+  error?: string;
+  helperText?: string;
   label: string;
   onChange: (value: string) => void;
+  type?: 'email' | 'text';
   value: string;
 }) {
   return (
@@ -517,42 +602,18 @@ function FormField({
         {label}
       </span>
       <input
-        className="input input-bordered w-full"
+        className={`input input-bordered w-full ${error ? 'border-rose-400 focus:border-rose-500' : ''}`}
         onChange={(event) => onChange(event.target.value)}
-        type="text"
+        type={type ?? 'text'}
         value={value}
       />
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  onChange,
-  options,
-  value,
-}: {
-  label: string;
-  onChange: (value: string) => void;
-  options: Array<{ label: string; value: string }>;
-  value: string;
-}) {
-  return (
-    <label className="form-control w-full">
-      <span className="label-text mb-2 text-sm font-medium text-[var(--admin-ink)]">
-        {label}
-      </span>
-      <select
-        className="select select-bordered w-full"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      {error ? (
+        <span className="mt-2 text-sm text-rose-700">{error}</span>
+      ) : helperText ? (
+        <span className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+          {helperText}
+        </span>
+      ) : null}
     </label>
   );
 }

@@ -13,13 +13,11 @@ function AdminDepartmentsRoute() {
   const {
     clusters,
     departments,
+    readonlyReason,
     removeRoutingEmail,
     renameCluster,
     renameDepartment,
-    setClusterCao,
-    setDepartmentChair,
     updateDepartment,
-    updateUser,
     upsertRoutingEmail,
     users,
   } = useAdminData();
@@ -65,11 +63,12 @@ function AdminDepartmentsRoute() {
                   {selectedDepartment.name}
                 </h2>
                 <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-                  Adjust designations and department placement in preview mode.
+                  This roster is derived from each user&apos;s latest leave request
+                  snapshot in the database.
                 </p>
               </div>
               <div className="text-sm text-[var(--admin-ink-muted)]">
-                {departmentUsers.length} rostered people
+                {departmentUsers.length} people linked by request history
               </div>
             </div>
 
@@ -79,19 +78,14 @@ function AdminDepartmentsRoute() {
                   <tr>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Designation</th>
-                    <th>Department</th>
+                    <th>Role</th>
+                    <th>IAM ID</th>
                   </tr>
                 </thead>
                 <tbody>
                   {departmentUsers.map((user) => (
                     <tr key={user.id}>
-                      <td>
-                        <div className="font-semibold">{user.name}</div>
-                        <div className="text-xs text-[var(--admin-ink-muted)]">
-                          {user.position}
-                        </div>
-                      </td>
+                      <td className="font-semibold">{user.name}</td>
                       <td>
                         {user.email ? (
                           user.email
@@ -99,49 +93,21 @@ function AdminDepartmentsRoute() {
                           <span className="italic text-rose-700">Missing</span>
                         )}
                       </td>
-                      <td>
-                        <select
-                          className="select select-bordered select-sm"
-                          onChange={(event) =>
-                            updateUser(user.id, {
-                              designation: event.target.value as
-                                | 'fy'
-                                | 'ay'
-                                | 'nfa'
-                                | 'chair'
-                                | 'cao'
-                                | 'admin',
-                            })
-                          }
-                          value={user.designation}
-                        >
-                          <option value="fy">FY Faculty</option>
-                          <option value="ay">AY Faculty</option>
-                          <option value="nfa">Non-Faculty Academic</option>
-                          <option value="chair">Chair</option>
-                          <option value="cao">CAO</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          className="select select-bordered select-sm"
-                          onChange={(event) =>
-                            updateUser(user.id, {
-                              departmentId: event.target.value,
-                            })
-                          }
-                          value={user.departmentId}
-                        >
-                          {departments.map((department) => (
-                            <option key={department.id} value={department.id}>
-                              {department.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                      <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
+                      <td className="font-mono text-xs">{user.iamId}</td>
                     </tr>
                   ))}
+                  {departmentUsers.length === 0 ? (
+                    <tr>
+                      <td
+                        className="py-6 text-sm text-[var(--admin-ink-muted)]"
+                        colSpan={4}
+                      >
+                        No users currently map to this department from stored leave
+                        request snapshots.
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -164,95 +130,62 @@ function AdminDepartmentsRoute() {
           Department and cluster management
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--admin-ink-muted)]">
-          The structure below follows the mockup’s grouped department cards,
-          chair assignment flow, and routing settings while keeping everything
-          client-side until the real admin tables are ready.
+          These cards are now backed by the database. Cluster names, department
+          names, approval mode, and routing emails persist to SQL Server.
+        </p>
+        <p className="mt-3 text-sm text-[var(--admin-ink-muted)]">
+          {readonlyReason}
         </p>
       </section>
 
-      {clusterGroups.map((cluster) => {
-        const currentCao =
-          users.find((user) => user.id === cluster.caoUserId) ?? null;
+      {clusterGroups.map((cluster) => (
+        <section
+          className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm"
+          key={cluster.id}
+        >
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
+                Cluster
+              </label>
+              <input
+                className="input mt-2 w-full max-w-md border-[var(--admin-border)] bg-[var(--admin-sand)] text-[var(--admin-blue)]"
+                onBlur={(event) => renameCluster(cluster.id, event.target.value)}
+                defaultValue={cluster.name}
+              />
+            </div>
 
-        return (
-          <section
-            className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm"
-            key={cluster.id}
-          >
-            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
-                  Cluster
-                </label>
-                <input
-                  className="input mt-2 w-full max-w-md border-[var(--admin-border)] bg-[var(--admin-sand)] text-[var(--admin-blue)]"
-                  onChange={(event) => renameCluster(cluster.id, event.target.value)}
-                  value={cluster.name}
+            <div className="min-w-72 rounded-2xl bg-[var(--admin-sand)] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink-soft)]">
+                Persisted fields
+              </div>
+              <p className="mt-3 text-sm text-[var(--admin-ink-muted)]">
+                Cluster names and department assignments are live. Chair and CAO
+                assignments are still pending schema support.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {cluster.departments.map((department) => {
+              const linkedUserCount = users.filter(
+                (user) => user.departmentId === department.id && user.active
+              ).length;
+
+              return (
+                <DepartmentRow
+                  department={department}
+                  key={department.id}
+                  linkedUserCount={linkedUserCount}
+                  onOpenRoster={() => setViewDepartmentId(department.id)}
+                  onOpenSettings={() => setEditingDepartmentId(department.id)}
+                  onRename={(name) => renameDepartment(department.id, name)}
                 />
-              </div>
-
-              <div className="min-w-72 rounded-2xl bg-[var(--admin-sand)] p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink-soft)]">
-                  CAO
-                </div>
-                <select
-                  className="select select-bordered mt-3 w-full bg-white"
-                  onChange={(event) =>
-                    setClusterCao(
-                      cluster.id,
-                      event.target.value ? event.target.value : null
-                    )
-                  }
-                  value={currentCao?.id ?? ''}
-                >
-                  <option value="">Select CAO</option>
-                  {users
-                    .filter((user) => user.active)
-                    .map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                </select>
-                <p className="mt-2 text-xs text-[var(--admin-ink-muted)]">
-                  {currentCao?.email || 'No CAO email assigned yet.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {cluster.departments.map((department) => {
-                const chair =
-                  users.find((user) => user.id === department.chairUserId) ?? null;
-                const facultyCount = users.filter(
-                  (user) =>
-                    user.departmentId === department.id &&
-                    ['fy', 'ay', 'nfa'].includes(user.designation)
-                ).length;
-
-                return (
-                  <DepartmentRow
-                    chairName={chair?.name ?? 'Assign chair'}
-                    department={department}
-                    facultyCount={facultyCount}
-                    key={department.id}
-                    onAssignChair={(userId) =>
-                      setDepartmentChair(department.id, userId)
-                    }
-                    onOpenFaculty={() => setViewDepartmentId(department.id)}
-                    onOpenSettings={() => setEditingDepartmentId(department.id)}
-                    onRename={(name) => renameDepartment(department.id, name)}
-                    users={users.filter(
-                      (user) =>
-                        user.active && user.departmentId === department.id
-                    )}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {unassignedDepartments.length > 0 ? (
         <section className="rounded-[1.25rem] border border-dashed border-[var(--admin-border)] bg-white p-6 shadow-sm">
@@ -262,26 +195,14 @@ function AdminDepartmentsRoute() {
           <div className="mt-4 space-y-3">
             {unassignedDepartments.map((department) => (
               <DepartmentRow
-                chairName={
-                  users.find((user) => user.id === department.chairUserId)?.name ??
-                  'Assign chair'
-                }
                 department={department}
-                facultyCount={
-                  users.filter(
-                    (user) =>
-                      user.departmentId === department.id &&
-                      ['fy', 'ay', 'nfa'].includes(user.designation)
-                  ).length
-                }
                 key={department.id}
-                onAssignChair={(userId) => setDepartmentChair(department.id, userId)}
-                onOpenFaculty={() => setViewDepartmentId(department.id)}
+                linkedUserCount={users.filter(
+                  (user) => user.departmentId === department.id && user.active
+                ).length}
+                onOpenRoster={() => setViewDepartmentId(department.id)}
                 onOpenSettings={() => setEditingDepartmentId(department.id)}
                 onRename={(name) => renameDepartment(department.id, name)}
-                users={users.filter(
-                  (user) => user.active && user.departmentId === department.id
-                )}
               />
             ))}
           </div>
@@ -297,7 +218,7 @@ function AdminDepartmentsRoute() {
             removeRoutingEmail(editingDepartment.id, emailId)
           }
           onSave={(updates) => {
-            updateDepartment(editingDepartment.id, updates);
+            void updateDepartment(editingDepartment.id, updates);
             setEditingDepartmentId(null);
           }}
           onUpsertRoutingEmail={(email) =>
@@ -310,23 +231,17 @@ function AdminDepartmentsRoute() {
 }
 
 function DepartmentRow({
-  chairName,
   department,
-  facultyCount,
-  onAssignChair,
-  onOpenFaculty,
+  linkedUserCount,
+  onOpenRoster,
   onOpenSettings,
   onRename,
-  users,
 }: {
-  chairName: string;
   department: AdminDepartment;
-  facultyCount: number;
-  onAssignChair: (userId: string | null) => void;
-  onOpenFaculty: () => void;
+  linkedUserCount: number;
+  onOpenRoster: () => void;
   onOpenSettings: () => void;
   onRename: (name: string) => void;
-  users: Array<{ id: string; name: string }>;
 }) {
   const approvalLabel =
     department.approvalMode === 'approval'
@@ -334,7 +249,6 @@ function DepartmentRow({
       : department.approvalMode === 'auto'
         ? 'Auto-approve'
         : 'Notification only';
-  const chairUser = users.find((user) => user.id === department.chairUserId) ?? null;
 
   return (
     <div className="rounded-2xl border border-[var(--admin-border)] bg-white px-5 py-4 shadow-sm transition hover:shadow-md">
@@ -358,18 +272,17 @@ function DepartmentRow({
             </button>
             <button
               className="text-sm font-medium text-[var(--admin-blue)] underline decoration-[var(--admin-gold)] decoration-2 underline-offset-4"
-              onClick={onOpenFaculty}
+              onClick={onOpenRoster}
               type="button"
             >
-              View faculty
+              View linked users
             </button>
           </div>
           <div className="mt-1 font-mono text-sm text-[var(--admin-ink-muted)]">
             {department.code}
           </div>
           <div className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-            {facultyCount} faculty · {approvalLabel}
-            {department.autoDebitEnabled ? ' · Auto-debit on' : ''}
+            {linkedUserCount} active users · {approvalLabel}
             {department.routingEmails.length > 0
               ? ` · ${department.routingEmails.length} routing emails`
               : ' · No email configured'}
@@ -378,22 +291,8 @@ function DepartmentRow({
 
         <div className="flex flex-col items-start gap-3 lg:w-72 lg:items-end lg:text-right">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink-soft)]">
-            Chair
+            Database-backed settings
           </div>
-          <select
-            className="select select-bordered w-full max-w-xs bg-white lg:max-w-none"
-            onChange={(event) =>
-              onAssignChair(event.target.value ? event.target.value : null)
-            }
-            value={chairUser?.id ?? ''}
-          >
-            <option value="">{chairName === 'Assign chair' ? chairName : 'Reassign chair'}</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
           <button
             className="btn btn-outline w-full max-w-xs lg:max-w-none"
             onClick={onOpenSettings}
@@ -420,12 +319,7 @@ function DepartmentSettingsModal({
   onClose: () => void;
   onRemoveRoutingEmail: (emailId: string) => void;
   onSave: (
-    updates: Partial<
-      Pick<
-        AdminDepartment,
-        'approvalMode' | 'autoDebitEnabled' | 'clusterId' | 'dispositionRequired'
-      >
-    >
+    updates: Partial<Pick<AdminDepartment, 'approvalMode' | 'clusterId'>>
   ) => void;
   onUpsertRoutingEmail: (email: {
     address: string;
@@ -435,14 +329,7 @@ function DepartmentSettingsModal({
 }) {
   const [approvalMode, setApprovalMode] = useState(department.approvalMode);
   const [clusterId, setClusterId] = useState(department.clusterId ?? '');
-  const [dispositionRequired, setDispositionRequired] = useState(
-    department.dispositionRequired
-  );
-  const [autoDebitEnabled, setAutoDebitEnabled] = useState(
-    department.autoDebitEnabled
-  );
   const [newEmail, setNewEmail] = useState('');
-  const [newEmailKind, setNewEmailKind] = useState<'to' | 'cc'>('to');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-8">
@@ -451,8 +338,8 @@ function DepartmentSettingsModal({
           Department settings
         </h2>
         <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-          Matching the mockup, this is where approval rules, clustering, and
-          AggieService routing would be maintained.
+          These controls persist to the database for cluster placement, workflow
+          mode, and routing emails.
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -482,46 +369,23 @@ function DepartmentSettingsModal({
               className="select select-bordered"
               onChange={(event) =>
                 setApprovalMode(
-                  event.target.value as 'approval' | 'auto' | 'notification'
+                  event.target.value as 'approval' | 'notification'
                 )
               }
               value={approvalMode}
             >
               <option value="notification">Notification only</option>
               <option value="approval">Approval required</option>
-              <option value="auto">Auto-approve</option>
             </select>
-          </label>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <label className="flex items-center gap-3 text-sm text-[var(--admin-ink)]">
-            <input
-              checked={dispositionRequired}
-              className="checkbox"
-              onChange={(event) => setDispositionRequired(event.target.checked)}
-              type="checkbox"
-            />
-            Require a work coverage plan
-          </label>
-          <label className="flex items-center gap-3 text-sm text-[var(--admin-ink)]">
-            <input
-              checked={autoDebitEnabled}
-              className="checkbox"
-              onChange={(event) => setAutoDebitEnabled(event.target.checked)}
-              type="checkbox"
-            />
-            Allow auto-debit for this department
           </label>
         </div>
 
         <div className="mt-6 rounded-2xl bg-[var(--admin-sand)] p-5">
           <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--admin-gold-deep)]">
-            AggieService routing
+            Routing emails
           </h3>
           <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-            The UI is live here, but the eventual source of truth will be the
-            database rather than uploaded spreadsheets.
+            Routing emails are now stored in `DepartmentEmailRouting`.
           </p>
 
           <div className="mt-4 space-y-3">
@@ -531,7 +395,7 @@ function DepartmentSettingsModal({
                 key={email.id}
               >
                 <span className="badge border-0 bg-[var(--admin-sand)] text-[var(--admin-blue)]">
-                  {email.kind.toUpperCase()}
+                  EMAIL
                 </span>
                 <span className="flex-1 text-sm text-[var(--admin-ink)]">
                   {email.address}
@@ -548,16 +412,6 @@ function DepartmentSettingsModal({
           </div>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <select
-              className="select select-bordered bg-white sm:w-32"
-              onChange={(event) =>
-                setNewEmailKind(event.target.value as 'to' | 'cc')
-              }
-              value={newEmailKind}
-            >
-              <option value="to">TO</option>
-              <option value="cc">CC</option>
-            </select>
             <input
               className="input input-bordered flex-1 bg-white"
               onChange={(event) => setNewEmail(event.target.value)}
@@ -571,7 +425,7 @@ function DepartmentSettingsModal({
               onClick={() => {
                 onUpsertRoutingEmail({
                   address: newEmail,
-                  kind: newEmailKind,
+                  kind: 'to',
                 });
                 setNewEmail('');
               }}
@@ -591,14 +445,12 @@ function DepartmentSettingsModal({
             onClick={() =>
               onSave({
                 approvalMode,
-                autoDebitEnabled,
                 clusterId: clusterId || null,
-                dispositionRequired,
               })
             }
             type="button"
           >
-            Save preview changes
+            Save changes
           </button>
         </div>
       </div>

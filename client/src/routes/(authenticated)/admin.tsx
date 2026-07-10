@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
+import { HttpError } from '@/lib/api.ts';
 import { meQueryOptions, type User } from '@/queries/user.ts';
 import { AdminDataProvider } from '@/shared/admin/adminData.tsx';
 import { AdminLayout } from '@/shared/admin/adminLayout.tsx';
@@ -14,7 +15,7 @@ export const Route = createFileRoute('/(authenticated)/admin')({
   }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions());
     if (!hasAdminRole(user)) {
-      throw redirect({ to: '/', replace: true });
+      throw new HttpError(403, location.pathname);
     }
 
     if (location.pathname === '/admin' || location.pathname === '/admin/') {

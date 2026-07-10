@@ -25,7 +25,7 @@ function AdminStatusRoute() {
         <StatCard
           accent="text-amber-700"
           label="Pending requests"
-          sublabel="Demo snapshot mirroring the mockup dashboard"
+          sublabel="Calculated from persisted leave request records"
           value={String(statusSnapshot.requests.pending)}
         />
         <StatCard
@@ -124,11 +124,6 @@ function AdminStatusRoute() {
                 label: 'Clustered',
                 value: String(statusSnapshot.departments.clustered),
               },
-              {
-                label: 'Auto-debit enabled',
-                tone: 'amber',
-                value: String(statusSnapshot.autoDebit.active),
-              },
             ]}
           />
         </Card>
@@ -139,11 +134,6 @@ function AdminStatusRoute() {
               {
                 label: 'Manual',
                 value: String(statusSnapshot.requests.bySource.manual),
-              },
-              {
-                label: 'Auto-debit',
-                tone: 'emerald',
-                value: String(statusSnapshot.requests.bySource['auto-debit']),
               },
               {
                 label: 'External Cognos',
@@ -168,18 +158,9 @@ function AdminStatusRoute() {
           />
         </Card>
 
-        <Card title="Auto-debit and vacation cap">
+        <Card title="Vacation cap">
           <MetricGrid
             items={[
-              {
-                label: 'Eligible FY/Chair',
-                value: String(statusSnapshot.autoDebit.eligible),
-              },
-              {
-                label: 'Auto-debit enabled',
-                tone: 'emerald',
-                value: String(statusSnapshot.autoDebit.active),
-              },
               {
                 label: 'At cap',
                 tone: 'rose',
@@ -250,7 +231,7 @@ function FreshnessRow({
 }) {
   const updatedLabel = updatedAt
     ? new Date(updatedAt).toLocaleString()
-    : 'Waiting on database tables';
+    : 'No rows loaded yet';
   const tone =
     status === 'ready'
       ? 'text-emerald-700 bg-emerald-50'

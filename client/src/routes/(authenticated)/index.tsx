@@ -1,5 +1,5 @@
 import { useUser } from '@/shared/auth/UserContext.tsx';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/(authenticated)/')({
   component: RouteComponent,
@@ -7,7 +7,6 @@ export const Route = createFileRoute('/(authenticated)/')({
 
 function RouteComponent() {
   const user = useUser();
-  const isAdmin = user.roles.some((role) => role.toLowerCase() === 'admin');
 
   return (
     <div className="min-h-screen bg-base-100">
