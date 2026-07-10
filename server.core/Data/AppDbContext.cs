@@ -7,6 +7,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppAdminAssignment> AppAdminAssignments => Set<AppAdminAssignment>();
+    public DbSet<Cluster> Clusters => Set<Cluster>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<DepartmentEmailRouting> DepartmentEmailRoutings => Set<DepartmentEmailRouting>();
+    public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<LeaveRequestAction> LeaveRequestActions => Set<LeaveRequestAction>();
+    public DbSet<LeaveType> LeaveTypes => Set<LeaveType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -14,5 +20,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         AppUser.Configure(modelBuilder.Entity<AppUser>());
         AppAdminAssignment.Configure(modelBuilder.Entity<AppAdminAssignment>());
+        Cluster.Configure(modelBuilder.Entity<Cluster>());
+        Department.Configure(modelBuilder.Entity<Department>());
+        DepartmentEmailRouting.Configure(modelBuilder.Entity<DepartmentEmailRouting>());
+        LeaveRequest.Configure(modelBuilder.Entity<LeaveRequest>());
+        LeaveRequestAction.Configure(modelBuilder.Entity<LeaveRequestAction>());
+        LeaveType.Configure(modelBuilder.Entity<LeaveType>());
     }
 }

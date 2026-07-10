@@ -49,6 +49,10 @@ public class AppUser
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<AppAdminAssignment> CreatedAdminAssignments { get; set; } = new List<AppAdminAssignment>();
+    public ICollection<Cluster> CreatedClusters { get; set; } = new List<Cluster>();
+    public ICollection<DepartmentEmailRouting> UpdatedDepartmentEmailRoutings { get; set; } = new List<DepartmentEmailRouting>();
+    public ICollection<LeaveRequest> LeaveRequests { get; set; } = new List<LeaveRequest>();
+    public ICollection<LeaveRequestAction> LeaveRequestActions { get; set; } = new List<LeaveRequestAction>();
 
     public static void Configure(EntityTypeBuilder<AppUser> entity)
     {
