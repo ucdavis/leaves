@@ -1,10 +1,8 @@
-import { Link } from '@tanstack/react-router';
-
 type PageErrorAction = {
-  label: string;
   href?: string;
-  to?: string;
+  label: string;
   onClick?: () => void;
+  to?: string;
 };
 
 type PageErrorStateProps = {
