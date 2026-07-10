@@ -39,11 +39,22 @@ public class Department
     [Column(TypeName = "datetime2")]
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
+    public ICollection<DepartmentEmailRouting> DepartmentEmailRoutings { get; set; } = new List<DepartmentEmailRouting>();
+
     public static void Configure(EntityTypeBuilder<Department> entity)
     {
         entity.HasKey(e => e.DepartmentCode);
         entity.Property(e => e.IsActive).HasDefaultValue(true);
         entity.Property(e => e.WorkflowMode).HasDefaultValue(WorkflowMode.DirectSubmission);
+
+        entity.HasIndex(e => e.ClusterId)
+            .HasDatabaseName("IX_Department_ClusterId");
+
+        entity.HasIndex(e => e.WorkflowMode)
+            .HasDatabaseName("IX_Department_WorkflowMode");
+
+        entity.HasIndex(e => e.LastSeenInSourceAt)
+            .HasDatabaseName("IX_Department_LastSeenInSourceAt");
 
         entity.HasOne(e => e.Cluster)
             .WithMany(e => e.Departments)
