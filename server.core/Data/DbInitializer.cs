@@ -13,17 +13,20 @@ public class DbInitializer : IDbInitializer
 {
     private static readonly AppUserSeed[] DevUsers =
     [
-        new("adminherd", "11111111-1111-1111-1111-111111111111", "84726195", "Maya Thompson", "admin@ucdavis.edu", true, "2026-07-01T16:00:00", "2026-07-08T18:10:00"),
-        new("apatel", "22222222-2222-2222-2222-222222222222", "36190428", "Asha Patel", "apatel@ucdavis.edu", true, "2026-07-01T16:15:00", "2026-07-08T17:42:00"),
-        new("jlin", "33333333-3333-3333-3333-333333333333", "59281746", "Jordan Lin", "jlin@ucdavis.edu", true, "2026-07-01T16:20:00", "2026-07-08T17:35:00"),
-        new("egarcia", "44444444-4444-4444-4444-444444444444", "11846372", "Elena Garcia", "egarcia@ucdavis.edu", true, "2026-07-01T16:25:00", "2026-07-08T16:48:00"),
-        new("kchen", "55555555-5555-5555-5555-555555555555", "73029514", "Kai Chen", "kchen@ucdavis.edu", true, "2026-07-01T16:30:00", "2026-07-08T19:03:00"),
-        new("mowens", "66666666-6666-6666-6666-666666666666", "28465091", "Morgan Owens", "mowens@ucdavis.edu", true, "2026-07-01T16:35:00", "2026-07-08T18:21:00"),
-        new("lwilson", "77777777-7777-7777-7777-777777777777", "66510837", "Lena Wilson", "lwilson@ucdavis.edu", true, "2026-07-01T16:40:00", "2026-07-07T15:16:00"),
+        new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEntraObjectId.ToString(), DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, DevelopmentSeedData.LocalAdminEmail, true, "2026-07-01T15:55:00", "2026-07-08T18:05:00"),
+        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEntraObjectId.ToString(), DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, DevelopmentSeedData.LocalRequesterEmail, true, "2026-07-01T15:56:00", "2026-07-08T18:00:00"),
+        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEntraObjectId.ToString(), DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, DevelopmentSeedData.LocalUnauthorizedEmail, true, "2026-07-01T15:57:00", "2026-07-08T17:55:00"),
+        new("adminherd", "11111111-1111-1111-1111-111111111111", "84726195", "Maya Thompson", "adminherd@fake.ucdavis.edu", true, "2026-07-01T16:00:00", "2026-07-08T18:10:00"),
+        new("apatel", "22222222-2222-2222-2222-222222222222", "36190428", "Asha Patel", "apatel@fake.ucdavis.edu", true, "2026-07-01T16:15:00", "2026-07-08T17:42:00"),
+        new("jlin", "33333333-3333-3333-3333-333333333333", "59281746", "Jordan Lin", "jlin@fake.ucdavis.edu", true, "2026-07-01T16:20:00", "2026-07-08T17:35:00"),
+        new("egarcia", "44444444-4444-4444-4444-444444444444", "11846372", "Elena Garcia", "egarcia@fake.ucdavis.edu", true, "2026-07-01T16:25:00", "2026-07-08T16:48:00"),
+        new("kchen", "55555555-5555-5555-5555-555555555555", "73029514", "Kai Chen", "kchen@fake.ucdavis.edu", true, "2026-07-01T16:30:00", "2026-07-08T19:03:00"),
+        new("mowens", "66666666-6666-6666-6666-666666666666", "28465091", "Morgan Owens", "mowens@fake.ucdavis.edu", true, "2026-07-01T16:35:00", "2026-07-08T18:21:00"),
+        new("lwilson", "77777777-7777-7777-7777-777777777777", "66510837", "Lena Wilson", "lwilson@fake.ucdavis.edu", true, "2026-07-01T16:40:00", "2026-07-07T15:16:00"),
         new("rshah", "88888888-8888-8888-8888-888888888888", "40957263", "Riya Shah", null, true, "2026-07-01T16:45:00", "2026-07-08T14:10:00"),
-        new("nroberts", "99999999-9999-9999-9999-999999999999", "95374128", "Noah Roberts", "nroberts@ucdavis.edu", true, "2026-07-01T16:50:00", "2026-07-08T13:28:00"),
-        new("sbaker", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "17628405", "Sofia Baker", "sbaker@ucdavis.edu", true, "2026-07-01T16:55:00", "2026-07-08T11:47:00"),
-        new("tnguyen", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "52893617", "Theo Nguyen", "tnguyen@ucdavis.edu", false, "2026-07-01T17:00:00", "2026-07-05T10:12:00"),
+        new("nroberts", "99999999-9999-9999-9999-999999999999", "95374128", "Noah Roberts", "nroberts@fake.ucdavis.edu", true, "2026-07-01T16:50:00", "2026-07-08T13:28:00"),
+        new("sbaker", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "17628405", "Sofia Baker", "sbaker@fake.ucdavis.edu", true, "2026-07-01T16:55:00", "2026-07-08T11:47:00"),
+        new("tnguyen", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "52893617", "Theo Nguyen", "tnguyen@fake.ucdavis.edu", false, "2026-07-01T17:00:00", "2026-07-05T10:12:00"),
     ];
 
     private static readonly ClusterSeed[] DevClusters =
@@ -42,10 +45,10 @@ public class DbInitializer : IDbInitializer
 
     private static readonly DepartmentEmailRoutingSeed[] DevDepartmentEmailRoutings =
     [
-        new("D8K4M1", "aggieservice-animal@ucdavis.edu", true, "adminherd"),
-        new("D8K4M1", "leave-ops@ucdavis.edu", true, "adminherd"),
-        new("P3X7Q9", "aggieservice-vet@ucdavis.edu", true, "adminherd"),
-        new("L6V2R5", "aggieservice-plants@ucdavis.edu", true, "adminherd"),
+        new("D8K4M1", "animal-routing@fake.ucdavis.edu", true, "adminherd"),
+        new("D8K4M1", "leave-ops@fake.ucdavis.edu", true, "adminherd"),
+        new("P3X7Q9", "vet-routing@fake.ucdavis.edu", true, "adminherd"),
+        new("L6V2R5", "plants-routing@fake.ucdavis.edu", true, "adminherd"),
     ];
 
     private static readonly LeaveTypeSeed[] DevLeaveTypes =
@@ -176,20 +179,32 @@ public class DbInitializer : IDbInitializer
         DateTime nowUtc,
         CancellationToken ct)
     {
-        if (await _db.AppAdminAssignments.AnyAsync(assignment => assignment.IamId == "adminherd", ct))
+        var existingAdminIamIds = await _db.AppAdminAssignments
+            .Select(assignment => assignment.IamId)
+            .ToListAsync(ct);
+
+        var existing = existingAdminIamIds
+            .Select(NormalizeKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingAssignments = new[] { "adminherd", DevelopmentSeedData.LocalAdminIamId }
+            .Where(iamId => !existing.Contains(iamId))
+            .Select(iamId => new AppAdminAssignment
+            {
+                IamId = iamId,
+                CreatedByAppUserId = usersByIamId["adminherd"].Id,
+                CreatedUtc = nowUtc,
+            })
+            .ToArray();
+
+        if (missingAssignments.Length == 0)
         {
             return;
         }
 
-        _db.AppAdminAssignments.Add(new AppAdminAssignment
-        {
-            IamId = "adminherd",
-            CreatedByAppUserId = usersByIamId["adminherd"].Id,
-            CreatedUtc = nowUtc,
-        });
-
+        await _db.AppAdminAssignments.AddRangeAsync(missingAssignments, ct);
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seeded development AppAdminAssignment rows.");
+        _logger.LogInformation("Seeded {Count} development AppAdminAssignment rows.", missingAssignments.Length);
     }
 
     private async Task SeedClustersAsync(
