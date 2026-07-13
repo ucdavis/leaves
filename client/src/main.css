@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@plugin "daisyui";
 @import '@ucdavis/gunrock-tailwind/imports.css';
+@plugin "daisyui";
 
 :root {
   --admin-blue: #002855;

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import {
   type AdminDepartment,
   useAdminData,
 } from '@/shared/admin/adminData.tsx';
+import { HttpError } from '@/lib/api.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
   component: AdminDepartmentsRoute,
@@ -148,10 +149,12 @@ function AdminDepartmentsRoute() {
               <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
                 Cluster
               </label>
-              <input
-                className="input mt-2 w-full max-w-md border-[var(--admin-border)] bg-[var(--admin-sand)] text-[var(--admin-blue)]"
-                onBlur={(event) => renameCluster(cluster.id, event.target.value)}
-                defaultValue={cluster.name}
+              <NameEditor
+                inputClassName="input w-full border-[var(--admin-border)] bg-[var(--admin-sand)] text-[var(--admin-blue)]"
+                name={cluster.name}
+                onSave={(name) => renameCluster(cluster.id, name)}
+                savingMessage="Saving cluster name..."
+                wrapperClassName="mt-2 w-full max-w-md"
               />
             </div>
 
@@ -217,14 +220,86 @@ function AdminDepartmentsRoute() {
           onRemoveRoutingEmail={(emailId) =>
             removeRoutingEmail(editingDepartment.id, emailId)
           }
-          onSave={(updates) => {
-            void updateDepartment(editingDepartment.id, updates);
-            setEditingDepartmentId(null);
-          }}
+          onSave={(updates) =>
+            updateDepartment(editingDepartment.id, updates).then(() => {
+              setEditingDepartmentId(null);
+            })
+          }
           onUpsertRoutingEmail={(email) =>
             upsertRoutingEmail(editingDepartment.id, email)
           }
         />
+      ) : null}
+    </div>
+  );
+}
+
+function NameEditor({
+  inputClassName,
+  name,
+  onSave,
+  savingMessage,
+  wrapperClassName,
+}: {
+  inputClassName: string;
+  name: string;
+  onSave: (name: string) => Promise<void>;
+  savingMessage: string;
+  wrapperClassName?: string;
+}) {
+  const [value, setValue] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(name);
+    setError(null);
+  }, [name]);
+
+  const handleBlur = async () => {
+    const nextName = value.trim();
+
+    if (!nextName) {
+      setValue(name);
+      setError(null);
+      return;
+    }
+
+    if (nextName === name) {
+      setError(null);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await onSave(nextName);
+      setValue(nextName);
+    } catch (mutationError) {
+      setError(getAdminMutationErrorMessage(mutationError));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className={wrapperClassName}>
+      <input
+        className={`${inputClassName} ${error ? 'border-rose-400 focus:border-rose-500' : ''}`}
+        disabled={isSaving}
+        onBlur={() => {
+          void handleBlur();
+        }}
+        onChange={(event) => setValue(event.target.value)}
+        value={value}
+      />
+      {error ? (
+        <p className="mt-2 text-sm text-rose-700">{error}</p>
+      ) : isSaving ? (
+        <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+          {savingMessage}
+        </p>
       ) : null}
     </div>
   );
@@ -241,7 +316,7 @@ function DepartmentRow({
   linkedUserCount: number;
   onOpenRoster: () => void;
   onOpenSettings: () => void;
-  onRename: (name: string) => void;
+  onRename: (name: string) => Promise<void>;
 }) {
   const approvalLabel =
     department.approvalMode === 'approval'
@@ -255,21 +330,13 @@ function DepartmentRow({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <button
-              className="text-left text-lg font-bold uppercase tracking-wide text-[var(--admin-blue)]"
-              onClick={() => {
-                const nextName = window.prompt(
-                  'Rename department',
-                  department.name
-                );
-                if (nextName?.trim()) {
-                  onRename(nextName.trim());
-                }
-              }}
-              type="button"
-            >
-              {department.name}
-            </button>
+            <NameEditor
+              inputClassName="input input-ghost h-auto min-h-0 w-full max-w-md justify-start px-0 text-lg font-bold uppercase tracking-wide text-[var(--admin-blue)] shadow-none focus:bg-transparent"
+              name={department.name}
+              onSave={onRename}
+              savingMessage="Saving department name..."
+              wrapperClassName="w-full max-w-md"
+            />
             <button
               className="text-sm font-medium text-[var(--admin-blue)] underline decoration-[var(--admin-gold)] decoration-2 underline-offset-4"
               onClick={onOpenRoster}
@@ -317,19 +384,80 @@ function DepartmentSettingsModal({
   clusters: Array<{ id: string; name: string }>;
   department: AdminDepartment;
   onClose: () => void;
-  onRemoveRoutingEmail: (emailId: string) => void;
+  onRemoveRoutingEmail: (emailId: string) => Promise<void>;
   onSave: (
     updates: Partial<Pick<AdminDepartment, 'approvalMode' | 'clusterId'>>
-  ) => void;
+  ) => Promise<void>;
   onUpsertRoutingEmail: (email: {
     address: string;
     id?: string;
     kind: 'to' | 'cc';
-  }) => void;
+  }) => Promise<void>;
 }) {
   const [approvalMode, setApprovalMode] = useState(department.approvalMode);
   const [clusterId, setClusterId] = useState(department.clusterId ?? '');
   const [newEmail, setNewEmail] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [routingEmailError, setRoutingEmailError] = useState<string | null>(
+    null
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddingEmail, setIsAddingEmail] = useState(false);
+  const [pendingRemovalEmailId, setPendingRemovalEmailId] = useState<
+    string | null
+  >(null);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await onSave({
+        approvalMode,
+        clusterId: clusterId || null,
+      });
+    } catch (mutationError) {
+      setSaveError(getAdminMutationErrorMessage(mutationError));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddEmail = async () => {
+    const emailAddress = newEmail.trim();
+
+    if (!emailAddress) {
+      return;
+    }
+
+    setIsAddingEmail(true);
+    setRoutingEmailError(null);
+
+    try {
+      await onUpsertRoutingEmail({
+        address: emailAddress,
+        kind: 'to',
+      });
+      setNewEmail('');
+    } catch (mutationError) {
+      setRoutingEmailError(getAdminMutationErrorMessage(mutationError));
+    } finally {
+      setIsAddingEmail(false);
+    }
+  };
+
+  const handleRemoveEmail = async (emailId: string) => {
+    setPendingRemovalEmailId(emailId);
+    setRoutingEmailError(null);
+
+    try {
+      await onRemoveRoutingEmail(emailId);
+    } catch (mutationError) {
+      setRoutingEmailError(getAdminMutationErrorMessage(mutationError));
+    } finally {
+      setPendingRemovalEmailId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-8">
@@ -402,14 +530,30 @@ function DepartmentSettingsModal({
                 </span>
                 <button
                   className="btn btn-ghost btn-sm text-rose-700"
-                  onClick={() => onRemoveRoutingEmail(email.id)}
+                  disabled={pendingRemovalEmailId === email.id}
+                  onClick={() => {
+                    void handleRemoveEmail(email.id);
+                  }}
                   type="button"
                 >
-                  Remove
+                  {pendingRemovalEmailId === email.id ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs mr-2"></span>
+                      Removing...
+                    </>
+                  ) : (
+                    'Remove'
+                  )}
                 </button>
               </div>
             ))}
           </div>
+
+          {routingEmailError ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {routingEmailError}
+            </div>
+          ) : null}
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input
@@ -421,20 +565,22 @@ function DepartmentSettingsModal({
             />
             <button
               className="btn btn-outline"
-              disabled={!newEmail}
+              disabled={isAddingEmail || !newEmail.trim()}
               onClick={() => {
-                onUpsertRoutingEmail({
-                  address: newEmail,
-                  kind: 'to',
-                });
-                setNewEmail('');
+                void handleAddEmail();
               }}
               type="button"
             >
-              Add email
+              {isAddingEmail ? 'Adding...' : 'Add email'}
             </button>
           </div>
         </div>
+
+        {saveError ? (
+          <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {saveError}
+          </div>
+        ) : null}
 
         <div className="mt-6 flex justify-end gap-3">
           <button className="btn btn-ghost" onClick={onClose} type="button">
@@ -442,18 +588,47 @@ function DepartmentSettingsModal({
           </button>
           <button
             className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
-            onClick={() =>
-              onSave({
-                approvalMode,
-                clusterId: clusterId || null,
-              })
-            }
+            disabled={isSaving}
+            onClick={() => {
+              void handleSave();
+            }}
             type="button"
           >
-            Save changes
+            {isSaving ? 'Saving...' : 'Save changes'}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function getAdminMutationErrorMessage(error: unknown) {
+  if (error instanceof HttpError) {
+    if (typeof error.body === 'string' && error.body.trim()) {
+      return error.body;
+    }
+
+    if (error.body && typeof error.body === 'object') {
+      const body = error.body as {
+        detail?: string;
+        title?: string;
+      };
+
+      if (body.detail) {
+        return body.detail;
+      }
+
+      if (body.title) {
+        return body.title;
+      }
+    }
+
+    return 'Unable to save the change. Please try again.';
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'Unable to save the change. Please try again.';
 }

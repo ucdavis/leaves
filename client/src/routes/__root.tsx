@@ -18,7 +18,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
   notFoundComponent: () => (
     <PageErrorState
-      action={{ label: 'Go home', to: '/' }}
       badge="Page missing"
       code="404"
       description="The page you tried to open does not exist, was moved, or is no longer available in this workspace."

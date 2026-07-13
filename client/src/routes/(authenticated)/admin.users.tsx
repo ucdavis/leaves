@@ -36,7 +36,7 @@ const userFormSchema = z.object({
     .min(1, 'IAM ID is required.')
     .max(10, 'IAM ID must be 10 characters or fewer.')
     .regex(
-      /^[a-z][a-z0-9_-]*$/i,
+      /^[a-z][\w-]*$/i,
       'IAM ID must start with a letter and use only letters, numbers, underscores, or hyphens.'
     ),
   name: z.string().trim().min(1, 'Display name is required.'),
@@ -124,19 +124,12 @@ function AdminUsersRoute() {
     {
       accessorKey: 'active',
       cell: ({ row }) => (
-        <button
-          className={`badge border-0 px-3 py-3 text-xs font-semibold ${
-            row.original.active
-              ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-slate-200 text-slate-700'
-          }`}
-          onClick={() =>
-            void updateUser(row.original.id, { active: !row.original.active })
+        <UserStatusToggle
+          active={row.original.active}
+          onToggle={() =>
+            updateUser(row.original.id, { active: !row.original.active })
           }
-          type="button"
-        >
-          {row.original.active ? 'Included' : 'Excluded'}
-        </button>
+        />
       ),
       header: 'Status',
     },
@@ -259,10 +252,11 @@ function AdminUsersRoute() {
       {editingUser ? (
         <UserEditorModal
           onClose={() => setEditingUserId(null)}
-          onSave={(updates) => {
-            void updateUser(editingUser.id, updates);
-            setEditingUserId(null);
-          }}
+          onSave={(updates) =>
+            updateUser(editingUser.id, updates).then(() => {
+              setEditingUserId(null);
+            })
+          }
           user={editingUser}
         />
       ) : null}
@@ -328,6 +322,48 @@ function ModalFrame({
   );
 }
 
+function UserStatusToggle({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => Promise<void>;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleToggle = async () => {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await onToggle();
+    } catch (toggleError) {
+      setError(getUserUpdateErrorMessage(toggleError));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <button
+        className={`badge border-0 px-3 py-3 text-xs font-semibold ${
+          active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+        }`}
+        disabled={isSaving}
+        onClick={() => {
+          void handleToggle();
+        }}
+        type="button"
+      >
+        {isSaving ? 'Saving...' : active ? 'Included' : 'Excluded'}
+      </button>
+      {error ? <span className="text-xs text-rose-700">{error}</span> : null}
+    </div>
+  );
+}
+
 function UserEditorModal({
   onClose,
   onSave,
@@ -338,7 +374,7 @@ function UserEditorModal({
     updates: Partial<
       Pick<AdminUser, 'active' | 'email' | 'employeeId' | 'iamId' | 'name'>
     >
-  ) => void;
+  ) => Promise<void>;
   user: AdminUser;
 }) {
   const [name, setName] = useState(user.name);
@@ -346,18 +382,107 @@ function UserEditorModal({
   const [employeeId, setEmployeeId] = useState(user.employeeId);
   const [iamId, setIamId] = useState(user.iamId);
   const [active, setActive] = useState(user.active);
+  const [fieldErrors, setFieldErrors] = useState<UserFormErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function clearFieldError(field: UserFormField) {
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+  }
+
+  async function handleSubmit() {
+    setSubmitError(null);
+
+    const formValues: UserFormValues = {
+      email,
+      employeeId,
+      iamId,
+      name,
+    };
+
+    const result = userFormSchema.safeParse(formValues);
+
+    if (!result.success) {
+      const nextFieldErrors: UserFormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !nextFieldErrors[field as UserFormField]) {
+          nextFieldErrors[field as UserFormField] = issue.message;
+        }
+      }
+
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+
+    setFieldErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await onSave({
+        active,
+        email: result.data.email.trim(),
+        employeeId: result.data.employeeId.trim(),
+        iamId: result.data.iamId.trim(),
+        name: result.data.name.trim(),
+      });
+    } catch (error) {
+      setSubmitError(getUserUpdateErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <ModalFrame title={`Edit ${user.name}`}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Display name" onChange={setName} value={name} />
-        <FormField label="Email" onChange={setEmail} value={email} />
         <FormField
+          error={fieldErrors.name}
+          label="Display name"
+          onChange={(value) => {
+            setName(value);
+            clearFieldError('name');
+          }}
+          value={name}
+        />
+        <FormField
+          error={fieldErrors.email}
+          label="Email"
+          onChange={(value) => {
+            setEmail(value);
+            clearFieldError('email');
+          }}
+          type="email"
+          value={email}
+        />
+        <FormField
+          error={fieldErrors.employeeId}
           label="Employee ID"
-          onChange={setEmployeeId}
+          onChange={(value) => {
+            setEmployeeId(value);
+            clearFieldError('employeeId');
+          }}
           value={employeeId}
         />
-        <FormField label="IAM ID" onChange={setIamId} value={iamId} />
+        <FormField
+          error={fieldErrors.iamId}
+          helperText="Use the campus IAM ID / Kerberos-style username."
+          label="IAM ID"
+          onChange={(value) => {
+            setIamId(value);
+            clearFieldError('iamId');
+          }}
+          value={iamId}
+        />
       </div>
 
       <label className="mt-5 flex items-center gap-3 text-sm text-[var(--admin-ink)]">
@@ -370,24 +495,23 @@ function UserEditorModal({
         Include this person in the admin roster
       </label>
 
+      {submitError ? (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {submitError}
+        </div>
+      ) : null}
+
       <div className="mt-6 flex justify-end gap-3">
         <button className="btn btn-ghost" onClick={onClose} type="button">
           Cancel
         </button>
         <button
           className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
-          onClick={() =>
-            onSave({
-              active,
-              email,
-              employeeId,
-              iamId,
-              name,
-            })
-          }
+          disabled={isSubmitting}
+          onClick={() => void handleSubmit()}
           type="button"
         >
-          Save changes
+          {isSubmitting ? 'Saving...' : 'Save changes'}
         </button>
       </div>
     </ModalFrame>
@@ -536,6 +660,20 @@ function CreateUserModal({
 }
 
 function getUserCreateErrorMessage(error: unknown) {
+  return getUserMutationErrorMessage(
+    error,
+    'Unable to create the user. Please review the fields and try again.'
+  );
+}
+
+function getUserUpdateErrorMessage(error: unknown) {
+  return getUserMutationErrorMessage(
+    error,
+    'Unable to save the user. Please review the fields and try again.'
+  );
+}
+
+function getUserMutationErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof HttpError) {
     if (typeof error.body === 'string' && error.body.trim()) {
       return error.body;
@@ -571,14 +709,14 @@ function getUserCreateErrorMessage(error: unknown) {
       return 'A user with that IAM ID, employee ID, or identity already exists.';
     }
 
-    return 'Unable to create the user. Please review the fields and try again.';
+    return fallbackMessage;
   }
 
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  return 'Unable to create the user. Please review the fields and try again.';
+  return fallbackMessage;
 }
 
 function FormField({

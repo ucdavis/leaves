@@ -1,25 +1,14 @@
-type PageErrorAction = {
-  href?: string;
-  label: string;
-  onClick?: () => void;
-  to?: string;
-};
-
 type PageErrorStateProps = {
-  action?: PageErrorAction;
   badge: string;
   code: string;
   description: string;
-  secondaryAction?: PageErrorAction;
   title: string;
 };
 
 export function PageErrorState({
-  action,
   badge,
   code,
   description,
-  secondaryAction,
   title,
 }: PageErrorStateProps) {
   return (

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Helpers;
 
 namespace Server.Controllers;
 
@@ -243,10 +245,10 @@ public sealed class AdminController : ApiControllerBase
 
         if (existing == null)
         {
-            var adminUserId = await GetFallbackAdminUserId(cancellationToken);
+            var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
             if (adminUserId == null)
             {
-                return ValidationProblem("An AppUser row is required before routing emails can be updated.");
+                return ValidationProblem("The authenticated admin must have an AppUser row before routing emails can be updated.");
             }
 
             existing = new DepartmentEmailRouting
@@ -266,7 +268,15 @@ public sealed class AdminController : ApiControllerBase
             existing.UpdatedUtc = DateTime.UtcNow;
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateDepartmentRoutingEmail(ex))
+        {
+            return Conflict("That routing email already exists for this department.");
+        }
+
         return NoContent();
     }
 
@@ -290,7 +300,7 @@ public sealed class AdminController : ApiControllerBase
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
-        var iamId = request.IamId?.Trim();
+        var iamId = request.IamId.Trim();
         if (string.IsNullOrWhiteSpace(iamId))
         {
             return ValidationProblem("IAM ID is required.");
@@ -310,7 +320,16 @@ public sealed class AdminController : ApiControllerBase
         };
 
         _db.AppUsers.Add(user);
-        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
+        {
+            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
+        }
+
         return NoContent();
     }
 
@@ -355,7 +374,16 @@ public sealed class AdminController : ApiControllerBase
         }
 
         user.UpdatedUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
+        {
+            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
+        }
+
         return NoContent();
     }
 
@@ -365,28 +393,30 @@ public sealed class AdminController : ApiControllerBase
         return Ok(new AdminStatusResponse("Admin access granted."));
     }
 
-    private async Task<int?> GetFallbackAdminUserId(CancellationToken cancellationToken)
+    private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)
     {
-        var adminIamId = await _db.AppAdminAssignments
-            .AsNoTracking()
-            .OrderBy(item => item.Id)
-            .Select(item => item.IamId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(adminIamId))
+        if (!User.TryGetUserId(out var userId) || !Guid.TryParse(userId, out var entraObjectId))
         {
-            return await _db.AppUsers
-                .AsNoTracking()
-                .Where(user => user.IamId == adminIamId)
-                .Select(user => (int?)user.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            return null;
         }
 
         return await _db.AppUsers
             .AsNoTracking()
-            .OrderBy(user => user.Id)
+            .Where(user => user.EntraObjectId == entraObjectId)
             .Select(user => (int?)user.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static bool IsDuplicateDepartmentRoutingEmail(DbUpdateException exception)
+    {
+        return exception.InnerException is SqlException sqlException &&
+               (sqlException.Number == 2601 || sqlException.Number == 2627);
+    }
+
+    private static bool IsDuplicateAppUser(DbUpdateException exception)
+    {
+        return exception.InnerException is SqlException sqlException &&
+               (sqlException.Number == 2601 || sqlException.Number == 2627);
     }
 
     private static string? GetLatestTimestamp(IEnumerable<DateTime> timestamps)
@@ -463,7 +493,7 @@ public sealed class AdminController : ApiControllerBase
     public sealed record UpdateClusterRequest(string? Name);
     public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode);
     public sealed record UpsertRoutingEmailRequest(string? Address);
-    public sealed record CreateUserRequest(bool Active, string? Email, string? EmployeeId, string? IamId, string? Name);
+    public sealed record CreateUserRequest(bool Active, string? Email, string? EmployeeId, string IamId, string? Name);
     public sealed record UpdateUserRequest(
         bool? Active,
         string? Email,
