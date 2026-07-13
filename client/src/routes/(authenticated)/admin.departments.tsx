@@ -16,7 +16,6 @@ function AdminDepartmentsRoute() {
     departments,
     readonlyReason,
     removeRoutingEmail,
-    renameCluster,
     renameDepartment,
     updateDepartment,
     upsertRoutingEmail,
@@ -149,13 +148,9 @@ function AdminDepartmentsRoute() {
               <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
                 Cluster
               </label>
-              <NameEditor
-                inputClassName="input w-full border-[var(--admin-border)] bg-[var(--admin-sand)] text-[var(--admin-blue)]"
-                name={cluster.name}
-                onSave={(name) => renameCluster(cluster.id, name)}
-                savingMessage="Saving cluster name..."
-                wrapperClassName="mt-2 w-full max-w-md"
-              />
+              <div className="mt-2 w-full max-w-md rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-sand)] px-4 py-3 text-[var(--admin-blue)]">
+                {cluster.name}
+              </div>
             </div>
 
             <div className="min-w-72 rounded-2xl bg-[var(--admin-sand)] p-4">
