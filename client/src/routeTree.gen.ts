@@ -9,22 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
 import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)/index'
-import { Route as authenticatedTableExportRouteImport } from './routes/(authenticated)/table-export'
-import { Route as authenticatedStylesRouteImport } from './routes/(authenticated)/styles'
-import { Route as authenticatedNotificationRouteImport } from './routes/(authenticated)/notification'
-import { Route as authenticatedMeRouteImport } from './routes/(authenticated)/me'
-import { Route as authenticatedFormRouteImport } from './routes/(authenticated)/form'
-import { Route as authenticatedFetchRouteImport } from './routes/(authenticated)/fetch'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
+import { Route as authenticatedAdminUsersRouteImport } from './routes/(authenticated)/admin.users'
+import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
+import { Route as authenticatedAdminDepartmentsRouteImport } from './routes/(authenticated)/admin.departments'
 
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
   id: '/(authenticated)',
   getParentRoute: () => rootRouteImport,
@@ -34,130 +25,78 @@ const authenticatedIndexRoute = authenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
-const authenticatedTableExportRoute =
-  authenticatedTableExportRouteImport.update({
-    id: '/table-export',
-    path: '/table-export',
-    getParentRoute: () => authenticatedRouteRoute,
-  } as any)
-const authenticatedStylesRoute = authenticatedStylesRouteImport.update({
-  id: '/styles',
-  path: '/styles',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedNotificationRoute =
-  authenticatedNotificationRouteImport.update({
-    id: '/notification',
-    path: '/notification',
-    getParentRoute: () => authenticatedRouteRoute,
-  } as any)
-const authenticatedMeRoute = authenticatedMeRouteImport.update({
-  id: '/me',
-  path: '/me',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedFormRoute = authenticatedFormRouteImport.update({
-  id: '/form',
-  path: '/form',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
-const authenticatedFetchRoute = authenticatedFetchRouteImport.update({
-  id: '/fetch',
-  path: '/fetch',
-  getParentRoute: () => authenticatedRouteRoute,
-} as any)
 const authenticatedAdminRoute = authenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
+const authenticatedAdminUsersRoute = authenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => authenticatedAdminRoute,
+} as any)
+const authenticatedAdminStatusRoute =
+  authenticatedAdminStatusRouteImport.update({
+    id: '/status',
+    path: '/status',
+    getParentRoute: () => authenticatedAdminRoute,
+  } as any)
+const authenticatedAdminDepartmentsRoute =
+  authenticatedAdminDepartmentsRouteImport.update({
+    id: '/departments',
+    path: '/departments',
+    getParentRoute: () => authenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/about': typeof AboutRoute
-  '/admin': typeof authenticatedAdminRoute
-  '/fetch': typeof authenticatedFetchRoute
-  '/form': typeof authenticatedFormRoute
-  '/me': typeof authenticatedMeRoute
-  '/notification': typeof authenticatedNotificationRoute
-  '/styles': typeof authenticatedStylesRoute
-  '/table-export': typeof authenticatedTableExportRoute
+  '/admin': typeof authenticatedAdminRouteWithChildren
   '/': typeof authenticatedIndexRoute
+  '/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/admin/status': typeof authenticatedAdminStatusRoute
+  '/admin/users': typeof authenticatedAdminUsersRoute
 }
 export interface FileRoutesByTo {
-  '/about': typeof AboutRoute
-  '/admin': typeof authenticatedAdminRoute
-  '/fetch': typeof authenticatedFetchRoute
-  '/form': typeof authenticatedFormRoute
-  '/me': typeof authenticatedMeRoute
-  '/notification': typeof authenticatedNotificationRoute
-  '/styles': typeof authenticatedStylesRoute
-  '/table-export': typeof authenticatedTableExportRoute
+  '/admin': typeof authenticatedAdminRouteWithChildren
   '/': typeof authenticatedIndexRoute
+  '/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/admin/status': typeof authenticatedAdminStatusRoute
+  '/admin/users': typeof authenticatedAdminUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(authenticated)': typeof authenticatedRouteRouteWithChildren
-  '/about': typeof AboutRoute
-  '/(authenticated)/admin': typeof authenticatedAdminRoute
-  '/(authenticated)/fetch': typeof authenticatedFetchRoute
-  '/(authenticated)/form': typeof authenticatedFormRoute
-  '/(authenticated)/me': typeof authenticatedMeRoute
-  '/(authenticated)/notification': typeof authenticatedNotificationRoute
-  '/(authenticated)/styles': typeof authenticatedStylesRoute
-  '/(authenticated)/table-export': typeof authenticatedTableExportRoute
+  '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
   '/(authenticated)/': typeof authenticatedIndexRoute
+  '/(authenticated)/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/(authenticated)/admin/status': typeof authenticatedAdminStatusRoute
+  '/(authenticated)/admin/users': typeof authenticatedAdminUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/about'
     | '/admin'
-    | '/fetch'
-    | '/form'
-    | '/me'
-    | '/notification'
-    | '/styles'
-    | '/table-export'
     | '/'
+    | '/admin/departments'
+    | '/admin/status'
+    | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/about'
-    | '/admin'
-    | '/fetch'
-    | '/form'
-    | '/me'
-    | '/notification'
-    | '/styles'
-    | '/table-export'
-    | '/'
+  to: '/admin' | '/' | '/admin/departments' | '/admin/status' | '/admin/users'
   id:
     | '__root__'
     | '/(authenticated)'
-    | '/about'
     | '/(authenticated)/admin'
-    | '/(authenticated)/fetch'
-    | '/(authenticated)/form'
-    | '/(authenticated)/me'
-    | '/(authenticated)/notification'
-    | '/(authenticated)/styles'
-    | '/(authenticated)/table-export'
     | '/(authenticated)/'
+    | '/(authenticated)/admin/departments'
+    | '/(authenticated)/admin/status'
+    | '/(authenticated)/admin/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   authenticatedRouteRoute: typeof authenticatedRouteRouteWithChildren
-  AboutRoute: typeof AboutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(authenticated)': {
       id: '/(authenticated)'
       path: ''
@@ -172,48 +111,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authenticatedIndexRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
-    '/(authenticated)/table-export': {
-      id: '/(authenticated)/table-export'
-      path: '/table-export'
-      fullPath: '/table-export'
-      preLoaderRoute: typeof authenticatedTableExportRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/styles': {
-      id: '/(authenticated)/styles'
-      path: '/styles'
-      fullPath: '/styles'
-      preLoaderRoute: typeof authenticatedStylesRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/notification': {
-      id: '/(authenticated)/notification'
-      path: '/notification'
-      fullPath: '/notification'
-      preLoaderRoute: typeof authenticatedNotificationRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/me': {
-      id: '/(authenticated)/me'
-      path: '/me'
-      fullPath: '/me'
-      preLoaderRoute: typeof authenticatedMeRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/form': {
-      id: '/(authenticated)/form'
-      path: '/form'
-      fullPath: '/form'
-      preLoaderRoute: typeof authenticatedFormRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
-    '/(authenticated)/fetch': {
-      id: '/(authenticated)/fetch'
-      path: '/fetch'
-      fullPath: '/fetch'
-      preLoaderRoute: typeof authenticatedFetchRouteImport
-      parentRoute: typeof authenticatedRouteRoute
-    }
     '/(authenticated)/admin': {
       id: '/(authenticated)/admin'
       path: '/admin'
@@ -221,28 +118,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authenticatedAdminRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
+    '/(authenticated)/admin/users': {
+      id: '/(authenticated)/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof authenticatedAdminUsersRouteImport
+      parentRoute: typeof authenticatedAdminRoute
+    }
+    '/(authenticated)/admin/status': {
+      id: '/(authenticated)/admin/status'
+      path: '/status'
+      fullPath: '/admin/status'
+      preLoaderRoute: typeof authenticatedAdminStatusRouteImport
+      parentRoute: typeof authenticatedAdminRoute
+    }
+    '/(authenticated)/admin/departments': {
+      id: '/(authenticated)/admin/departments'
+      path: '/departments'
+      fullPath: '/admin/departments'
+      preLoaderRoute: typeof authenticatedAdminDepartmentsRouteImport
+      parentRoute: typeof authenticatedAdminRoute
+    }
   }
 }
 
+interface authenticatedAdminRouteChildren {
+  authenticatedAdminDepartmentsRoute: typeof authenticatedAdminDepartmentsRoute
+  authenticatedAdminStatusRoute: typeof authenticatedAdminStatusRoute
+  authenticatedAdminUsersRoute: typeof authenticatedAdminUsersRoute
+}
+
+const authenticatedAdminRouteChildren: authenticatedAdminRouteChildren = {
+  authenticatedAdminDepartmentsRoute: authenticatedAdminDepartmentsRoute,
+  authenticatedAdminStatusRoute: authenticatedAdminStatusRoute,
+  authenticatedAdminUsersRoute: authenticatedAdminUsersRoute,
+}
+
+const authenticatedAdminRouteWithChildren =
+  authenticatedAdminRoute._addFileChildren(authenticatedAdminRouteChildren)
+
 interface authenticatedRouteRouteChildren {
-  authenticatedAdminRoute: typeof authenticatedAdminRoute
-  authenticatedFetchRoute: typeof authenticatedFetchRoute
-  authenticatedFormRoute: typeof authenticatedFormRoute
-  authenticatedMeRoute: typeof authenticatedMeRoute
-  authenticatedNotificationRoute: typeof authenticatedNotificationRoute
-  authenticatedStylesRoute: typeof authenticatedStylesRoute
-  authenticatedTableExportRoute: typeof authenticatedTableExportRoute
+  authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
   authenticatedIndexRoute: typeof authenticatedIndexRoute
 }
 
 const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
-  authenticatedAdminRoute: authenticatedAdminRoute,
-  authenticatedFetchRoute: authenticatedFetchRoute,
-  authenticatedFormRoute: authenticatedFormRoute,
-  authenticatedMeRoute: authenticatedMeRoute,
-  authenticatedNotificationRoute: authenticatedNotificationRoute,
-  authenticatedStylesRoute: authenticatedStylesRoute,
-  authenticatedTableExportRoute: authenticatedTableExportRoute,
+  authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
   authenticatedIndexRoute: authenticatedIndexRoute,
 }
 
@@ -251,7 +172,6 @@ const authenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   authenticatedRouteRoute: authenticatedRouteRouteWithChildren,
-  AboutRoute: AboutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -8,6 +8,7 @@ import { RouterContext } from '../../main.tsx';
 import { meQueryOptions } from '../../queries/user.ts';
 import { AuthenticatedShell } from '@/shared/auth/AuthenticatedShell.tsx';
 import { UserProvider } from '@/shared/auth/UserContext.tsx';
+import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
 
 export const Route = createFileRoute('/(authenticated)')({
   beforeLoad: async ({ context }: { context: RouterContext }) => {
@@ -26,33 +27,21 @@ export const Route = createFileRoute('/(authenticated)')({
 function AuthenticatedRouteError({ error }: ErrorComponentProps<unknown>) {
   if (error instanceof HttpError && error.status === 403) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 py-12">
-        <section className="max-w-lg text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Access unavailable
-          </h1>
-          <p className="mt-4 text-gray-600">
-            You are signed in, but your account is not authorized to use this
-            application.
-          </p>
-          <a className="btn btn-primary mt-6" href="/login?returnUrl=/">
-            Sign in with a different account
-          </a>
-        </section>
-      </main>
+      <PageErrorState
+        badge="Restricted access"
+        code="403"
+        description="This account does not have permission to view the requested area."
+        title="This area is restricted"
+      />
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-12">
-      <section className="max-w-lg text-center">
-        <h1 className="text-3xl font-bold text-gray-900">
-          We could not load this page
-        </h1>
-        <p className="mt-4 text-gray-600">
-          Refresh the page or try again later.
-        </p>
-      </section>
-    </main>
+    <PageErrorState
+      badge="Unavailable"
+      code="500"
+      description="We could not load this page right now. The service may be temporarily unavailable or the page data may still be loading."
+      title="This page is temporarily unavailable"
+    />
   );
 }

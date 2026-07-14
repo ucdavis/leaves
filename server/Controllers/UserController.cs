@@ -1,16 +1,27 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Server.Helpers;
+using Server.Services;
 
 namespace Server.Controllers;
 
 public class UserController : ApiControllerBase
 {
+    private readonly IUserService _userService;
+
+    public UserController(IUserService userService)
+    {
+        _userService = userService;
+    }
+
     [HttpGet("me")]
-    public IActionResult Me()
+    public async Task<IActionResult> Me()
     {
         var userId = User.GetUserId();
-        var userName = User.Identity?.Name ?? userId;
+        var userName = await _userService.GetDisplayNameForUser(userId)
+            ?? User.FindFirstValue("name")
+            ?? User.Identity?.Name
+            ?? userId;
         var userEmail =
             GetClaimValue("preferred_username")
             ?? GetClaimValue(ClaimTypes.Email)

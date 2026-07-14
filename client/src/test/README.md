@@ -6,21 +6,16 @@
 src/
 ├── routes/                           # Only actual route files
 │   ├── __root.tsx
-│   ├── index.tsx
-│   ├── about.tsx
 │   └── (authenticated)/
-│       ├── fetch.tsx                 # Route component
-│       └── dashboard.tsx             # Route component
+│       ├── index.tsx                 # Home route
+│       └── admin.tsx                 # Admin parent route
 ├── test/
 │   ├── setup.ts                      # Global test setup
 │   ├── routerUtils.tsx               # Router testing utilities
 │   ├── mswUtils.ts                   # MSW testing utilities
 │   └── routes/                       # Mirror route structure for tests
-│       ├── index.test.tsx
-│       ├── about.test.tsx
 │       └── (authenticated)/
-│           ├── fetch.test.tsx        # ✅ Test for fetch route
-│           └── dashboard.test.tsx    # ✅ Test for dashboard route
+│           └── admin.test.tsx        # Example authenticated route test
 ```
 
 ## Why This Matters
@@ -37,6 +32,6 @@ src/
 npm test
 
 # Run specific test file
-npm test -- fetch.test
+npm test -- admin.test
 
 ```

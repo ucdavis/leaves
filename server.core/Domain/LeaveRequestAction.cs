@@ -17,11 +17,13 @@ public class LeaveRequestAction
     [Required]
     public LeaveRequestActionType ActionType { get; set; }
 
-    public int? ActorAppUserId { get; set; }
+    [Required]
+    public int ActorAppUserId { get; set; }
 
+    [Required]
     [Column(TypeName = "char(10)")]
     [MaxLength(10)]
-    public string? ActorIamId { get; set; }
+    public required string ActorIamId { get; set; }
 
     [Required]
     [Column(TypeName = "datetime2")]
@@ -60,6 +62,6 @@ public class LeaveRequestAction
         entity.HasOne<AppUser>()
             .WithMany(e => e.LeaveRequestActions)
             .HasForeignKey(e => e.ActorAppUserId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

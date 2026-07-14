@@ -39,6 +39,10 @@ public class DepartmentEmailRouting
         entity.HasIndex(e => e.DepartmentCode)
             .HasDatabaseName("IX_DepartmentEmailRouting_DepartmentCode");
 
+        entity.HasIndex(e => new { e.DepartmentCode, e.ToEmail })
+            .IsUnique()
+            .HasDatabaseName("UX_DepartmentEmailRouting_DepartmentCode_ToEmail");
+
         entity.HasOne<Department>()
             .WithMany(e => e.DepartmentEmailRoutings)
             .HasForeignKey(e => e.DepartmentCode)
