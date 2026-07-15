@@ -28,6 +28,19 @@ export type AdminUser = {
   role: AdminRole;
 };
 
+export type AdminUserEditableFields = Pick<
+  AdminUser,
+  'email' | 'employeeId' | 'iamId' | 'name'
+>;
+
+export type CreateUserInput = AdminUserEditableFields & {
+  active?: boolean;
+};
+
+export type UpdateUserInput = Partial<AdminUserEditableFields> & {
+  active?: boolean;
+};
+
 export type DepartmentRoutingEmail = {
   address: string;
   id: string;
@@ -58,18 +71,6 @@ export type AdminDataSource = {
   status: ImportStatus;
   updatedAt: string | null;
 };
-
-type CreateUserInput = {
-  active?: boolean;
-  email: string;
-  employeeId: string;
-  iamId: string;
-  name: string;
-};
-
-type UpdateUserInput = Partial<
-  Pick<AdminUser, 'active' | 'email' | 'employeeId' | 'iamId' | 'name'>
->;
 
 type UpdateDepartmentInput = Partial<
   Pick<AdminDepartment, 'approvalMode' | 'clusterId'>
