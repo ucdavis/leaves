@@ -60,6 +60,20 @@ public class DbInitializer : IDbInitializer
         new("CompTime", 50, "Compensatory Time", true, true),
     ];
 
+    private static readonly EmployeeAccrualBalanceSeed[] DevEmployeeAccrualBalances =
+    [
+        // The local requester has two biweekly snapshots so balance-history development has useful data.
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-06-28", "40001234", 10, "Vacation", 88.00m, 0.00m, 3.69m, 0.00m, 91.69m, 240.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 10, "Vacation", 91.69m, 8.00m, 3.69m, 0.00m, 87.38m, 240.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 20, "Sick Leave", 72.00m, 0.00m, 3.69m, 0.00m, 75.69m, 0.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
+
+        // Monthly and biweekly employees intentionally have different latest dates.
+        new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 10, "Vacation", 160.00m, 0.00m, 8.00m, 0.00m, 168.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 20, "Sick Leave", 272.00m, 0.00m, 8.00m, 0.00m, 280.00m, 0.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new("36190428", "apatel@fake.ucdavis.edu", "Asha Patel", "2026-06-30", "40003456", 10, "Vacation", 210.00m, 8.00m, 10.00m, 0.00m, 212.00m, 240.00m, "MSP", "Managers and Senior Professionals", "000245", "Department Chair", "030045", "ANIMAL SCIENCE"),
+        new("17628405", "sbaker@fake.ucdavis.edu", "Sofia Baker", "2026-07-12", "40004567", 50, "Compensatory Time", 18.00m, 0.00m, 2.00m, 0.00m, 20.00m, 80.00m, "PSS", "Professional and Support Staff", "006257", "Agricultural Technician", "030000", "AGR & ENV SCI DEANS OFFICE"),
+    ];
+
     private static readonly LeaveRequestSeed[] DevLeaveRequests =
     [
         new("lwilson", "66510837", "Vacation", null, LeaveRequestStatus.PendingApproval, "2026-07-14", "2026-07-16", 24.00m, "Summer conference travel.", "Lecture coverage arranged with department staff.", "D8K4M1", "Animal Science", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-08T15:30:00"),
@@ -127,6 +141,7 @@ public class DbInitializer : IDbInitializer
         await SeedDepartmentsAsync(clustersByName, nowUtc, ct);
         await SeedDepartmentEmailRoutingsAsync(usersByIamId, nowUtc, ct);
         await SeedLeaveTypesAsync(ct);
+        await SeedEmployeeAccrualBalancesAsync(ct);
 
         var leaveTypesByKey = await LoadLeaveTypesByKeyAsync(ct);
 
@@ -342,6 +357,45 @@ public class DbInitializer : IDbInitializer
         _logger.LogInformation("Seeded {Count} development LeaveType rows.", missingLeaveTypes.Length);
     }
 
+    private async Task SeedEmployeeAccrualBalancesAsync(CancellationToken ct)
+    {
+        var existingKeys = await _db.EmployeeAccrualBalances
+            .Select(balance => new
+            {
+                balance.EmployeeId,
+                balance.AsOfDate,
+                balance.PositionNumber,
+                balance.LeaveTypeNumber,
+            })
+            .ToListAsync(ct);
+
+        var existing = existingKeys
+            .Select(balance => CreateEmployeeAccrualBalanceKey(
+                balance.EmployeeId,
+                balance.AsOfDate,
+                balance.PositionNumber,
+                balance.LeaveTypeNumber))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingBalances = DevEmployeeAccrualBalances
+            .Where(balance => !existing.Contains(CreateEmployeeAccrualBalanceKey(
+                balance.EmployeeId,
+                ParseDateOnly(balance.AsOfDate),
+                balance.PositionNumber,
+                balance.LeaveTypeNumber)))
+            .Select(CreateEmployeeAccrualBalance)
+            .ToArray();
+
+        if (missingBalances.Length == 0)
+        {
+            return;
+        }
+
+        await _db.Set<EmployeeAccrualBalance>().AddRangeAsync(missingBalances, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development EmployeeAccrualBalances rows.", missingBalances.Length);
+    }
+
     private async Task SeedLeaveRequestsAsync(
         IReadOnlyDictionary<string, AppUser> usersByIamId,
         IReadOnlyDictionary<string, Cluster> clustersByName,
@@ -471,6 +525,67 @@ public class DbInitializer : IDbInitializer
     private static string CreateLeaveRequestKey(string iamId, DateOnly startDate, DateOnly endDate)
         => $"{NormalizeKey(iamId)}|{startDate:O}|{endDate:O}";
 
+    private static string CreateEmployeeAccrualBalanceKey(
+        string employeeId,
+        DateOnly asOfDate,
+        string positionNumber,
+        int leaveTypeNumber)
+        => $"{NormalizeKey(employeeId)}|{asOfDate:O}|{NormalizeKey(positionNumber)}|{leaveTypeNumber}";
+
+    private static EmployeeAccrualBalance CreateEmployeeAccrualBalance(EmployeeAccrualBalanceSeed seed)
+    {
+        var asOfDate = ParseDateOnly(seed.AsOfDate);
+        var loadedAt = ParseUtc($"{seed.AsOfDate}T14:00:00");
+
+        return new EmployeeAccrualBalance
+        {
+            EmployeeId = seed.EmployeeId,
+            AsOfDate = asOfDate,
+            PositionNumber = seed.PositionNumber,
+            LeaveTypeNumber = seed.LeaveTypeNumber,
+            EmployeeEmail = seed.EmployeeEmail,
+            EmployeeName = seed.EmployeeName,
+            UnionCode = "99",
+            UnionDescription = "Non-Represented",
+            EmployeeClassCode = seed.EmployeeClassCode,
+            EmployeeClassDescription = seed.EmployeeClassDescription,
+            JobCode = seed.JobCode,
+            JobCodeDescription = seed.JobCodeDescription,
+            ReportsToPositionNumber = "40000001",
+            ReportsToEmployeeId = "84726195",
+            ReportsToEmployeeName = "Maya Thompson",
+            HrStatus = "A",
+            EmployeeStatus = "A",
+            EmployeeStatusDescription = "Active",
+            EmployeeType = "E",
+            EmployeeTypeDescription = "Employee",
+            HourlyRateFTE = 1.0000m,
+            TypeLabel = seed.TypeLabel,
+            PrevBal = seed.PrevBal,
+            HoursTaken = seed.HoursTaken,
+            AccrualHours = seed.AccrualHours,
+            AdjustedHours = seed.AdjustedHours,
+            CalculatedBal = seed.CalculatedBal,
+            AccrualLimit = seed.AccrualLimit,
+            ApproachingMax = seed.AccrualLimit > 0m && seed.CalculatedBal >= seed.AccrualLimit * 0.9m ? "Y" : "N",
+            HoursOverUnderPolicyMax = seed.AccrualLimit > 0m ? seed.AccrualLimit - seed.CalculatedBal : 0.00m,
+            AccrualPercentage = seed.AccrualLimit > 0m ? decimal.Round(seed.CalculatedBal / seed.AccrualLimit * 100m, 2) : 0.00m,
+            ExceptionalMaxVacationOnly = 0,
+            Level1Dept = "DVCMP",
+            Level1DeptDesc = "UC Davis Campus",
+            Level2Dept = "DVCMP",
+            Level2DeptDesc = "UC DAVIS CAMPUS",
+            Level3Dept = "01",
+            Level3DeptDesc = "AGRICULTURE",
+            Level4Dept = "S2000",
+            Level4DeptDesc = "AGRICULTURE SUBDIV",
+            Level5Dept = seed.Level5Dept,
+            Level5DeptDesc = seed.Level5DeptDesc,
+            LoadDate = loadedAt,
+            LastUpdated = loadedAt,
+        };
+    }
+
     private static DateOnly ParseDateOnly(string value) => DateOnly.Parse(value);
 
     private static DateTime ParseUtc(string value) => DateTime.Parse(
@@ -514,6 +629,27 @@ public class DbInitializer : IDbInitializer
         string DisplayName,
         bool HasAccrualBalance,
         bool IsActive);
+
+    private sealed record EmployeeAccrualBalanceSeed(
+        string EmployeeId,
+        string EmployeeEmail,
+        string EmployeeName,
+        string AsOfDate,
+        string PositionNumber,
+        int LeaveTypeNumber,
+        string TypeLabel,
+        decimal PrevBal,
+        decimal HoursTaken,
+        decimal AccrualHours,
+        decimal AdjustedHours,
+        decimal CalculatedBal,
+        decimal AccrualLimit,
+        string EmployeeClassCode,
+        string EmployeeClassDescription,
+        string JobCode,
+        string JobCodeDescription,
+        string Level5Dept,
+        string Level5DeptDesc);
 
     private sealed record LeaveRequestSeed(
         string IamId,
