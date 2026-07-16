@@ -1,19 +1,32 @@
 import { useFormContext } from './formContext.tsx';
 
-export function SubscribeButton({ label }: { label: string }) {
+export function SubscribeButton({
+  className,
+  label,
+  loadingLabel,
+  onClick,
+  type,
+}: {
+  className?: string;
+  label: string;
+  loadingLabel?: string;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+}) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
         <button
-          className="btn btn-primary w-full"
+          className={className ?? 'btn btn-primary w-full'}
           disabled={isSubmitting}
-          type="submit"
+          onClick={onClick}
+          type={type ?? 'submit'}
         >
           {isSubmitting ? (
             <>
               <span className="loading loading-spinner loading-xs mr-2"></span>
-              Submitting...
+              {loadingLabel ?? 'Submitting...'}
             </>
           ) : (
             label
