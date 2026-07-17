@@ -6,7 +6,7 @@ namespace Server.Core.Data;
 
 public interface IDbInitializer
 {
-    Task InitializeAsync(bool includeDevSeed, CancellationToken cancellationToken = default);
+    Task InitializeAsync(CancellationToken cancellationToken = default);
 }
 
 public class DbInitializer : IDbInitializer
@@ -51,6 +51,49 @@ public class DbInitializer : IDbInitializer
         new("L6V2R5", "plants-routing@fake.ucdavis.edu", true, "adminherd"),
     ];
 
+    private static readonly PersonSeed[] DevPeople =
+    [
+        new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "D8K4M1", "2026-07-08T08:00:00"),
+        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Requester", DevelopmentSeedData.LocalRequesterEmail, true, false, false, true, "D8K4M1", "2026-07-08T08:05:00"),
+        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "A1N8T4", "2026-07-08T08:10:00"),
+        new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "A1N8T4", "2026-07-08T08:15:00"),
+        new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "D8K4M1", "2026-07-08T08:20:00"),
+        new("jlin", "59281746", "Jordan Lin", null, "jlin@fake.ucdavis.edu", true, false, true, true, "P3X7Q9", "2026-07-08T08:25:00"),
+        new("egarcia", "11846372", "Elena Garcia", null, "egarcia@fake.ucdavis.edu", true, false, false, true, "P3X7Q9", "2026-07-08T08:30:00"),
+        new("kchen", "73029514", "Kai Chen", null, "kchen@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T08:35:00"),
+        new("mowens", "28465091", "Morgan Owens", null, "mowens@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T08:40:00"),
+        new("lwilson", "66510837", "Lena Wilson", null, "lwilson@fake.ucdavis.edu", true, false, true, true, "D8K4M1", "2026-07-08T08:45:00"),
+        new("rshah", "40957263", "Riya Shah", null, null, true, false, true, true, "D8K4M1", "2026-07-08T08:50:00"),
+        new("nroberts", "95374128", "Noah Roberts", null, "nroberts@fake.ucdavis.edu", true, false, false, true, "P3X7Q9", "2026-07-08T08:55:00"),
+        new("sbaker", "17628405", "Sofia Baker", null, "sbaker@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T09:00:00"),
+        new("tnguyen", "52893617", "Theo Nguyen", null, "tnguyen@fake.ucdavis.edu", true, false, false, true, "A1N8T4", "2026-07-08T09:05:00"),
+    ];
+
+    private static readonly AppSettingSeed[] DevAppSettings =
+    [
+        new("Routing:DefaultToEmail", "aggieservice@fake.ucdavis.edu", "adminherd", "2026-07-08T09:10:00"),
+        new("Routing:DefaultCcJson", "[\"leave-ops@fake.ucdavis.edu\"]", "adminherd", "2026-07-08T09:12:00"),
+    ];
+
+    private static readonly EmployeeReportingDepartmentOverrideSeed[] DevEmployeeReportingDepartmentOverrides =
+    [
+        new("sbaker", "D8K4M1", "2026-07-01", null, "Temporary reporting line coverage for summer operations.", "adminherd", "2026-07-08T09:20:00", null, null),
+        new("tnguyen", "L6V2R5", "2026-06-15", "2026-07-15", "Historical override retained for testing closed records.", "adminherd", "2026-07-01T09:20:00", "apatel", "2026-07-15T17:00:00"),
+    ];
+
+    private static readonly DepartmentChairAssignmentSeed[] DevDepartmentChairAssignments =
+    [
+        new("D8K4M1", "apatel", "2026-01-01", null, "adminherd", "2026-07-08T09:25:00", null, null),
+        new("P3X7Q9", "jlin", "2026-01-01", null, "adminherd", "2026-07-08T09:26:00", null, null),
+        new("L6V2R5", "kchen", "2025-09-01", "2026-06-30", "adminherd", "2026-06-01T09:26:00", "apatel", "2026-06-30T17:00:00"),
+    ];
+
+    private static readonly ClusterCaoAssignmentSeed[] DevClusterCaoAssignments =
+    [
+        new("Animal Sciences Cluster", "adminherd", "2026-01-01", null, "adminherd", "2026-07-08T09:30:00", null, null),
+        new("Land & Environment Cluster", "mowens", "2026-01-01", null, "adminherd", "2026-07-08T09:31:00", null, null),
+    ];
+
     private static readonly LeaveTypeSeed[] DevLeaveTypes =
     [
         new("Vacation", 10, "Vacation", true, true),
@@ -92,6 +135,13 @@ public class DbInitializer : IDbInitializer
         new("apatel", "2026-07-25", "2026-07-25", LeaveRequestActionType.Approved, "adminherd", "2026-07-03T15:00:00", "Administrative leave entry approved.", null, false),
     ];
 
+    private static readonly OutboundMessageSeed[] DevOutboundMessages =
+    [
+        new("nroberts", "2026-07-10", "2026-07-10", "LeaveRequestApproved", "nroberts@fake.ucdavis.edu", OutboundMessageStatus.Sent, "2026-07-07T11:15:00", "2026-07-07T11:16:00", 1, null, "smtp-approved-001"),
+        new("sbaker", "2026-08-03", "2026-08-07", "LeaveRequestApproved", "sbaker@fake.ucdavis.edu", OutboundMessageStatus.Pending, "2026-07-02T09:20:00", null, 0, null, null),
+        new("tnguyen", "2026-09-14", "2026-09-18", "LeaveRequestDenied", "tnguyen@fake.ucdavis.edu", OutboundMessageStatus.Failed, "2026-07-02T16:30:00", null, 2, "SMTP timeout during sandbox test send.", null),
+    ];
+
     private readonly AppDbContext _db;
     private readonly ILogger<DbInitializer> _logger;
 
@@ -101,7 +151,7 @@ public class DbInitializer : IDbInitializer
         _logger = logger;
     }
 
-    public async Task InitializeAsync(bool includeDevSeed, CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (_db.Database.IsRelational())
         {
@@ -116,14 +166,7 @@ public class DbInitializer : IDbInitializer
             _logger.LogInformation("Database ensured.");
         }
 
-        if (includeDevSeed)
-        {
-            await SeedDevelopmentAsync(cancellationToken);
-        }
-        else
-        {
-            await SeedProductionSafeAsync(cancellationToken);
-        }
+        await SeedDevelopmentAsync(cancellationToken);
     }
 
     private async Task SeedDevelopmentAsync(CancellationToken ct)
@@ -132,13 +175,18 @@ public class DbInitializer : IDbInitializer
 
         await SeedAppUsersAsync(nowUtc, ct);
         var usersByIamId = await LoadUsersByIamIdAsync(ct);
+        await SeedPeopleAsync(usersByIamId, ct);
 
         await SeedAppAdminAssignmentsAsync(usersByIamId, nowUtc, ct);
+        await SeedAppSettingsAsync(usersByIamId, ct);
         await SeedClustersAsync(usersByIamId, nowUtc, ct);
 
         var clustersByName = await LoadClustersByNameAsync(ct);
 
         await SeedDepartmentsAsync(clustersByName, nowUtc, ct);
+        await SeedEmployeeReportingDepartmentOverridesAsync(usersByIamId, nowUtc, ct);
+        await SeedDepartmentChairAssignmentsAsync(usersByIamId, nowUtc, ct);
+        await SeedClusterCaoAssignmentsAsync(usersByIamId, clustersByName, nowUtc, ct);
         await SeedDepartmentEmailRoutingsAsync(usersByIamId, nowUtc, ct);
         await SeedLeaveTypesAsync(ct);
         await SeedEmployeeAccrualBalancesAsync(ct);
@@ -149,7 +197,36 @@ public class DbInitializer : IDbInitializer
 
         var leaveRequestsByKey = await LoadLeaveRequestsByKeyAsync(ct);
 
+        await SeedLeaveRequestDaysAsync(leaveRequestsByKey, ct);
         await SeedLeaveRequestActionsAsync(usersByIamId, leaveRequestsByKey, ct);
+        await SeedOutboundMessagesAsync(leaveRequestsByKey, ct);
+    }
+
+    private async Task SeedPeopleAsync(
+        IReadOnlyDictionary<string, AppUser> usersByIamId,
+        CancellationToken ct)
+    {
+        var existingIamIds = await _db.Set<Person>()
+            .Select(person => person.IamId)
+            .ToListAsync(ct);
+
+        var existing = existingIamIds
+            .Select(NormalizeKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingPeople = DevPeople
+            .Where(person => !existing.Contains(person.IamId))
+            .Select(person => CreatePerson(person, usersByIamId))
+            .ToArray();
+
+        if (missingPeople.Length == 0)
+        {
+            return;
+        }
+
+        await _db.Set<Person>().AddRangeAsync(missingPeople, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development People rows.", missingPeople.Length);
     }
 
     private async Task SeedAppUsersAsync(DateTime nowUtc, CancellationToken ct)
@@ -222,6 +299,37 @@ public class DbInitializer : IDbInitializer
         _logger.LogInformation("Seeded {Count} development AppAdminAssignment rows.", missingAssignments.Length);
     }
 
+    private async Task SeedAppSettingsAsync(
+        IReadOnlyDictionary<string, AppUser> usersByIamId,
+        CancellationToken ct)
+    {
+        var existingKeys = await _db.AppSettings
+            .Select(setting => setting.SettingKey)
+            .ToListAsync(ct);
+
+        var existing = existingKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingSettings = DevAppSettings
+            .Where(setting => !existing.Contains(setting.SettingKey))
+            .Select(setting => new AppSetting
+            {
+                SettingKey = setting.SettingKey,
+                SettingValue = setting.SettingValue,
+                UpdatedByAppUserId = usersByIamId[setting.UpdatedByIamId].Id,
+                UpdatedUtc = ParseUtc(setting.UpdatedUtc),
+            })
+            .ToArray();
+
+        if (missingSettings.Length == 0)
+        {
+            return;
+        }
+
+        await _db.AppSettings.AddRangeAsync(missingSettings, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development AppSetting rows.", missingSettings.Length);
+    }
+
     private async Task SeedClustersAsync(
         IReadOnlyDictionary<string, AppUser> usersByIamId,
         DateTime nowUtc,
@@ -290,6 +398,129 @@ public class DbInitializer : IDbInitializer
         await _db.Departments.AddRangeAsync(missingDepartments, ct);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Seeded {Count} development Department rows.", missingDepartments.Length);
+    }
+
+    private async Task SeedEmployeeReportingDepartmentOverridesAsync(
+        IReadOnlyDictionary<string, AppUser> usersByIamId,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        var existingKeys = await _db.EmployeeReportingDepartmentOverrides
+            .Select(overrideRow => new { overrideRow.IamId, overrideRow.EffectiveStartDate })
+            .ToListAsync(ct);
+
+        var existing = existingKeys
+            .Select(overrideRow => CreateEffectiveRangeKey(overrideRow.IamId, overrideRow.EffectiveStartDate))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingOverrides = DevEmployeeReportingDepartmentOverrides
+            .Where(overrideRow => !existing.Contains(CreateEffectiveRangeKey(overrideRow.IamId, ParseDateOnly(overrideRow.EffectiveStartDate))))
+            .Select(overrideRow => new EmployeeReportingDepartmentOverride
+            {
+                IamId = overrideRow.IamId,
+                DepartmentCode = overrideRow.DepartmentCode,
+                EffectiveStartDate = ParseDateOnly(overrideRow.EffectiveStartDate),
+                EffectiveEndDateExclusive = overrideRow.EffectiveEndDateExclusive is null ? null : ParseDateOnly(overrideRow.EffectiveEndDateExclusive),
+                Reason = overrideRow.Reason,
+                CreatedByAppUserId = usersByIamId[overrideRow.CreatedByIamId].Id,
+                CreatedUtc = ParseUtc(overrideRow.CreatedUtc),
+                ClosedByAppUserId = overrideRow.ClosedByIamId is null ? null : usersByIamId[overrideRow.ClosedByIamId].Id,
+                ClosedUtc = overrideRow.ClosedUtc is null ? null : ParseUtc(overrideRow.ClosedUtc),
+            })
+            .ToArray();
+
+        if (missingOverrides.Length == 0)
+        {
+            return;
+        }
+
+        await _db.EmployeeReportingDepartmentOverrides.AddRangeAsync(missingOverrides, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development EmployeeReportingDepartmentOverride rows.", missingOverrides.Length);
+    }
+
+    private async Task SeedDepartmentChairAssignmentsAsync(
+        IReadOnlyDictionary<string, AppUser> usersByIamId,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        var existingKeys = await _db.DepartmentChairAssignments
+            .Select(assignment => new { assignment.DepartmentCode, assignment.IamId, assignment.EffectiveStartDate })
+            .ToListAsync(ct);
+
+        var existing = existingKeys
+            .Select(assignment => CreateAssignmentKey(assignment.DepartmentCode, assignment.IamId, assignment.EffectiveStartDate))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingAssignments = DevDepartmentChairAssignments
+            .Where(assignment => !existing.Contains(CreateAssignmentKey(
+                assignment.DepartmentCode,
+                assignment.IamId,
+                ParseDateOnly(assignment.EffectiveStartDate))))
+            .Select(assignment => new DepartmentChairAssignment
+            {
+                DepartmentCode = assignment.DepartmentCode,
+                IamId = assignment.IamId,
+                EffectiveStartDate = ParseDateOnly(assignment.EffectiveStartDate),
+                EffectiveEndDateExclusive = assignment.EffectiveEndDateExclusive is null ? null : ParseDateOnly(assignment.EffectiveEndDateExclusive),
+                CreatedByAppUserId = usersByIamId[assignment.CreatedByIamId].Id,
+                CreatedUtc = ParseUtc(assignment.CreatedUtc),
+                ClosedByAppUserId = assignment.ClosedByIamId is null ? null : usersByIamId[assignment.ClosedByIamId].Id,
+                ClosedUtc = assignment.ClosedUtc is null ? null : ParseUtc(assignment.ClosedUtc),
+            })
+            .ToArray();
+
+        if (missingAssignments.Length == 0)
+        {
+            return;
+        }
+
+        await _db.DepartmentChairAssignments.AddRangeAsync(missingAssignments, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development DepartmentChairAssignment rows.", missingAssignments.Length);
+    }
+
+    private async Task SeedClusterCaoAssignmentsAsync(
+        IReadOnlyDictionary<string, AppUser> usersByIamId,
+        IReadOnlyDictionary<string, Cluster> clustersByName,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        var existingKeys = await _db.ClusterCaoAssignments
+            .Select(assignment => new { assignment.ClusterId, assignment.IamId, assignment.EffectiveStartDate })
+            .ToListAsync(ct);
+
+        var existing = existingKeys
+            .Select(assignment => CreateAssignmentKey(assignment.ClusterId.ToString(), assignment.IamId, assignment.EffectiveStartDate))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingAssignments = DevClusterCaoAssignments
+            .Where(assignment =>
+            {
+                var clusterId = clustersByName[assignment.ClusterName].Id;
+                return !existing.Contains(CreateAssignmentKey(clusterId.ToString(), assignment.IamId, ParseDateOnly(assignment.EffectiveStartDate)));
+            })
+            .Select(assignment => new ClusterCaoAssignment
+            {
+                ClusterId = clustersByName[assignment.ClusterName].Id,
+                IamId = assignment.IamId,
+                EffectiveStartDate = ParseDateOnly(assignment.EffectiveStartDate),
+                EffectiveEndDateExclusive = assignment.EffectiveEndDateExclusive is null ? null : ParseDateOnly(assignment.EffectiveEndDateExclusive),
+                CreatedByAppUserId = usersByIamId[assignment.CreatedByIamId].Id,
+                CreatedUtc = ParseUtc(assignment.CreatedUtc),
+                ClosedByAppUserId = assignment.ClosedByIamId is null ? null : usersByIamId[assignment.ClosedByIamId].Id,
+                ClosedUtc = assignment.ClosedUtc is null ? null : ParseUtc(assignment.ClosedUtc),
+            })
+            .ToArray();
+
+        if (missingAssignments.Length == 0)
+        {
+            return;
+        }
+
+        await _db.ClusterCaoAssignments.AddRangeAsync(missingAssignments, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development ClusterCaoAssignment rows.", missingAssignments.Length);
     }
 
     private async Task SeedDepartmentEmailRoutingsAsync(
@@ -487,6 +718,82 @@ public class DbInitializer : IDbInitializer
         _logger.LogInformation("Seeded {Count} development LeaveRequestAction rows.", missingActions.Length);
     }
 
+    private async Task SeedLeaveRequestDaysAsync(
+        IReadOnlyDictionary<string, LeaveRequest> leaveRequestsByKey,
+        CancellationToken ct)
+    {
+        var existingKeys = await _db.LeaveRequestDays
+            .Select(day => new { day.LeaveRequestId, day.LeaveDate })
+            .ToListAsync(ct);
+
+        var existing = existingKeys
+            .Select(day => CreateLeaveRequestDayKey(day.LeaveRequestId, day.LeaveDate))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingDays = DevLeaveRequests
+            .SelectMany(request => ExpandLeaveRequestDays(request, leaveRequestsByKey))
+            .Where(day => !existing.Contains(CreateLeaveRequestDayKey(day.LeaveRequestId, day.LeaveDate)))
+            .ToArray();
+
+        if (missingDays.Length == 0)
+        {
+            return;
+        }
+
+        await _db.LeaveRequestDays.AddRangeAsync(missingDays, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development LeaveRequestDay rows.", missingDays.Length);
+    }
+
+    private async Task SeedOutboundMessagesAsync(
+        IReadOnlyDictionary<string, LeaveRequest> leaveRequestsByKey,
+        CancellationToken ct)
+    {
+        var existingDedupeKeys = await _db.OutboundMessages
+            .Select(message => message.DedupeKey)
+            .ToListAsync(ct);
+
+        var existing = existingDedupeKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingMessages = DevOutboundMessages
+            .Where(message => !existing.Contains(CreateOutboundMessageDedupeKey(
+                message.RequestIamId,
+                message.RequestStartDate,
+                message.RequestEndDate,
+                message.NotificationType,
+                message.RecipientEmail)))
+            .Select(message =>
+            {
+                var requestKey = CreateLeaveRequestKey(message.RequestIamId, ParseDateOnly(message.RequestStartDate), ParseDateOnly(message.RequestEndDate));
+                return new OutboundMessage
+                {
+                    LeaveRequestId = leaveRequestsByKey[requestKey].Id,
+                    NotificationType = message.NotificationType,
+                    RecipientEmail = message.RecipientEmail,
+                    Status = message.Status,
+                    DedupeKey = CreateOutboundMessageDedupeKey(message.RequestIamId, message.RequestStartDate, message.RequestEndDate, message.NotificationType, message.RecipientEmail),
+                    NotBeforeUtc = ParseUtc(message.NotBeforeUtc),
+                    LockedUntilUtc = null,
+                    LockId = null,
+                    AttemptCount = message.AttemptCount,
+                    LastError = message.LastError,
+                    ProviderMessageId = message.ProviderMessageId,
+                    CreatedUtc = ParseUtc(message.NotBeforeUtc),
+                    SentUtc = message.SentUtc is null ? null : ParseUtc(message.SentUtc),
+                };
+            })
+            .ToArray();
+
+        if (missingMessages.Length == 0)
+        {
+            return;
+        }
+
+        await _db.OutboundMessages.AddRangeAsync(missingMessages, ct);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Seeded {Count} development OutboundMessage rows.", missingMessages.Length);
+    }
+
     private async Task<Dictionary<string, AppUser>> LoadUsersByIamIdAsync(CancellationToken ct)
     {
         return await _db.AppUsers
@@ -514,10 +821,6 @@ public class DbInitializer : IDbInitializer
             StringComparer.OrdinalIgnoreCase);
     }
 
-    // Keep the production path explicit, even if currently empty, so startup behavior stays obvious.
-    private Task SeedProductionSafeAsync(CancellationToken ct)
-        => Task.CompletedTask;
-
     private static string NormalizeKey(string value) => value.Trim();
 
     private static string CreateDepartmentRoutingKey(string departmentCode, string toEmail) => $"{departmentCode}|{toEmail}";
@@ -525,12 +828,29 @@ public class DbInitializer : IDbInitializer
     private static string CreateLeaveRequestKey(string iamId, DateOnly startDate, DateOnly endDate)
         => $"{NormalizeKey(iamId)}|{startDate:O}|{endDate:O}";
 
+    private static string CreateEffectiveRangeKey(string iamId, DateOnly effectiveStartDate)
+        => $"{NormalizeKey(iamId)}|{effectiveStartDate:O}";
+
+    private static string CreateAssignmentKey(string scopeKey, string iamId, DateOnly effectiveStartDate)
+        => $"{NormalizeKey(scopeKey)}|{NormalizeKey(iamId)}|{effectiveStartDate:O}";
+
+    private static string CreateLeaveRequestDayKey(long leaveRequestId, DateOnly leaveDate)
+        => $"{leaveRequestId}|{leaveDate:O}";
+
     private static string CreateEmployeeAccrualBalanceKey(
         string employeeId,
         DateOnly asOfDate,
         string positionNumber,
         int leaveTypeNumber)
         => $"{NormalizeKey(employeeId)}|{asOfDate:O}|{NormalizeKey(positionNumber)}|{leaveTypeNumber}";
+
+    private static string CreateOutboundMessageDedupeKey(
+        string iamId,
+        string requestStartDate,
+        string requestEndDate,
+        string notificationType,
+        string recipientEmail)
+        => $"{NormalizeKey(iamId)}|{requestStartDate}|{requestEndDate}|{notificationType}|{recipientEmail}".ToLowerInvariant();
 
     private static EmployeeAccrualBalance CreateEmployeeAccrualBalance(EmployeeAccrualBalanceSeed seed)
     {
@@ -586,6 +906,75 @@ public class DbInitializer : IDbInitializer
         };
     }
 
+    private static Person CreatePerson(PersonSeed seed, IReadOnlyDictionary<string, AppUser> usersByIamId)
+    {
+        var names = seed.DisplayName.Split(' ', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var firstName = names.Length > 0 ? names[0] : seed.DisplayName;
+        var lastName = names.Length > 1 ? names[1] : seed.LastNameFallback;
+
+        return new Person
+        {
+            IamId = seed.IamId,
+            EmployeeId = seed.EmployeeId,
+            StudentId = null,
+            ExternalId = null,
+            FirstName = firstName,
+            MiddleName = null,
+            LastName = lastName,
+            Suffix = null,
+            FullName = seed.DisplayName,
+            Pronouns = null,
+            IsEmployee = seed.IsEmployee,
+            IsHsEmployee = false,
+            IsFaculty = seed.IsFaculty,
+            IsStudent = false,
+            IsStaff = seed.IsStaff,
+            IsExternal = false,
+            PrivacyCode = "N",
+            IsCampusEmployee = seed.IsEmployee ? "Y" : "N",
+            UserId = usersByIamId[seed.IamId].EmployeeId,
+            Email = seed.Email,
+            ModifyDate = ParseUtc(seed.ModifyDateUtc),
+            ModifyDateRaw = ParseUtc(seed.ModifyDateUtc).ToString("yyyy-MM-dd HH:mm:ss"),
+            FirstIngestedAt = ParseUtc(seed.ModifyDateUtc).AddDays(-14),
+            LastFetchedAt = ParseUtc(seed.ModifyDateUtc),
+            LastRunId = "11111111-2222-3333-4444-555555555555",
+            SourceEndpoint = $"fabric://people/{seed.SourceDepartmentCode.ToLowerInvariant()}",
+            PromotedAt = ParseUtc(seed.ModifyDateUtc).AddMinutes(15),
+            PromotionRunId = "66666666-7777-8888-9999-000000000000",
+        };
+    }
+
+    private static IEnumerable<LeaveRequestDay> ExpandLeaveRequestDays(
+        LeaveRequestSeed seed,
+        IReadOnlyDictionary<string, LeaveRequest> leaveRequestsByKey)
+    {
+        var startDate = ParseDateOnly(seed.StartDate);
+        var endDate = ParseDateOnly(seed.EndDate);
+        var requestKey = CreateLeaveRequestKey(seed.IamId, startDate, endDate);
+        var leaveRequestId = leaveRequestsByKey[requestKey].Id;
+        var totalDays = endDate.DayNumber - startDate.DayNumber + 1;
+        var hoursPerDay = decimal.Round(seed.TotalHours / totalDays, 2);
+        var allocatedHours = 0m;
+
+        for (var offset = 0; offset < totalDays; offset++)
+        {
+            var leaveDate = startDate.AddDays(offset);
+            var hours = offset == totalDays - 1
+                ? seed.TotalHours - allocatedHours
+                : hoursPerDay;
+
+            allocatedHours += hours;
+
+            yield return new LeaveRequestDay
+            {
+                LeaveRequestId = leaveRequestId,
+                LeaveDate = leaveDate,
+                Hours = hours,
+            };
+        }
+    }
+
     private static DateOnly ParseDateOnly(string value) => DateOnly.Parse(value);
 
     private static DateTime ParseUtc(string value) => DateTime.Parse(
@@ -622,6 +1011,56 @@ public class DbInitializer : IDbInitializer
         string ToEmail,
         bool IsActive,
         string UpdatedByIamId);
+
+    private sealed record PersonSeed(
+        string IamId,
+        string EmployeeId,
+        string DisplayName,
+        string? LastNameFallback,
+        string? Email,
+        bool IsEmployee,
+        bool IsFaculty,
+        bool IsStaff,
+        bool IsCampusEmployee,
+        string SourceDepartmentCode,
+        string ModifyDateUtc);
+
+    private sealed record AppSettingSeed(
+        string SettingKey,
+        string SettingValue,
+        string UpdatedByIamId,
+        string UpdatedUtc);
+
+    private sealed record EmployeeReportingDepartmentOverrideSeed(
+        string IamId,
+        string DepartmentCode,
+        string EffectiveStartDate,
+        string? EffectiveEndDateExclusive,
+        string? Reason,
+        string CreatedByIamId,
+        string CreatedUtc,
+        string? ClosedByIamId,
+        string? ClosedUtc);
+
+    private sealed record DepartmentChairAssignmentSeed(
+        string DepartmentCode,
+        string IamId,
+        string EffectiveStartDate,
+        string? EffectiveEndDateExclusive,
+        string CreatedByIamId,
+        string CreatedUtc,
+        string? ClosedByIamId,
+        string? ClosedUtc);
+
+    private sealed record ClusterCaoAssignmentSeed(
+        string ClusterName,
+        string IamId,
+        string EffectiveStartDate,
+        string? EffectiveEndDateExclusive,
+        string CreatedByIamId,
+        string CreatedUtc,
+        string? ClosedByIamId,
+        string? ClosedUtc);
 
     private sealed record LeaveTypeSeed(
         string LeaveTypeKey,
@@ -678,4 +1117,17 @@ public class DbInitializer : IDbInitializer
         string? Comment,
         string? ReasonCode,
         bool IsSelfAction);
+
+    private sealed record OutboundMessageSeed(
+        string RequestIamId,
+        string RequestStartDate,
+        string RequestEndDate,
+        string NotificationType,
+        string RecipientEmail,
+        OutboundMessageStatus Status,
+        string NotBeforeUtc,
+        string? SentUtc,
+        int AttemptCount,
+        string? LastError,
+        string? ProviderMessageId);
 }
