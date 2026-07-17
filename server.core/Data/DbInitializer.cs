@@ -37,55 +37,47 @@ public class DbInitializer : IDbInitializer
 
     private static readonly DepartmentSeed[] DevDepartments =
     [
-        new("D8K4M1", "Animal Science", 3, "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, true, "2026-07-08T08:00:00"),
-        new("P3X7Q9", "Population Health & Reproduction", 3, "Animal Sciences Cluster", WorkflowMode.DirectSubmission, true, "2026-07-08T08:00:00"),
-        new("L6V2R5", "Plant Sciences", 3, "Land & Environment Cluster", WorkflowMode.ApprovalRequired, true, "2026-07-08T08:00:00"),
-        new("A1N8T4", "Agricultural Experiment Stations", 2, null, WorkflowMode.DirectSubmission, true, "2026-07-08T08:00:00"),
+        new("030045", "ANIMAL SCIENCE", 5, "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, true, "2026-07-08T08:00:00"),
+        new("030000", "AGR & ENV SCI DEANS OFFICE", 5, "Land & Environment Cluster", WorkflowMode.DirectSubmission, true, "2026-07-08T08:00:00"),
     ];
 
     private static readonly DepartmentEmailRoutingSeed[] DevDepartmentEmailRoutings =
     [
-        new("D8K4M1", "animal-routing@fake.ucdavis.edu", true, "adminherd"),
-        new("D8K4M1", "leave-ops@fake.ucdavis.edu", true, "adminherd"),
-        new("P3X7Q9", "vet-routing@fake.ucdavis.edu", true, "adminherd"),
-        new("L6V2R5", "plants-routing@fake.ucdavis.edu", true, "adminherd"),
+        new("030045", "animal-routing@fake.ucdavis.edu", true, "adminherd"),
+        new("030045", "leave-ops@fake.ucdavis.edu", true, "adminherd"),
+        new("030000", "deans-routing@fake.ucdavis.edu", true, "adminherd"),
+        new("030000", "operations-routing@fake.ucdavis.edu", true, "adminherd"),
     ];
 
     private static readonly PersonSeed[] DevPeople =
     [
-        new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "D8K4M1", "2026-07-08T08:00:00"),
-        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Requester", DevelopmentSeedData.LocalRequesterEmail, true, false, false, true, "D8K4M1", "2026-07-08T08:05:00"),
-        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "A1N8T4", "2026-07-08T08:10:00"),
-        new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "A1N8T4", "2026-07-08T08:15:00"),
-        new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "D8K4M1", "2026-07-08T08:20:00"),
-        new("jlin", "59281746", "Jordan Lin", null, "jlin@fake.ucdavis.edu", true, false, true, true, "P3X7Q9", "2026-07-08T08:25:00"),
-        new("egarcia", "11846372", "Elena Garcia", null, "egarcia@fake.ucdavis.edu", true, false, false, true, "P3X7Q9", "2026-07-08T08:30:00"),
-        new("kchen", "73029514", "Kai Chen", null, "kchen@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T08:35:00"),
-        new("mowens", "28465091", "Morgan Owens", null, "mowens@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T08:40:00"),
-        new("lwilson", "66510837", "Lena Wilson", null, "lwilson@fake.ucdavis.edu", true, false, true, true, "D8K4M1", "2026-07-08T08:45:00"),
-        new("rshah", "40957263", "Riya Shah", null, null, true, false, true, true, "D8K4M1", "2026-07-08T08:50:00"),
-        new("nroberts", "95374128", "Noah Roberts", null, "nroberts@fake.ucdavis.edu", true, false, false, true, "P3X7Q9", "2026-07-08T08:55:00"),
-        new("sbaker", "17628405", "Sofia Baker", null, "sbaker@fake.ucdavis.edu", true, false, false, true, "L6V2R5", "2026-07-08T09:00:00"),
-        new("tnguyen", "52893617", "Theo Nguyen", null, "tnguyen@fake.ucdavis.edu", true, false, false, true, "A1N8T4", "2026-07-08T09:05:00"),
-    ];
-
-    private static readonly AppSettingSeed[] DevAppSettings =
-    [
-        new("Routing:DefaultToEmail", "aggieservice@fake.ucdavis.edu", "adminherd", "2026-07-08T09:10:00"),
-        new("Routing:DefaultCcJson", "[\"leave-ops@fake.ucdavis.edu\"]", "adminherd", "2026-07-08T09:12:00"),
+        new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "030045", "2026-07-08T08:00:00"),
+        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Requester", DevelopmentSeedData.LocalRequesterEmail, true, false, false, true, "030045", "2026-07-08T08:05:00"),
+        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "030000", "2026-07-08T08:10:00"),
+        new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "030000", "2026-07-08T08:15:00"),
+        new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:20:00"),
+        new("jlin", "59281746", "Jordan Lin", null, "jlin@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:25:00"),
+        new("egarcia", "11846372", "Elena Garcia", null, "egarcia@fake.ucdavis.edu", true, false, false, true, "030045", "2026-07-08T08:30:00"),
+        new("kchen", "73029514", "Kai Chen", null, "kchen@fake.ucdavis.edu", true, false, false, true, "030000", "2026-07-08T08:35:00"),
+        new("mowens", "28465091", "Morgan Owens", null, "mowens@fake.ucdavis.edu", true, false, false, true, "030000", "2026-07-08T08:40:00"),
+        new("lwilson", "66510837", "Lena Wilson", null, "lwilson@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:45:00"),
+        new("rshah", "40957263", "Riya Shah", null, null, true, false, true, true, "030045", "2026-07-08T08:50:00"),
+        new("nroberts", "95374128", "Noah Roberts", null, "nroberts@fake.ucdavis.edu", true, false, false, true, "030045", "2026-07-08T08:55:00"),
+        new("sbaker", "17628405", "Sofia Baker", null, "sbaker@fake.ucdavis.edu", true, false, false, true, "030000", "2026-07-08T09:00:00"),
+        new("tnguyen", "52893617", "Theo Nguyen", null, "tnguyen@fake.ucdavis.edu", true, false, false, true, "030000", "2026-07-08T09:05:00"),
     ];
 
     private static readonly EmployeeReportingDepartmentOverrideSeed[] DevEmployeeReportingDepartmentOverrides =
     [
-        new("sbaker", "D8K4M1", "2026-07-01", null, "Temporary reporting line coverage for summer operations.", "adminherd", "2026-07-08T09:20:00", null, null),
-        new("tnguyen", "L6V2R5", "2026-06-15", "2026-07-15", "Historical override retained for testing closed records.", "adminherd", "2026-07-01T09:20:00", "apatel", "2026-07-15T17:00:00"),
+        new("sbaker", "030045", "2026-07-01", null, "Temporary reporting line coverage for summer operations.", "adminherd", "2026-07-08T09:20:00", null, null),
+        new("tnguyen", "030045", "2026-06-15", "2026-07-15", "Historical override retained for testing closed records.", "adminherd", "2026-07-01T09:20:00", "apatel", "2026-07-15T17:00:00"),
     ];
 
     private static readonly DepartmentChairAssignmentSeed[] DevDepartmentChairAssignments =
     [
-        new("D8K4M1", "apatel", "2026-01-01", null, "adminherd", "2026-07-08T09:25:00", null, null),
-        new("P3X7Q9", "jlin", "2026-01-01", null, "adminherd", "2026-07-08T09:26:00", null, null),
-        new("L6V2R5", "kchen", "2025-09-01", "2026-06-30", "adminherd", "2026-06-01T09:26:00", "apatel", "2026-06-30T17:00:00"),
+        new("030045", "apatel", "2026-01-01", null, "adminherd", "2026-07-08T09:25:00", null, null),
+        new("030045", "jlin", "2026-01-01", null, "adminherd", "2026-07-08T09:26:00", null, null),
+        new("030000", "kchen", "2025-09-01", "2026-06-30", "adminherd", "2026-06-01T09:26:00", "apatel", "2026-06-30T17:00:00"),
     ];
 
     private static readonly ClusterCaoAssignmentSeed[] DevClusterCaoAssignments =
@@ -119,12 +111,12 @@ public class DbInitializer : IDbInitializer
 
     private static readonly LeaveRequestSeed[] DevLeaveRequests =
     [
-        new("lwilson", "66510837", "Vacation", null, LeaveRequestStatus.PendingApproval, "2026-07-14", "2026-07-16", 24.00m, "Summer conference travel.", "Lecture coverage arranged with department staff.", "D8K4M1", "Animal Science", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-08T15:30:00"),
-        new("rshah", "40957263", "FamilyCare", null, LeaveRequestStatus.PendingApproval, "2026-07-21", "2026-07-22", 16.00m, "Family care coverage needed for two half-days.", "Classes shifted to asynchronous materials.", "D8K4M1", "Animal Science", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-08T16:10:00"),
-        new("nroberts", "95374128", "Sick", null, LeaveRequestStatus.Approved, "2026-07-10", "2026-07-10", 8.00m, "Medical appointment.", "Clinic rotation covered by faculty peer.", "P3X7Q9", "Population Health & Reproduction", "Animal Sciences Cluster", WorkflowMode.DirectSubmission, "2026-07-07T09:20:00"),
-        new("sbaker", "17628405", "Vacation", "CompTime", LeaveRequestStatus.Approved, "2026-08-03", "2026-08-07", 40.00m, "Planned vacation.", "Greenhouse support assigned to backup specialist.", "L6V2R5", "Plant Sciences", "Land & Environment Cluster", WorkflowMode.ApprovalRequired, "2026-07-01T11:05:00"),
-        new("tnguyen", "52893617", "Sabbatical", null, LeaveRequestStatus.Denied, "2026-09-14", "2026-09-18", 40.00m, "Requested study leave before reactivation.", "No approved coverage available for requested period.", "A1N8T4", "Agricultural Experiment Stations", null, WorkflowMode.DirectSubmission, "2026-07-02T10:40:00"),
-        new("apatel", "36190428", "Vacation", null, LeaveRequestStatus.Approved, "2026-07-25", "2026-07-25", 8.00m, "Personal day.", "Chair duties delegated to interim reviewer.", "D8K4M1", "Animal Science", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-03T13:50:00"),
+        new("lwilson", "66510837", "Vacation", null, LeaveRequestStatus.PendingApproval, "2026-07-14", "2026-07-16", 24.00m, "Summer conference travel.", "Lecture coverage arranged with department staff.", "030045", "ANIMAL SCIENCE", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-08T15:30:00"),
+        new("rshah", "40957263", "FamilyCare", null, LeaveRequestStatus.PendingApproval, "2026-07-21", "2026-07-22", 16.00m, "Family care coverage needed for two half-days.", "Classes shifted to asynchronous materials.", "030045", "ANIMAL SCIENCE", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-08T16:10:00"),
+        new("nroberts", "95374128", "Sick", null, LeaveRequestStatus.Approved, "2026-07-10", "2026-07-10", 8.00m, "Medical appointment.", "Clinic rotation covered by faculty peer.", "030045", "ANIMAL SCIENCE", "Animal Sciences Cluster", WorkflowMode.DirectSubmission, "2026-07-07T09:20:00"),
+        new("sbaker", "17628405", "Vacation", "CompTime", LeaveRequestStatus.Approved, "2026-08-03", "2026-08-07", 40.00m, "Planned vacation.", "Greenhouse support assigned to backup specialist.", "030000", "AGR & ENV SCI DEANS OFFICE", "Land & Environment Cluster", WorkflowMode.ApprovalRequired, "2026-07-01T11:05:00"),
+        new("tnguyen", "52893617", "Sabbatical", null, LeaveRequestStatus.Denied, "2026-09-14", "2026-09-18", 40.00m, "Requested study leave before reactivation.", "No approved coverage available for requested period.", "030000", "AGR & ENV SCI DEANS OFFICE", "Land & Environment Cluster", WorkflowMode.DirectSubmission, "2026-07-02T10:40:00"),
+        new("apatel", "36190428", "Vacation", null, LeaveRequestStatus.Approved, "2026-07-25", "2026-07-25", 8.00m, "Personal day.", "Chair duties delegated to interim reviewer.", "030045", "ANIMAL SCIENCE", "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, "2026-07-03T13:50:00"),
     ];
 
     private static readonly LeaveRequestActionSeed[] DevLeaveRequestActions =
@@ -178,7 +170,6 @@ public class DbInitializer : IDbInitializer
         await SeedPeopleAsync(usersByIamId, ct);
 
         await SeedAppAdminAssignmentsAsync(usersByIamId, nowUtc, ct);
-        await SeedAppSettingsAsync(usersByIamId, ct);
         await SeedClustersAsync(usersByIamId, nowUtc, ct);
 
         var clustersByName = await LoadClustersByNameAsync(ct);
@@ -297,37 +288,6 @@ public class DbInitializer : IDbInitializer
         await _db.AppAdminAssignments.AddRangeAsync(missingAssignments, ct);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Seeded {Count} development AppAdminAssignment rows.", missingAssignments.Length);
-    }
-
-    private async Task SeedAppSettingsAsync(
-        IReadOnlyDictionary<string, AppUser> usersByIamId,
-        CancellationToken ct)
-    {
-        var existingKeys = await _db.AppSettings
-            .Select(setting => setting.SettingKey)
-            .ToListAsync(ct);
-
-        var existing = existingKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var missingSettings = DevAppSettings
-            .Where(setting => !existing.Contains(setting.SettingKey))
-            .Select(setting => new AppSetting
-            {
-                SettingKey = setting.SettingKey,
-                SettingValue = setting.SettingValue,
-                UpdatedByAppUserId = usersByIamId[setting.UpdatedByIamId].Id,
-                UpdatedUtc = ParseUtc(setting.UpdatedUtc),
-            })
-            .ToArray();
-
-        if (missingSettings.Length == 0)
-        {
-            return;
-        }
-
-        await _db.AppSettings.AddRangeAsync(missingSettings, ct);
-        await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seeded {Count} development AppSetting rows.", missingSettings.Length);
     }
 
     private async Task SeedClustersAsync(
@@ -1024,12 +984,6 @@ public class DbInitializer : IDbInitializer
         bool IsCampusEmployee,
         string SourceDepartmentCode,
         string ModifyDateUtc);
-
-    private sealed record AppSettingSeed(
-        string SettingKey,
-        string SettingValue,
-        string UpdatedByIamId,
-        string UpdatedUtc);
 
     private sealed record EmployeeReportingDepartmentOverrideSeed(
         string IamId,
