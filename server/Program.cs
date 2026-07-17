@@ -93,8 +93,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        await init.InitializeAsync(env.IsDevelopment());
+        await init.InitializeAsync();
     }
 
     app.UseForwardedHeaders();

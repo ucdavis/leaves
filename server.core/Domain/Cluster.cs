@@ -31,6 +31,7 @@ public class Cluster
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<Department> Departments { get; set; } = new List<Department>();
+    public ICollection<ClusterCaoAssignment> ClusterCaoAssignments { get; set; } = new List<ClusterCaoAssignment>();
 
     public static void Configure(EntityTypeBuilder<Cluster> entity)
     {

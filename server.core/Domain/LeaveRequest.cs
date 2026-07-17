@@ -9,7 +9,7 @@ namespace Server.Core.Domain;
 public class LeaveRequest
 {
     [Key]
-    public long Id { get; set; }
+    public int Id { get; set; }
 
     [Required]
     public int AppUserId { get; set; }
@@ -76,6 +76,8 @@ public class LeaveRequest
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<LeaveRequestAction> Actions { get; set; } = new List<LeaveRequestAction>();
+    public ICollection<LeaveRequestDay> Days { get; set; } = new List<LeaveRequestDay>();
+    public ICollection<OutboundMessage> OutboundMessages { get; set; } = new List<OutboundMessage>();
 
     public static void Configure(EntityTypeBuilder<LeaveRequest> entity)
     {

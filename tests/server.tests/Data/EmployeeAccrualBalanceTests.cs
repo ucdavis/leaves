@@ -53,8 +53,8 @@ public class EmployeeAccrualBalanceTests
         await using var db = TestDbContextFactory.CreateInMemory();
         var initializer = new DbInitializer(db, NullLogger<DbInitializer>.Instance);
 
-        await initializer.InitializeAsync(includeDevSeed: true);
-        await initializer.InitializeAsync(includeDevSeed: true);
+        await initializer.InitializeAsync();
+        await initializer.InitializeAsync();
 
         db.ChangeTracker.Clear();
         var balances = await db.EmployeeAccrualBalances.ToListAsync();
