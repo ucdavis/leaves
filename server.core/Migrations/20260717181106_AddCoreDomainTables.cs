@@ -11,25 +11,73 @@ namespace server.core.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "AppSetting",
-                columns: table => new
-                {
-                    SettingKey = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    SettingValue = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UpdatedByAppUserId = table.Column<int>(type: "int", nullable: true),
-                    UpdatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AppSetting", x => x.SettingKey);
-                    table.ForeignKey(
-                        name: "FK_AppSetting_AppUser_UpdatedByAppUserId",
-                        column: x => x.UpdatedByAppUserId,
-                        principalTable: "AppUser",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+            migrationBuilder.DropForeignKey(
+                name: "FK_LeaveRequestAction_LeaveRequest_LeaveRequestId",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropIndex(
+                name: "UX_LeaveRequestAction_LeaveRequestId",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_LeaveRequestAction",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_LeaveRequest",
+                table: "LeaveRequest");
+
+            migrationBuilder.AlterColumn<int>(
+                name: "Id",
+                table: "LeaveRequest",
+                type: "int",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint")
+                .Annotation("SqlServer:Identity", "1, 1")
+                .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AlterColumn<int>(
+                name: "LeaveRequestId",
+                table: "LeaveRequestAction",
+                type: "int",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint");
+
+            migrationBuilder.AlterColumn<int>(
+                name: "Id",
+                table: "LeaveRequestAction",
+                type: "int",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint")
+                .Annotation("SqlServer:Identity", "1, 1")
+                .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_LeaveRequest",
+                table: "LeaveRequest",
+                column: "Id");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_LeaveRequestAction",
+                table: "LeaveRequestAction",
+                column: "Id");
+
+            migrationBuilder.CreateIndex(
+                name: "UX_LeaveRequestAction_LeaveRequestId",
+                table: "LeaveRequestAction",
+                column: "LeaveRequestId",
+                unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_LeaveRequestAction_LeaveRequest_LeaveRequestId",
+                table: "LeaveRequestAction",
+                column: "LeaveRequestId",
+                principalTable: "LeaveRequest",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
 
             migrationBuilder.CreateTable(
                 name: "ClusterCaoAssignment",
@@ -150,9 +198,9 @@ namespace server.core.Migrations
                 name: "LeaveRequestDay",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    LeaveRequestId = table.Column<long>(type: "bigint", nullable: false),
+                    LeaveRequestId = table.Column<int>(type: "int", nullable: false),
                     LeaveDate = table.Column<DateOnly>(type: "date", nullable: false),
                     Hours = table.Column<decimal>(type: "decimal(10,2)", nullable: false)
                 },
@@ -171,9 +219,9 @@ namespace server.core.Migrations
                 name: "OutboundMessage",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    LeaveRequestId = table.Column<long>(type: "bigint", nullable: false),
+                    LeaveRequestId = table.Column<int>(type: "int", nullable: false),
                     NotificationType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     RecipientEmail = table.Column<string>(type: "nvarchar(320)", maxLength: 320, nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
@@ -236,11 +284,6 @@ namespace server.core.Migrations
                 {
                     table.PrimaryKey("PK_People", x => x.IamId);
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AppSetting_UpdatedByAppUserId",
-                table: "AppSetting",
-                column: "UpdatedByAppUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CaoAssignment_Cluster_EffectiveDates",
@@ -350,9 +393,6 @@ namespace server.core.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "AppSetting");
-
-            migrationBuilder.DropTable(
                 name: "ClusterCaoAssignment");
 
             migrationBuilder.DropTable(
@@ -370,6 +410,74 @@ namespace server.core.Migrations
             migrationBuilder.DropTable(
                 name: "People",
                 schema: "dbo");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_LeaveRequestAction_LeaveRequest_LeaveRequestId",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropIndex(
+                name: "UX_LeaveRequestAction_LeaveRequestId",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_LeaveRequestAction",
+                table: "LeaveRequestAction");
+
+            migrationBuilder.DropPrimaryKey(
+                name: "PK_LeaveRequest",
+                table: "LeaveRequest");
+
+            migrationBuilder.AlterColumn<long>(
+                name: "Id",
+                table: "LeaveRequest",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(int),
+                oldType: "int")
+                .Annotation("SqlServer:Identity", "1, 1")
+                .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AlterColumn<long>(
+                name: "LeaveRequestId",
+                table: "LeaveRequestAction",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(int),
+                oldType: "int");
+
+            migrationBuilder.AlterColumn<long>(
+                name: "Id",
+                table: "LeaveRequestAction",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(int),
+                oldType: "int")
+                .Annotation("SqlServer:Identity", "1, 1")
+                .OldAnnotation("SqlServer:Identity", "1, 1");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_LeaveRequest",
+                table: "LeaveRequest",
+                column: "Id");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_LeaveRequestAction",
+                table: "LeaveRequestAction",
+                column: "Id");
+
+            migrationBuilder.CreateIndex(
+                name: "UX_LeaveRequestAction_LeaveRequestId",
+                table: "LeaveRequestAction",
+                column: "LeaveRequestId",
+                unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_LeaveRequestAction_LeaveRequest_LeaveRequestId",
+                table: "LeaveRequestAction",
+                column: "LeaveRequestId",
+                principalTable: "LeaveRequest",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
         }
     }
 }

@@ -9,10 +9,10 @@ namespace Server.Core.Domain;
 public class LeaveRequestDay
 {
     [Key]
-    public long Id { get; set; }
+    public int Id { get; set; }
 
     [Required]
-    public long LeaveRequestId { get; set; }
+    public int LeaveRequestId { get; set; }
 
     public LeaveRequest? LeaveRequest { get; set; }
 

@@ -7,7 +7,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppAdminAssignment> AppAdminAssignments => Set<AppAdminAssignment>();
-    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<Cluster> Clusters => Set<Cluster>();
     public DbSet<ClusterCaoAssignment> ClusterCaoAssignments => Set<ClusterCaoAssignment>();
     public DbSet<Department> Departments => Set<Department>();
@@ -28,7 +27,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         AppUser.Configure(modelBuilder.Entity<AppUser>());
         AppAdminAssignment.Configure(modelBuilder.Entity<AppAdminAssignment>());
-        AppSetting.Configure(modelBuilder.Entity<AppSetting>());
         Cluster.Configure(modelBuilder.Entity<Cluster>());
         ClusterCaoAssignment.Configure(modelBuilder.Entity<ClusterCaoAssignment>());
         Department.Configure(modelBuilder.Entity<Department>());

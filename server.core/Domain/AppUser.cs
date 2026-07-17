@@ -57,7 +57,6 @@ public class AppUser
     public ICollection<ClusterCaoAssignment> CreatedClusterCaoAssignments { get; set; } = new List<ClusterCaoAssignment>();
     public ICollection<ClusterCaoAssignment> ClosedClusterCaoAssignments { get; set; } = new List<ClusterCaoAssignment>();
     public ICollection<DepartmentEmailRouting> UpdatedDepartmentEmailRoutings { get; set; } = new List<DepartmentEmailRouting>();
-    public ICollection<AppSetting> UpdatedAppSettings { get; set; } = new List<AppSetting>();
     public ICollection<LeaveRequest> LeaveRequests { get; set; } = new List<LeaveRequest>();
     public ICollection<LeaveRequestAction> LeaveRequestActions { get; set; } = new List<LeaveRequestAction>();
 

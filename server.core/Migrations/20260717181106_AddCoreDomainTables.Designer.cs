@@ -12,7 +12,7 @@ using Server.Core.Data;
 namespace server.core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260717155630_AddCoreDomainTables")]
+    [Migration("20260717181106_AddCoreDomainTables")]
     partial class AddCoreDomainTables
     {
         /// <inheritdoc />
@@ -54,29 +54,6 @@ namespace server.core.Migrations
                         .HasDatabaseName("UX_AppAdminAssignment_IamId");
 
                     b.ToTable("AppAdminAssignment");
-                });
-
-            modelBuilder.Entity("Server.Core.Domain.AppSetting", b =>
-                {
-                    b.Property<string>("SettingKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SettingValue")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("UpdatedByAppUserId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("SettingKey");
-
-                    b.HasIndex("UpdatedByAppUserId");
-
-                    b.ToTable("AppSetting");
                 });
 
             modelBuilder.Entity("Server.Core.Domain.AppUser", b =>
@@ -638,11 +615,11 @@ namespace server.core.Migrations
 
             modelBuilder.Entity("Server.Core.Domain.LeaveRequest", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AppUserId")
                         .HasColumnType("int");
@@ -733,11 +710,11 @@ namespace server.core.Migrations
 
             modelBuilder.Entity("Server.Core.Domain.LeaveRequestAction", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("ActionAt")
                         .HasColumnType("datetime2");
@@ -762,8 +739,8 @@ namespace server.core.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
-                    b.Property<long>("LeaveRequestId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("LeaveRequestId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ReasonCode")
                         .HasMaxLength(100)
@@ -786,11 +763,11 @@ namespace server.core.Migrations
 
             modelBuilder.Entity("Server.Core.Domain.LeaveRequestDay", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Hours")
                         .HasColumnType("decimal(10,2)");
@@ -798,8 +775,8 @@ namespace server.core.Migrations
                     b.Property<DateOnly>("LeaveDate")
                         .HasColumnType("date");
 
-                    b.Property<long>("LeaveRequestId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("LeaveRequestId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -858,11 +835,11 @@ namespace server.core.Migrations
 
             modelBuilder.Entity("Server.Core.Domain.OutboundMessage", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AttemptCount")
                         .ValueGeneratedOnAdd()
@@ -881,8 +858,8 @@ namespace server.core.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<long>("LeaveRequestId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("LeaveRequestId")
+                        .HasColumnType("int");
 
                     b.Property<Guid?>("LockId")
                         .HasColumnType("uniqueidentifier");
@@ -1059,16 +1036,6 @@ namespace server.core.Migrations
                         .IsRequired();
 
                     b.Navigation("CreatedByAppUser");
-                });
-
-            modelBuilder.Entity("Server.Core.Domain.AppSetting", b =>
-                {
-                    b.HasOne("Server.Core.Domain.AppUser", "UpdatedByAppUser")
-                        .WithMany("UpdatedAppSettings")
-                        .HasForeignKey("UpdatedByAppUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("UpdatedByAppUser");
                 });
 
             modelBuilder.Entity("Server.Core.Domain.Cluster", b =>
@@ -1262,8 +1229,6 @@ namespace server.core.Migrations
                     b.Navigation("LeaveRequestActions");
 
                     b.Navigation("LeaveRequests");
-
-                    b.Navigation("UpdatedAppSettings");
 
                     b.Navigation("UpdatedDepartmentEmailRoutings");
                 });

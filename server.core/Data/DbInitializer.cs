@@ -794,7 +794,7 @@ public class DbInitializer : IDbInitializer
     private static string CreateAssignmentKey(string scopeKey, string iamId, DateOnly effectiveStartDate)
         => $"{NormalizeKey(scopeKey)}|{NormalizeKey(iamId)}|{effectiveStartDate:O}";
 
-    private static string CreateLeaveRequestDayKey(long leaveRequestId, DateOnly leaveDate)
+    private static string CreateLeaveRequestDayKey(int leaveRequestId, DateOnly leaveDate)
         => $"{leaveRequestId}|{leaveDate:O}";
 
     private static string CreateEmployeeAccrualBalanceKey(
