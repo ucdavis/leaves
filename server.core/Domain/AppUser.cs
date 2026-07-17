@@ -50,7 +50,14 @@ public class AppUser
 
     public ICollection<AppAdminAssignment> CreatedAdminAssignments { get; set; } = new List<AppAdminAssignment>();
     public ICollection<Cluster> CreatedClusters { get; set; } = new List<Cluster>();
+    public ICollection<EmployeeReportingDepartmentOverride> CreatedEmployeeReportingDepartmentOverrides { get; set; } = new List<EmployeeReportingDepartmentOverride>();
+    public ICollection<EmployeeReportingDepartmentOverride> ClosedEmployeeReportingDepartmentOverrides { get; set; } = new List<EmployeeReportingDepartmentOverride>();
+    public ICollection<DepartmentChairAssignment> CreatedDepartmentChairAssignments { get; set; } = new List<DepartmentChairAssignment>();
+    public ICollection<DepartmentChairAssignment> ClosedDepartmentChairAssignments { get; set; } = new List<DepartmentChairAssignment>();
+    public ICollection<ClusterCaoAssignment> CreatedClusterCaoAssignments { get; set; } = new List<ClusterCaoAssignment>();
+    public ICollection<ClusterCaoAssignment> ClosedClusterCaoAssignments { get; set; } = new List<ClusterCaoAssignment>();
     public ICollection<DepartmentEmailRouting> UpdatedDepartmentEmailRoutings { get; set; } = new List<DepartmentEmailRouting>();
+    public ICollection<AppSetting> UpdatedAppSettings { get; set; } = new List<AppSetting>();
     public ICollection<LeaveRequest> LeaveRequests { get; set; } = new List<LeaveRequest>();
     public ICollection<LeaveRequestAction> LeaveRequestActions { get; set; } = new List<LeaveRequestAction>();
 

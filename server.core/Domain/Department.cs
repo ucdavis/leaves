@@ -40,6 +40,8 @@ public class Department
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<DepartmentEmailRouting> DepartmentEmailRoutings { get; set; } = new List<DepartmentEmailRouting>();
+    public ICollection<EmployeeReportingDepartmentOverride> EmployeeReportingDepartmentOverrides { get; set; } = new List<EmployeeReportingDepartmentOverride>();
+    public ICollection<DepartmentChairAssignment> DepartmentChairAssignments { get; set; } = new List<DepartmentChairAssignment>();
 
     public static void Configure(EntityTypeBuilder<Department> entity)
     {
