@@ -12,6 +12,9 @@ namespace Server.Controllers;
 [Route("api/admin/departments")]
 public sealed class AdminDepartmentsController : ApiControllerBase
 {
+    private const int ClusterNameMaxLength = 100;
+    private const int DepartmentCodeMaxLength = 10;
+    private const int DepartmentNameMaxLength = 100;
     private readonly AppDbContext _db;
 
     public AdminDepartmentsController(AppDbContext db)
@@ -118,9 +121,9 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Cluster name is required.");
         }
 
-        if (name.Length > 100)
+        if (name.Length > ClusterNameMaxLength)
         {
-            return ValidationProblem("Cluster name must be 100 characters or fewer.");
+            return ValidationProblem($"Cluster name must be {ClusterNameMaxLength} characters or fewer.");
         }
 
         var duplicateExists = await _db.Clusters.AnyAsync(
@@ -156,9 +159,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Department code is required.");
         }
 
-        if (departmentCode.Length > 10)
+        if (departmentCode.Length > DepartmentCodeMaxLength)
         {
-            return ValidationProblem("Department code must be 10 characters or fewer.");
+            return ValidationProblem($"Department code must be {DepartmentCodeMaxLength} characters or fewer.");
+        }
+
+        if (!departmentCode.All(character => char.IsLetterOrDigit(character) || character == '_' || character == '-'))
+        {
+            return ValidationProblem("Department code must use only letters, numbers, underscores, or hyphens.");
         }
 
         var departmentName = request.Name?.Trim();
@@ -167,9 +175,9 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Department name is required.");
         }
 
-        if (departmentName.Length > 100)
+        if (departmentName.Length > DepartmentNameMaxLength)
         {
-            return ValidationProblem("Department name must be 100 characters or fewer.");
+            return ValidationProblem($"Department name must be {DepartmentNameMaxLength} characters or fewer.");
         }
 
         if (request.ClusterId.HasValue)

@@ -7,12 +7,19 @@ import type {
 import type { CreateDepartmentInput } from '@/queries/adminDepartments.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 
+const DEPARTMENT_CODE_MAX_LENGTH = 10;
+const DEPARTMENT_NAME_MAX_LENGTH = 100;
+const CLUSTER_NAME_MAX_LENGTH = 100;
+
 const clusterFormSchema = z.object({
   name: z
     .string()
     .trim()
     .min(1, 'Cluster name is required.')
-    .max(100, 'Cluster name must be 100 characters or fewer.'),
+    .max(
+      CLUSTER_NAME_MAX_LENGTH,
+      `Cluster name must be ${CLUSTER_NAME_MAX_LENGTH} characters or fewer.`
+    ),
 });
 
 const departmentFormSchema = z.object({
@@ -22,16 +29,18 @@ const departmentFormSchema = z.object({
     .string()
     .trim()
     .min(1, 'Department code is required.')
-    .max(10, 'Department code must be 10 characters or fewer.')
-    .regex(
-      /^[A-Za-z0-9_-]+$/,
-      'Department code can only use letters, numbers, underscores, or hyphens.'
+    .max(
+      DEPARTMENT_CODE_MAX_LENGTH,
+      `Department code must be ${DEPARTMENT_CODE_MAX_LENGTH} characters or fewer.`
     ),
   name: z
     .string()
     .trim()
     .min(1, 'Department name is required.')
-    .max(100, 'Department name must be 100 characters or fewer.'),
+    .max(
+      DEPARTMENT_NAME_MAX_LENGTH,
+      `Department name must be ${DEPARTMENT_NAME_MAX_LENGTH} characters or fewer.`
+    ),
 });
 
 export function AdminDepartmentCreationPanel({

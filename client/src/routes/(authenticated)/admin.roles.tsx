@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -13,8 +17,10 @@ import {
 } from '@/queries/adminRoles.ts';
 import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
 import { DataTable } from '@/shared/dataTable.tsx';
+import { WarningModal } from '@/shared/WarningModal.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/roles')({
+  component: AdminRolesRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminRolesQueryOptions()),
   pendingComponent: () => (
@@ -27,7 +33,6 @@ export const Route = createFileRoute('/(authenticated)/admin/roles')({
       </p>
     </section>
   ),
-  component: AdminRolesRoute,
 });
 
 const roleLabels: Record<AdminAssignableRoleType, string> = {
@@ -35,6 +40,18 @@ const roleLabels: Record<AdminAssignableRoleType, string> = {
   cao: 'CAO',
   chair: 'Department chair',
 };
+
+type PendingRoleAction =
+  | {
+      kind: 'add';
+      roleType: AdminAssignableRoleType;
+      targetName: string | null;
+      userName: string;
+    }
+  | {
+      assignment: AdminRoleAssignment;
+      kind: 'remove';
+    };
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -49,6 +66,9 @@ function AdminRolesRoute() {
   const [effectiveStartDate, setEffectiveStartDate] = useState(getToday());
   const [effectiveEndDate, setEffectiveEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingRoleAction | null>(
+    null
+  );
 
   const invalidateRoles = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
@@ -74,10 +94,16 @@ function AdminRolesRoute() {
   const isSaving =
     addAdminMutation.isPending ||
     addCaoMutation.isPending ||
-    addChairMutation.isPending;
+    addChairMutation.isPending ||
+    removeMutation.isPending;
 
   const targetOptions = type === 'cao' ? data.clusters : data.departments;
-  const selectedUser = data.users.find((user) => user.iamId === iamId);
+  const selectedTargetName =
+    type === 'admin'
+      ? null
+      : (targetOptions.find((option) => option.id === targetId)?.name ?? null);
+  const selectedUserName =
+    data.users.find((user) => user.iamId === iamId)?.name ?? iamId;
 
   const resetForm = () => {
     setIamId('');
@@ -109,9 +135,40 @@ function AdminRolesRoute() {
       }
 
       resetForm();
+      return true;
     } catch (addError) {
       setError(getAdminMutationErrorMessage(addError));
+      return false;
     }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
+
+    if (pendingAction.kind === 'add') {
+      const succeeded = await handleAdd();
+      if (succeeded) {
+        setPendingAction(null);
+      }
+
+      return;
+    } else {
+      setError(null);
+
+      try {
+        await removeMutation.mutateAsync({
+          id: pendingAction.assignment.id,
+          type: pendingAction.assignment.type,
+        });
+      } catch (removeError) {
+        setError(getAdminMutationErrorMessage(removeError));
+        return;
+      }
+    }
+
+    setPendingAction(null);
   };
 
   const columns: ColumnDef<AdminRoleAssignment>[] = [
@@ -169,20 +226,15 @@ function AdminRolesRoute() {
         <button
           className="btn btn-ghost btn-sm text-rose-700"
           disabled={removeMutation.isPending || !row.original.active}
-          onClick={() => {
-            setError(null);
-            removeMutation
-              .mutateAsync({
-                id: row.original.id,
-                type: row.original.type,
-              })
-              .catch((removeError: unknown) => {
-                setError(getAdminMutationErrorMessage(removeError));
-              });
-          }}
+          onClick={() =>
+            setPendingAction({
+              assignment: row.original,
+              kind: 'remove',
+            })
+          }
           type="button"
         >
-          Remove
+          {row.original.type === 'admin' ? 'Remove' : 'Close out assignment'}
         </button>
       ),
       header: 'Actions',
@@ -232,11 +284,6 @@ function AdminRolesRoute() {
                 </option>
               ))}
             </select>
-            {selectedUser?.email ? (
-              <span className="label-text-alt mt-1 text-[var(--admin-ink-muted)]">
-                {selectedUser.email}
-              </span>
-            ) : null}
           </label>
 
           {type !== 'admin' ? (
@@ -267,7 +314,9 @@ function AdminRolesRoute() {
                 <span className="label-text font-medium">Start date</span>
                 <input
                   className="input input-bordered mt-2 w-full"
-                  onChange={(event) => setEffectiveStartDate(event.target.value)}
+                  onChange={(event) =>
+                    setEffectiveStartDate(event.target.value)
+                  }
                   type="date"
                   value={effectiveStartDate}
                 />
@@ -296,9 +345,14 @@ function AdminRolesRoute() {
               !iamId ||
               (type !== 'admin' && (!targetId || !effectiveStartDate))
             }
-            onClick={() => {
-              void handleAdd();
-            }}
+            onClick={() =>
+              setPendingAction({
+                kind: 'add',
+                roleType: type,
+                targetName: selectedTargetName,
+                userName: selectedUserName,
+              })
+            }
             type="button"
           >
             {isSaving ? 'Adding...' : 'Add role'}
@@ -325,6 +379,83 @@ function AdminRolesRoute() {
           }}
         />
       </section>
+
+      {pendingAction ? (
+        <RoleWarningModal
+          action={pendingAction}
+          isSaving={isSaving}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={() => {
+            void handleConfirmAction();
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function getRoleWarningModalText(action: PendingRoleAction) {
+  const isAdd = action.kind === 'add';
+  const roleType = isAdd ? action.roleType : action.assignment.type;
+  const title = isAdd
+    ? `Add ${roleLabels[roleType]} assignment?`
+    : roleType === 'admin'
+      ? 'Remove admin assignment?'
+      : `Close out ${roleLabels[roleType]} assignment?`;
+  const confirmLabel = isAdd
+    ? 'Add role'
+    : roleType === 'admin'
+      ? 'Remove'
+      : 'Close out assignment';
+  const personName = isAdd ? action.userName : action.assignment.name;
+  const scopeName = isAdd
+    ? (action.targetName ?? 'Application-wide')
+    : (action.assignment.targetName ?? 'Application-wide');
+  const message = isAdd ? (
+    <span>
+      This will grant {roleLabels[roleType]} access to {personName}
+      {scopeName === 'Application-wide' ? '' : ` for ${scopeName}`}.
+    </span>
+  ) : roleType === 'admin' ? (
+    <span>This will remove application admin access for {personName}.</span>
+  ) : (
+    <span>
+      This will close the active {roleLabels[roleType]} assignment for{' '}
+      {personName} in {scopeName}. The database will record the closing admin
+      and closing timestamp.
+    </span>
+  );
+
+  return {
+    confirmLabel,
+    message,
+    title,
+  };
+}
+
+function RoleWarningModal({
+  action,
+  isSaving,
+  onCancel,
+  onConfirm,
+}: {
+  action: PendingRoleAction;
+  isSaving: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { confirmLabel, message, title } = getRoleWarningModalText(action);
+
+  return (
+    <WarningModal
+      confirmLabel={confirmLabel}
+      description="Please confirm this role assignment change before it is saved."
+      isSaving={isSaving}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title={title}
+    >
+      {message}
+    </WarningModal>
   );
 }
