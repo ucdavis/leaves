@@ -18,6 +18,9 @@ export type ImportStatus = 'ready' | 'planned' | 'deferred';
 export type AdminUser = {
   active: boolean;
   departmentId: string;
+  departmentOverrideEndDate: string;
+  departmentOverrideId: string;
+  departmentOverrideStartDate: string;
   designation: AdminDesignation;
   email: string;
   employeeId: string;
@@ -30,15 +33,14 @@ export type AdminUser = {
 
 export type AdminUserEditableFields = Pick<
   AdminUser,
-  'email' | 'employeeId' | 'iamId' | 'name'
+  'email' | 'name'
 >;
-
-export type CreateUserInput = AdminUserEditableFields & {
-  active?: boolean;
-};
 
 export type UpdateUserInput = Partial<AdminUserEditableFields> & {
   active?: boolean;
+  departmentOverrideEndDate?: string;
+  departmentOverrideId?: string;
+  departmentOverrideStartDate?: string;
 };
 
 export type DepartmentRoutingEmail = {
@@ -116,12 +118,10 @@ type AdminDashboardResponse = {
 
 type AdminDataContextValue = {
   clusters: AdminCluster[];
-  createUser: (input: CreateUserInput) => Promise<void>;
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
   readonlyReason: string;
   removeRoutingEmail: (departmentId: string, emailId: string) => Promise<void>;
-  renameCluster: (clusterId: string, name: string) => Promise<void>;
   renameDepartment: (departmentId: string, name: string) => Promise<void>;
   statusSnapshot: AdminStatusSnapshot;
   updateDepartment: (
@@ -209,6 +209,9 @@ function normalizeDashboardResponse(
     users: response.users.map((user) => ({
       ...user,
       departmentId: user.departmentId ?? '',
+      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
+      departmentOverrideId: user.departmentOverrideId ?? '',
+      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
       designation: normalizeDesignation(user.designation),
       role: normalizeRole(user.role),
     })),
@@ -235,24 +238,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const dashboardQuery = useQuery(adminDashboardQueryOptions());
 
-  const createUserMutation = useMutation({
-    mutationFn: async (input: CreateUserInput) => {
-      await fetchJson<void>('/api/admin/users', {
-        body: JSON.stringify({
-          active: input.active ?? true,
-          email: input.email,
-          employeeId: input.employeeId,
-          iamId: input.iamId,
-          name: input.name,
-        }),
-        method: 'POST',
-      });
-    },
-    onSuccess: async () => {
-      await invalidateAdminDashboard(queryClient);
-    },
-  });
-
   const updateUserMutation = useMutation({
     mutationFn: async ({
       updates,
@@ -266,31 +251,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           active: updates.active,
           email: updates.email,
           emailSet: Object.hasOwn(updates, 'email'),
-          employeeId: updates.employeeId,
-          employeeIdSet: Object.hasOwn(updates, 'employeeId'),
-          iamId: updates.iamId,
-          iamIdSet: Object.hasOwn(updates, 'iamId'),
+          departmentOverrideEndDate: updates.departmentOverrideEndDate,
+          departmentOverrideId: updates.departmentOverrideId,
+          departmentOverrideSet: Object.hasOwn(updates, 'departmentOverrideId'),
+          departmentOverrideStartDate: updates.departmentOverrideStartDate,
           name: updates.name,
           nameSet: Object.hasOwn(updates, 'name'),
         }),
-        method: 'PATCH',
-      });
-    },
-    onSuccess: async () => {
-      await invalidateAdminDashboard(queryClient);
-    },
-  });
-
-  const renameClusterMutation = useMutation({
-    mutationFn: async ({
-      clusterId,
-      name,
-    }: {
-      clusterId: string;
-      name: string;
-    }) => {
-      await fetchJson<void>(`/api/admin/clusters/${clusterId}`, {
-        body: JSON.stringify({ name }),
         method: 'PATCH',
       });
     },
@@ -391,17 +358,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     <AdminDataContext.Provider
       value={{
         clusters: data.clusters,
-        createUser: async (input) => {
-          await createUserMutation.mutateAsync(input);
-        },
         dataSources: data.dataSources,
         departments: data.departments,
         readonlyReason: data.readonlyReason,
         removeRoutingEmail: async (departmentId, emailId) => {
           await removeRoutingEmailMutation.mutateAsync({ departmentId, emailId });
-        },
-        renameCluster: async (clusterId, name) => {
-          await renameClusterMutation.mutateAsync({ clusterId, name });
         },
         renameDepartment: async (departmentId, name) => {
           await updateDepartmentMutation.mutateAsync({

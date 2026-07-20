@@ -1,31 +1,73 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import {
-  useAdminData,
-} from '@/shared/admin/adminData.tsx';
-import { HttpError } from '@/lib/api.ts';
+  adminDepartmentsQueryOptions,
+  createAdminCluster,
+  createAdminDepartment,
+  removeAdminDepartmentRoutingEmail,
+  renameAdminDepartment,
+  updateAdminDepartment,
+  upsertAdminDepartmentRoutingEmail,
+} from '@/queries/adminDepartments.ts';
+import { AdminDepartmentCreationPanel } from '@/shared/admin/AdminDepartmentCreationPanel.tsx';
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
 import { DepartmentSettingsModal } from '@/shared/admin/DepartmentSettingsModal.tsx';
+import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
+  pendingComponent: () => (
+    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+        Loading department data
+      </h2>
+      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+        Pulling the current department and cluster records from the database.
+      </p>
+    </section>
+  ),
   component: AdminDepartmentsRoute,
 });
 
 function AdminDepartmentsRoute() {
-  const {
-    clusters,
-    departments,
-    readonlyReason,
-    removeRoutingEmail,
-    renameDepartment,
-    updateDepartment,
-    upsertRoutingEmail,
-    users,
-  } = useAdminData();
+  const queryClient = useQueryClient();
+  const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
+  const { clusters, departments, readonlyReason, users } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
   const [viewDepartmentId, setViewDepartmentId] = useState<string | null>(null);
+
+  const invalidateDepartments = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['admin', 'departments'] });
+  };
+
+  const createClusterMutation = useMutation({
+    mutationFn: createAdminCluster,
+    onSuccess: invalidateDepartments,
+  });
+  const createDepartmentMutation = useMutation({
+    mutationFn: createAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const renameDepartmentMutation = useMutation({
+    mutationFn: renameAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const updateDepartmentMutation = useMutation({
+    mutationFn: updateAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const upsertRoutingEmailMutation = useMutation({
+    mutationFn: upsertAdminDepartmentRoutingEmail,
+    onSuccess: invalidateDepartments,
+  });
+  const removeRoutingEmailMutation = useMutation({
+    mutationFn: removeAdminDepartmentRoutingEmail,
+    onSuccess: invalidateDepartments,
+  });
 
   const clusterGroups = clusters.map((cluster) => ({
     ...cluster,
@@ -139,6 +181,15 @@ function AdminDepartmentsRoute() {
         </p>
       </section>
 
+      <AdminDepartmentCreationPanel
+        clusters={clusters}
+        formatError={getAdminMutationErrorMessage}
+        onCreateCluster={(name) => createClusterMutation.mutateAsync({ name })}
+        onCreateDepartment={(input) =>
+          createDepartmentMutation.mutateAsync({ input })
+        }
+      />
+
       {clusterGroups.map((cluster) => (
         <section
           className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm"
@@ -178,7 +229,12 @@ function AdminDepartmentsRoute() {
                   linkedUserCount={linkedUserCount}
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  onRename={(name) => renameDepartment(department.id, name)}
+                  onRename={(name) =>
+                    renameDepartmentMutation.mutateAsync({
+                      departmentId: department.id,
+                      name,
+                    })
+                  }
                 />
               );
             })}
@@ -201,7 +257,12 @@ function AdminDepartmentsRoute() {
                 ).length}
                 onOpenRoster={() => setViewDepartmentId(department.id)}
                 onOpenSettings={() => setEditingDepartmentId(department.id)}
-                onRename={(name) => renameDepartment(department.id, name)}
+                onRename={(name) =>
+                  renameDepartmentMutation.mutateAsync({
+                    departmentId: department.id,
+                    name,
+                  })
+                }
               />
             ))}
           </div>
@@ -215,49 +276,29 @@ function AdminDepartmentsRoute() {
           formatError={getAdminMutationErrorMessage}
           onClose={() => setEditingDepartmentId(null)}
           onRemoveRoutingEmail={(emailId) =>
-            removeRoutingEmail(editingDepartment.id, emailId)
-          }
-          onSave={(updates) =>
-            updateDepartment(editingDepartment.id, updates).then(() => {
-              setEditingDepartmentId(null);
+            removeRoutingEmailMutation.mutateAsync({
+              departmentId: editingDepartment.id,
+              emailId,
             })
           }
+          onSave={(updates) =>
+            updateDepartmentMutation
+              .mutateAsync({
+                departmentId: editingDepartment.id,
+                updates,
+              })
+              .then(() => {
+                setEditingDepartmentId(null);
+              })
+          }
           onUpsertRoutingEmail={(email) =>
-            upsertRoutingEmail(editingDepartment.id, email)
+            upsertRoutingEmailMutation.mutateAsync({
+              departmentId: editingDepartment.id,
+              email,
+            })
           }
         />
       ) : null}
     </div>
   );
-}
-
-function getAdminMutationErrorMessage(error: unknown) {
-  if (error instanceof HttpError) {
-    if (typeof error.body === 'string' && error.body.trim()) {
-      return error.body;
-    }
-
-    if (error.body && typeof error.body === 'object') {
-      const body = error.body as {
-        detail?: string;
-        title?: string;
-      };
-
-      if (body.detail) {
-        return body.detail;
-      }
-
-      if (body.title) {
-        return body.title;
-      }
-    }
-
-    return 'Unable to save the change. Please try again.';
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unable to save the change. Please try again.';
 }

@@ -6,7 +6,10 @@ import { AdminUserModal } from '@/shared/admin/AdminUserModal.tsx';
 import type {
   AdminUser,
 } from '@/shared/admin/adminData.tsx';
-import { useAdminData } from '@/shared/admin/adminData.tsx';
+import {
+  AdminDataProvider,
+  useAdminData,
+} from '@/shared/admin/adminData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/users')({
@@ -18,13 +21,19 @@ type UserRow = AdminUser & {
 };
 
 function AdminUsersRoute() {
-  const { createUser, departments, readonlyReason, updateUser, users } =
-    useAdminData();
+  return (
+    <AdminDataProvider>
+      <AdminUsersRouteContent />
+    </AdminDataProvider>
+  );
+}
+
+function AdminUsersRouteContent() {
+  const { departments, readonlyReason, updateUser, users } = useAdminData();
   const [filterRole, setFilterRole] = useState('');
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [showExcluded, setShowExcluded] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const departmentNames = Object.fromEntries(
     departments.map((department) => [department.id, department.name])
@@ -160,13 +169,6 @@ function AdminUsersRoute() {
               {readonlyReason}
             </p>
           </div>
-          <button
-            className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
-            onClick={() => setShowCreateModal(true)}
-            type="button"
-          >
-            Add user
-          </button>
         </div>
 
         <DataTable
@@ -222,53 +224,29 @@ function AdminUsersRoute() {
 
       {editingUser ? (
         <AdminUserModal
+          departments={departments}
           initialValues={{
-            active: editingUser.active,
+            departmentOverrideEndDate: editingUser.departmentOverrideEndDate,
+            departmentOverrideId: editingUser.departmentOverrideId,
+            departmentOverrideStartDate: editingUser.departmentOverrideStartDate,
             email: editingUser.email,
-            employeeId: editingUser.employeeId,
-            iamId: editingUser.iamId,
             name: editingUser.name,
           }}
           onClose={() => setEditingUserId(null)}
           onSubmit={async (value) => {
             await updateUser(editingUser.id, {
-              active: value.active,
+              departmentOverrideEndDate: value.departmentOverrideEndDate,
+              departmentOverrideId: value.departmentOverrideId,
+              departmentOverrideStartDate: value.departmentOverrideStartDate,
               email: value.email,
-              employeeId: value.employeeId,
-              iamId: value.iamId,
               name: value.name,
             });
+            setEditingUserId(null);
           }}
           submitErrorMessage={getUserUpdateErrorMessage}
           submitLabel="Save changes"
           submittingLabel="Saving..."
           title={`Edit ${editingUser.name}`}
-        />
-      ) : null}
-
-      {showCreateModal ? (
-        <AdminUserModal
-          initialValues={{
-            active: true,
-            email: '',
-            employeeId: '',
-            iamId: '',
-            name: '',
-          }}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={async (value) => {
-            await createUser({
-              email: value.email,
-              employeeId: value.employeeId,
-              iamId: value.iamId,
-              name: value.name,
-            });
-          }}
-          showActiveField={false}
-          submitErrorMessage={getUserCreateErrorMessage}
-          submitLabel="Create user"
-          submittingLabel="Creating..."
-          title="Add user"
         />
       ) : null}
     </div>
@@ -342,13 +320,6 @@ function UserStatusToggle({
 }
 
 
-function getUserCreateErrorMessage(error: unknown) {
-  return getUserMutationErrorMessage(
-    error,
-    'Unable to create the user. Please review the fields and try again.'
-  );
-}
-
 function getUserUpdateErrorMessage(error: unknown) {
   return getUserMutationErrorMessage(
     error,
@@ -389,7 +360,7 @@ function getUserMutationErrorMessage(error: unknown, fallbackMessage: string) {
     }
 
     if (error.status === 409) {
-      return 'A user with that IAM ID, employee ID, or identity already exists.';
+      return 'That user update conflicts with an existing record.';
     }
 
     return fallbackMessage;

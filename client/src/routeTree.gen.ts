@@ -14,6 +14,7 @@ import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
 import { Route as authenticatedAdminUsersRouteImport } from './routes/(authenticated)/admin.users'
 import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
+import { Route as authenticatedAdminRolesRouteImport } from './routes/(authenticated)/admin.roles'
 import { Route as authenticatedAdminDepartmentsRouteImport } from './routes/(authenticated)/admin.departments'
 
 const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
@@ -41,6 +42,11 @@ const authenticatedAdminStatusRoute =
     path: '/status',
     getParentRoute: () => authenticatedAdminRoute,
   } as any)
+const authenticatedAdminRolesRoute = authenticatedAdminRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => authenticatedAdminRoute,
+} as any)
 const authenticatedAdminDepartmentsRoute =
   authenticatedAdminDepartmentsRouteImport.update({
     id: '/departments',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof authenticatedAdminRouteWithChildren
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/admin/roles': typeof authenticatedAdminRolesRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
   '/admin/users': typeof authenticatedAdminUsersRoute
 }
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/admin': typeof authenticatedAdminRouteWithChildren
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/admin/roles': typeof authenticatedAdminRolesRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
   '/admin/users': typeof authenticatedAdminUsersRoute
 }
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
   '/(authenticated)/': typeof authenticatedIndexRoute
   '/(authenticated)/admin/departments': typeof authenticatedAdminDepartmentsRoute
+  '/(authenticated)/admin/roles': typeof authenticatedAdminRolesRoute
   '/(authenticated)/admin/status': typeof authenticatedAdminStatusRoute
   '/(authenticated)/admin/users': typeof authenticatedAdminUsersRoute
 }
@@ -77,16 +86,24 @@ export interface FileRouteTypes {
     | '/admin'
     | '/'
     | '/admin/departments'
+    | '/admin/roles'
     | '/admin/status'
     | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/admin' | '/' | '/admin/departments' | '/admin/status' | '/admin/users'
+  to:
+    | '/admin'
+    | '/'
+    | '/admin/departments'
+    | '/admin/roles'
+    | '/admin/status'
+    | '/admin/users'
   id:
     | '__root__'
     | '/(authenticated)'
     | '/(authenticated)/admin'
     | '/(authenticated)/'
     | '/(authenticated)/admin/departments'
+    | '/(authenticated)/admin/roles'
     | '/(authenticated)/admin/status'
     | '/(authenticated)/admin/users'
   fileRoutesById: FileRoutesById
@@ -132,6 +149,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authenticatedAdminStatusRouteImport
       parentRoute: typeof authenticatedAdminRoute
     }
+    '/(authenticated)/admin/roles': {
+      id: '/(authenticated)/admin/roles'
+      path: '/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof authenticatedAdminRolesRouteImport
+      parentRoute: typeof authenticatedAdminRoute
+    }
     '/(authenticated)/admin/departments': {
       id: '/(authenticated)/admin/departments'
       path: '/departments'
@@ -144,12 +168,14 @@ declare module '@tanstack/react-router' {
 
 interface authenticatedAdminRouteChildren {
   authenticatedAdminDepartmentsRoute: typeof authenticatedAdminDepartmentsRoute
+  authenticatedAdminRolesRoute: typeof authenticatedAdminRolesRoute
   authenticatedAdminStatusRoute: typeof authenticatedAdminStatusRoute
   authenticatedAdminUsersRoute: typeof authenticatedAdminUsersRoute
 }
 
 const authenticatedAdminRouteChildren: authenticatedAdminRouteChildren = {
   authenticatedAdminDepartmentsRoute: authenticatedAdminDepartmentsRoute,
+  authenticatedAdminRolesRoute: authenticatedAdminRolesRoute,
   authenticatedAdminStatusRoute: authenticatedAdminStatusRoute,
   authenticatedAdminUsersRoute: authenticatedAdminUsersRoute,
 }

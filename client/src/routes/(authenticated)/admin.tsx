@@ -1,7 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import { meQueryOptions, type User } from '@/queries/user.ts';
-import { AdminDataProvider } from '@/shared/admin/adminData.tsx';
 import { AdminLayout } from '@/shared/admin/adminLayout.tsx';
 import { type RouterContext } from '@/main.tsx';
 
@@ -26,11 +25,7 @@ export const Route = createFileRoute('/(authenticated)/admin')({
 });
 
 function AdminRoute() {
-  return (
-    <AdminDataProvider>
-      <AdminLayout />
-    </AdminDataProvider>
-  );
+  return <AdminLayout />;
 }
 
 function hasAdminRole(user: User) {

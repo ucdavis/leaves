@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { z } from 'zod';
+import type { AdminDepartment } from '@/shared/admin/adminData.tsx';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
 const userFormSchema = z.object({
+  departmentOverrideEndDate: z.string(),
+  departmentOverrideId: z.string(),
+  departmentOverrideStartDate: z.string(),
   email: z
     .string()
     .trim()
@@ -11,45 +15,42 @@ const userFormSchema = z.object({
       (value) => value.length === 0 || z.email().safeParse(value).success,
       'Enter a valid email address.'
     ),
-  employeeId: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value.length === 0 || /^\d{8}$/.test(value),
-      'Employee ID must be exactly 8 digits.'
-    ),
-  iamId: z
-    .string()
-    .trim()
-    .min(1, 'IAM ID is required.')
-    .max(10, 'IAM ID must be 10 characters or fewer.')
-    .regex(
-      /^[a-z][\w-]*$/i,
-      'IAM ID must start with a letter and use only letters, numbers, underscores, or hyphens.'
-    ),
   name: z.string().trim().min(1, 'Display name is required.'),
-});
+}).refine(
+  (value) =>
+    !value.departmentOverrideId.trim() ||
+    !!value.departmentOverrideStartDate.trim(),
+  {
+    message: 'Start date is required when adding a department override.',
+    path: ['departmentOverrideStartDate'],
+  }
+).refine(
+  (value) =>
+    !value.departmentOverrideEndDate.trim() ||
+    !value.departmentOverrideStartDate.trim() ||
+    value.departmentOverrideEndDate > value.departmentOverrideStartDate,
+  {
+    message: 'End date must be after the start date.',
+    path: ['departmentOverrideEndDate'],
+  }
+);
 
-const editableUserFormSchema = userFormSchema.extend({
-  active: z.boolean(),
-});
-
-export type AdminUserModalValues = z.infer<typeof editableUserFormSchema>;
+export type AdminUserModalValues = z.infer<typeof userFormSchema>;
 
 export function AdminUserModal({
+  departments,
   initialValues,
   onClose,
   onSubmit,
-  showActiveField = true,
   submitErrorMessage,
   submitLabel,
   submittingLabel,
   title,
 }: {
+  departments: AdminDepartment[];
   initialValues: AdminUserModalValues;
   onClose: () => void;
   onSubmit: (value: AdminUserModalValues) => Promise<void>;
-  showActiveField?: boolean;
   submitErrorMessage: (error: unknown) => string;
   submitLabel: string;
   submittingLabel: string;
@@ -63,10 +64,10 @@ export function AdminUserModal({
 
       try {
         await onSubmit({
-          active: value.active,
+          departmentOverrideEndDate: value.departmentOverrideEndDate,
+          departmentOverrideId: value.departmentOverrideId,
+          departmentOverrideStartDate: value.departmentOverrideStartDate,
           email: value.email.trim(),
-          employeeId: value.employeeId.trim(),
-          iamId: value.iamId.trim(),
           name: value.name.trim(),
         });
       } catch (error) {
@@ -74,13 +75,13 @@ export function AdminUserModal({
       }
     },
     validators: {
-      onChange: editableUserFormSchema,
+      onChange: userFormSchema,
     },
   });
 
   return (
     <AdminModalFrame
-      description="These edits now persist to the AppUser table."
+      description="Profile edits persist to AppUser. Department overrides create dated reporting department rows."
       title={title}
     >
       <form
@@ -97,23 +98,35 @@ export function AdminUserModal({
             <form.AppField name="email">
               {(field) => <field.TextField label="Email" type="email" />}
             </form.AppField>
-            <form.AppField name="employeeId">
-              {(field) => <field.TextField label="Employee ID" />}
-            </form.AppField>
-            <form.AppField name="iamId">
-              {(field) => <field.TextField label="IAM ID" />}
-            </form.AppField>
           </div>
 
-          {showActiveField ? (
-            <div className="mt-5">
-              <form.AppField name="active">
+          <div className="mt-6 rounded-2xl bg-[var(--admin-sand)] p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--admin-gold-deep)]">
+              Department override
+            </h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <form.AppField name="departmentOverrideId">
                 {(field) => (
-                  <field.CheckboxField label="Include this person in the admin roster" />
+                  <field.SelectField
+                    allowEmptyOption
+                    label="Department"
+                    options={departments.map((department) => ({
+                      label: department.name,
+                      value: department.id,
+                    }))}
+                    placeholder="No override"
+                    selectClassName="select select-bordered w-full bg-white"
+                  />
                 )}
               </form.AppField>
+              <form.AppField name="departmentOverrideStartDate">
+                {(field) => <field.TextField label="Start date" type="date" />}
+              </form.AppField>
+              <form.AppField name="departmentOverrideEndDate">
+                {(field) => <field.TextField label="End date" type="date" />}
+              </form.AppField>
             </div>
-          ) : null}
+          </div>
 
           {submitError ? (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

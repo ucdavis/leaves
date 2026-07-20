@@ -1,12 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { AdminStatusContent } from '@/shared/admin/AdminStatusContent.tsx';
-import { useAdminData } from '@/shared/admin/adminData.tsx';
+import {
+  AdminDataProvider,
+  useAdminData,
+} from '@/shared/admin/adminData.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/status')({
   component: AdminStatusRoute,
 });
 
 function AdminStatusRoute() {
+  return (
+    <AdminDataProvider>
+      <AdminStatusRouteContent />
+    </AdminDataProvider>
+  );
+}
+
+function AdminStatusRouteContent() {
   const { dataSources, departments, statusSnapshot } = useAdminData();
 
   return (
