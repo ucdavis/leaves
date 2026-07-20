@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Helpers;
+using Server.Services;
 
 namespace Server.Controllers;
 
@@ -16,100 +17,18 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
     private readonly AppDbContext _db;
+    private readonly AdminDataService _adminDataService;
 
-    public AdminDepartmentsController(AppDbContext db)
+    public AdminDepartmentsController(AppDbContext db, AdminDataService adminDataService)
     {
         _db = db;
+        _adminDataService = adminDataService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        var clusters = await _db.Clusters
-            .AsNoTracking()
-            .OrderBy(cluster => cluster.ClusterName)
-            .ToListAsync(cancellationToken);
-
-        var departments = await _db.Departments
-            .AsNoTracking()
-            .Include(department => department.DepartmentEmailRoutings)
-            .OrderBy(department => department.DepartmentName)
-            .ToListAsync(cancellationToken);
-
-        var users = await _db.AppUsers
-            .AsNoTracking()
-            .OrderBy(user => user.DisplayName)
-            .ToListAsync(cancellationToken);
-
-        var adminIamIds = await _db.AppAdminAssignments
-            .AsNoTracking()
-            .Select(assignment => assignment.IamId.Trim())
-            .ToHashSetAsync(cancellationToken);
-
-        var leaveRequests = await _db.LeaveRequests
-            .AsNoTracking()
-            .OrderByDescending(request => request.SubmittedAt)
-            .ThenByDescending(request => request.Id)
-            .ToListAsync(cancellationToken);
-
-        var latestDepartmentByUserId = leaveRequests
-            .GroupBy(request => request.AppUserId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().ReportingDepartmentCodeSnapshot);
-
-        var departmentResponses = departments
-            .Select(department => new AdminDepartmentResponse(
-                ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "notification",
-                ChairUserId: null,
-                ClusterId: department.ClusterId?.ToString(),
-                Code: department.DepartmentCode,
-                DispositionRequired: false,
-                Id: department.DepartmentCode,
-                Name: department.DepartmentName,
-                RoutingEmails: department.DepartmentEmailRoutings
-                    .Where(routing => routing.IsActive)
-                    .OrderBy(routing => routing.ToEmail)
-                    .Select(routing => new DepartmentRoutingEmailResponse(
-                        Address: routing.ToEmail,
-                        Id: routing.Id.ToString(),
-                        Kind: "to"))
-                    .ToList()))
-            .ToList();
-
-        var clusterResponses = clusters
-            .Select(cluster => new AdminClusterResponse(
-                CaoUserId: null,
-                Id: cluster.Id.ToString(),
-                Name: cluster.ClusterName))
-            .ToList();
-
-        var userResponses = users
-            .Select(user =>
-            {
-                var trimmedIamId = user.IamId.Trim();
-                var isAdmin = adminIamIds.Contains(trimmedIamId);
-                var departmentCode = latestDepartmentByUserId.GetValueOrDefault(user.Id);
-
-                return new AdminUserResponse(
-                    Id: user.Id.ToString(),
-                    Active: user.IsActive,
-                    DepartmentId: departmentCode,
-                    Designation: isAdmin ? "admin" : "fy",
-                    Email: user.Email ?? string.Empty,
-                    EmployeeId: user.EmployeeId?.Trim() ?? string.Empty,
-                    IamId: trimmedIamId,
-                    Name: user.DisplayName ?? trimmedIamId,
-                    Position: string.Empty,
-                    Role: isAdmin ? "admin" : "faculty");
-            })
-            .ToList();
-
-        return Ok(new AdminDepartmentsResponse(
-            Clusters: clusterResponses,
-            Departments: departmentResponses,
-            ReadonlyReason: "Chair, CAO, designation, and disposition fields are not modeled in the current database yet, so this admin UI only enables the fields that persist today.",
-            Users: userResponses));
+        return Ok(await _adminDataService.GetDepartmentsAsync(cancellationToken));
     }
 
     [HttpPost("clusters")]
@@ -347,33 +266,6 @@ public sealed class AdminDepartmentsController : ApiControllerBase
                (sqlException.Number == 2601 || sqlException.Number == 2627);
     }
 
-    private sealed record AdminDepartmentsResponse(
-        IReadOnlyList<AdminClusterResponse> Clusters,
-        IReadOnlyList<AdminDepartmentResponse> Departments,
-        string ReadonlyReason,
-        IReadOnlyList<AdminUserResponse> Users);
-    private sealed record AdminClusterResponse(string? CaoUserId, string Id, string Name);
-    private sealed record AdminDepartmentResponse(
-        string ApprovalMode,
-        string? ChairUserId,
-        string? ClusterId,
-        string Code,
-        bool DispositionRequired,
-        string Id,
-        string Name,
-        IReadOnlyList<DepartmentRoutingEmailResponse> RoutingEmails);
-    private sealed record DepartmentRoutingEmailResponse(string Address, string Id, string Kind);
-    private sealed record AdminUserResponse(
-        string Id,
-        bool Active,
-        string? DepartmentId,
-        string Designation,
-        string Email,
-        string EmployeeId,
-        string IamId,
-        string Name,
-        string Position,
-        string Role);
     public sealed record CreateClusterRequest(string? Name);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
     public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode);

@@ -26,14 +26,12 @@ type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
 type AdminDepartmentsResponse = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  readonlyReason: string;
   users: AdminDepartmentUserResponse[];
 };
 
 export type AdminDepartmentsPageData = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  readonlyReason: string;
   users: Array<AdminUser & { departmentId: string }>;
 };
 

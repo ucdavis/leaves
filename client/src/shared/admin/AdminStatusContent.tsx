@@ -51,7 +51,7 @@ export function AdminStatusContent({
     <div className="space-y-6">
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <AdminMetricCard
-          label="Active users"
+          label="People"
           subtitle={`${statusSnapshot.users.admins} admins, ${statusSnapshot.users.chairs} chairs`}
           value={String(statusSnapshot.users.total)}
           variant="summary"
@@ -97,7 +97,7 @@ export function AdminStatusContent({
           <div className="space-y-1">
             <IssueRow
               count={statusSnapshot.issues.missingEmails}
-              label="Users missing email addresses"
+              label="People missing email addresses"
               tone="error"
             />
             <IssueRow
@@ -117,7 +117,7 @@ export function AdminStatusContent({
             />
             <IssueRow
               count={statusSnapshot.issues.excludedUsers}
-              label="Excluded users"
+              label="Excluded people"
               tone="neutral"
             />
           </div>
@@ -146,7 +146,7 @@ export function AdminStatusContent({
               value: String(statusSnapshot.users.caos),
             },
           ]}
-          title="Users"
+          title="People"
         />
 
         <MetricSection

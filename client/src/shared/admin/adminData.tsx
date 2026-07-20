@@ -54,7 +54,6 @@ export type AdminDepartment = {
   chairUserId: string | null;
   clusterId: string | null;
   code: string;
-  dispositionRequired: boolean;
   id: string;
   name: string;
   routingEmails: DepartmentRoutingEmail[];
@@ -111,7 +110,6 @@ type AdminDashboardResponse = {
   clusters: AdminCluster[];
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
-  readonlyReason: string;
   statusSnapshot: AdminStatusSnapshot;
   users: Array<AdminUser & { departmentId: string | null }>;
 };
@@ -120,7 +118,6 @@ type AdminDataContextValue = {
   clusters: AdminCluster[];
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
-  readonlyReason: string;
   removeRoutingEmail: (departmentId: string, emailId: string) => Promise<void>;
   renameDepartment: (departmentId: string, name: string) => Promise<void>;
   statusSnapshot: AdminStatusSnapshot;
@@ -246,7 +243,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       updates: UpdateUserInput;
       userId: string;
     }) => {
-      await fetchJson<void>(`/api/admin/users/${userId}`, {
+      await fetchJson<void>(`/api/admin/people/${encodeURIComponent(userId)}`, {
         body: JSON.stringify({
           active: updates.active,
           email: updates.email,
@@ -360,7 +357,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         clusters: data.clusters,
         dataSources: data.dataSources,
         departments: data.departments,
-        readonlyReason: data.readonlyReason,
         removeRoutingEmail: async (departmentId, emailId) => {
           await removeRoutingEmailMutation.mutateAsync({ departmentId, emailId });
         },

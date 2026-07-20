@@ -2,7 +2,7 @@ import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 
 const adminTabs = [
   { label: 'Status', to: '/admin/status' },
-  { label: 'Users', to: '/admin/users' },
+  { label: 'People', to: '/admin/people' },
   { label: 'Roles', to: '/admin/roles' },
   { label: 'Departments', to: '/admin/departments' },
 ] as const;

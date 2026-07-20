@@ -66,6 +66,7 @@ function AdminRolesRoute() {
   const [effectiveStartDate, setEffectiveStartDate] = useState(getToday());
   const [effectiveEndDate, setEffectiveEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showInactiveAssignments, setShowInactiveAssignments] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingRoleAction | null>(
     null
   );
@@ -104,6 +105,9 @@ function AdminRolesRoute() {
       : (targetOptions.find((option) => option.id === targetId)?.name ?? null);
   const selectedUserName =
     data.users.find((user) => user.iamId === iamId)?.name ?? iamId;
+  const assignmentRows = data.assignments.filter((assignment) =>
+    showInactiveAssignments ? true : assignment.active
+  );
 
   const resetForm = () => {
     setIamId('');
@@ -224,7 +228,11 @@ function AdminRolesRoute() {
     {
       cell: ({ row }) => (
         <button
-          className="btn btn-ghost btn-sm text-rose-700"
+          className={`btn btn-ghost btn-sm ${
+            row.original.active
+              ? 'text-rose-700'
+              : 'cursor-not-allowed text-slate-400'
+          }`}
           disabled={removeMutation.isPending || !row.original.active}
           onClick={() =>
             setPendingAction({
@@ -246,12 +254,8 @@ function AdminRolesRoute() {
     <div className="space-y-6">
       <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-          Role assignments
+          Assign CAO, department chair, or application admin roles
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--admin-ink-muted)]">
-          Manage application admins, cluster CAOs, and department chairs from
-          their assignment tables.
-        </p>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1.4fr_1fr_1fr_1fr_auto] lg:items-end">
           <label className="form-control">
@@ -369,7 +373,7 @@ function AdminRolesRoute() {
       <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
         <DataTable
           columns={columns}
-          data={data.assignments}
+          data={assignmentRows}
           filterPlaceholder="Search role, person, IAM ID, or scope..."
           globalFilter="left"
           initialState={{
@@ -377,6 +381,21 @@ function AdminRolesRoute() {
               pageSize: 10,
             },
           }}
+          tableActions={
+            <label className="label cursor-pointer gap-3 rounded-xl border border-[var(--admin-border)] px-4 py-2">
+              <span className="label-text text-sm text-[var(--admin-ink)]">
+                Show inactive
+              </span>
+              <input
+                checked={showInactiveAssignments}
+                className="toggle toggle-sm"
+                onChange={(event) =>
+                  setShowInactiveAssignments(event.target.checked)
+                }
+                type="checkbox"
+              />
+            </label>
+          }
         />
       </section>
 

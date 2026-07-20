@@ -34,7 +34,7 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
 function AdminDepartmentsRoute() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
-  const { clusters, departments, readonlyReason, users } = data;
+  const { clusters, departments, users } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
@@ -106,7 +106,7 @@ function AdminDepartmentsRoute() {
                   {selectedDepartment.name}
                 </h2>
                 <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-                  This roster is derived from each user&apos;s latest leave request
+                  This roster is derived from each person&apos;s latest leave request
                   snapshot in the database.
                 </p>
               </div>
@@ -146,7 +146,7 @@ function AdminDepartmentsRoute() {
                         className="py-6 text-sm text-[var(--admin-ink-muted)]"
                         colSpan={4}
                       >
-                        No users currently map to this department from stored leave
+                        No people currently map to this department from stored leave
                         request snapshots.
                       </td>
                     </tr>
@@ -168,18 +168,6 @@ function AdminDepartmentsRoute() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-          Department and cluster management
-        </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--admin-ink-muted)]">
-          These cards are now backed by the database. Cluster names, department
-          names, approval mode, and routing emails persist to SQL Server.
-        </p>
-        <p className="mt-3 text-sm text-[var(--admin-ink-muted)]">
-          {readonlyReason}
-        </p>
-      </section>
 
       <AdminDepartmentCreationPanel
         clusters={clusters}
@@ -204,22 +192,12 @@ function AdminDepartmentsRoute() {
                 {cluster.name}
               </div>
             </div>
-
-            <div className="min-w-72 rounded-2xl bg-[var(--admin-sand)] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink-soft)]">
-                Persisted fields
-              </div>
-              <p className="mt-3 text-sm text-[var(--admin-ink-muted)]">
-                Cluster names and department assignments are live. Chair and CAO
-                assignments are still pending schema support.
-              </p>
-            </div>
           </div>
 
           <div className="space-y-3">
             {cluster.departments.map((department) => {
               const linkedUserCount = users.filter(
-                (user) => user.departmentId === department.id && user.active
+                (user) => user.departmentId === department.id
               ).length;
 
               return (
@@ -253,7 +231,7 @@ function AdminDepartmentsRoute() {
                 department={department}
                 key={department.id}
                 linkedUserCount={users.filter(
-                  (user) => user.departmentId === department.id && user.active
+                  (user) => user.departmentId === department.id
                 ).length}
                 onOpenRoster={() => setViewDepartmentId(department.id)}
                 onOpenSettings={() => setEditingDepartmentId(department.id)}

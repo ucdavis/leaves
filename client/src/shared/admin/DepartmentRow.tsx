@@ -40,14 +40,14 @@ export function DepartmentRow({
               onClick={onOpenRoster}
               type="button"
             >
-              View linked users
+              View linked people
             </button>
           </div>
           <div className="mt-1 font-mono text-sm text-[var(--admin-ink-muted)]">
             {department.code}
           </div>
           <div className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-            {linkedUserCount} active users · {approvalLabel}
+            {linkedUserCount} linked people · {approvalLabel}
             {department.routingEmails.length > 0
               ? ` · ${department.routingEmails.length} routing emails`
               : ' · No email configured'}
