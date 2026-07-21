@@ -5,6 +5,10 @@ import type {
   AdminDepartment,
 } from '@/shared/admin/adminData.tsx';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
+import {
+  statusSurfaceColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
 const departmentSettingsSchema = z.object({
@@ -160,28 +164,28 @@ export function DepartmentSettingsModal({
             </settingsForm.AppField>
           </div>
 
-          <div className="mt-6 rounded-2xl bg-[var(--admin-sand)] p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--admin-gold-deep)]">
+          <div className="mt-6 rounded-2xl bg-base-200 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-secondary">
               Routing emails
             </h3>
-            <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+            <p className="mt-2 text-sm text-base-content/70">
               Routing emails are now stored in `DepartmentEmailRouting`.
             </p>
 
             <div className="mt-4 space-y-3">
               {department.routingEmails.map((email) => (
                 <div
-                  className="flex flex-col gap-3 rounded-xl border border-[var(--admin-border)] bg-white px-4 py-3 sm:flex-row sm:items-center"
+                  className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-100 px-4 py-3 sm:flex-row sm:items-center"
                   key={email.id}
                 >
-                  <span className="badge border-0 bg-[var(--admin-sand)] text-[var(--admin-blue)]">
+                  <span className="badge border-0 bg-base-200 text-primary">
                     EMAIL
                   </span>
-                  <span className="flex-1 text-sm text-[var(--admin-ink)]">
+                  <span className="flex-1 text-sm text-base-content">
                     {email.address}
                   </span>
                   <button
-                    className="btn btn-ghost btn-sm text-rose-700"
+                    className={`btn btn-ghost btn-sm ${statusTextColors.danger}`}
                     disabled={pendingRemovalEmailId === email.id}
                     onClick={() => {
                       void handleRemoveEmail(email.id);
@@ -202,7 +206,9 @@ export function DepartmentSettingsModal({
             </div>
 
             {routingEmailError ? (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div
+                className={`mt-4 rounded-xl px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
+              >
                 {routingEmailError}
               </div>
             ) : null}
@@ -213,7 +219,7 @@ export function DepartmentSettingsModal({
                   <routingEmailForm.AppField name="address">
                     {(field) => (
                       <field.TextField
-                        inputClassName="input input-bordered w-full bg-white"
+                        inputClassName="input input-bordered w-full bg-base-100"
                         label="Add routing email"
                         placeholder="email@ucdavis.edu"
                         type="email"
@@ -235,7 +241,9 @@ export function DepartmentSettingsModal({
           </div>
 
           {saveError ? (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div
+              className={`mt-6 rounded-xl px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
+            >
               {saveError}
             </div>
           ) : null}
@@ -245,7 +253,7 @@ export function DepartmentSettingsModal({
               Cancel
             </button>
             <settingsForm.SubscribeButton
-              className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
+              className="btn btn-primary"
               label="Save changes"
               loadingLabel="Saving..."
             />

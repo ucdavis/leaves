@@ -9,6 +9,10 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
+import {
+  statusSurfaceColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 
 export type AdminRole = 'faculty' | 'chair' | 'cao' | 'admin';
 export type AdminDesignation = 'fy' | 'ay' | 'nfa' | 'chair' | 'cao' | 'admin';
@@ -361,26 +365,32 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   if (dashboardQuery.isLoading) {
     return (
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-          Loading admin data
-        </h2>
-        <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-          Pulling the current admin dashboard from the database.
-        </p>
+      <section className="card border border-main-border bg-base-100">
+        <div className="card-body p-6">
+          <h2 className="text-lg font-semibold text-primary">
+            Loading admin data
+          </h2>
+          <p className="mt-2 text-sm text-base-content/70">
+            Pulling the current admin dashboard from the database.
+          </p>
+        </div>
       </section>
     );
   }
 
   if (dashboardQuery.isError || !dashboardQuery.data) {
     return (
-      <section className="rounded-[1.25rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-rose-800">
-          Admin data unavailable
-        </h2>
-        <p className="mt-2 text-sm text-rose-700">
-          The admin pages could not load their database-backed data right now.
-        </p>
+      <section className={`card ${statusSurfaceColors.dangerCard}`}>
+        <div className="card-body p-6">
+          <h2
+            className={`text-lg font-semibold ${statusTextColors.dangerStrong}`}
+          >
+            Admin data unavailable
+          </h2>
+          <p className={`mt-2 text-sm ${statusTextColors.danger}`}>
+            The admin pages could not load their database-backed data right now.
+          </p>
+        </div>
       </section>
     );
   }

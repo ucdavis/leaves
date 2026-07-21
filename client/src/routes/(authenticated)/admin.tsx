@@ -19,7 +19,7 @@ export const Route = createFileRoute('/(authenticated)/admin')({
     }
 
     if (location.pathname === '/admin' || location.pathname === '/admin/') {
-      throw redirect({ to: '/admin/status', replace: true });
+      throw redirect({ replace: true, to: '/admin/status' });
     }
   },
   component: AdminRoute,
