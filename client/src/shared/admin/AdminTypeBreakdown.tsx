@@ -1,3 +1,5 @@
+import { breakdownToneColors } from '@/shared/statusColors.ts';
+
 export function AdminTypeBreakdown({
   className,
   items,
@@ -9,24 +11,6 @@ export function AdminTypeBreakdown({
   }>;
 }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
-  const tones = [
-    {
-      bar: 'bg-primary',
-      dot: 'bg-primary',
-    },
-    {
-      bar: 'bg-emerald-600',
-      dot: 'bg-emerald-600',
-    },
-    {
-      bar: 'bg-amber-600',
-      dot: 'bg-amber-600',
-    },
-    {
-      bar: 'bg-violet-600',
-      dot: 'bg-violet-600',
-    },
-  ];
 
   return (
     <div className={className ?? ''}>
@@ -41,7 +25,7 @@ export function AdminTypeBreakdown({
       <div className="space-y-3">
         {items.map((item, index) => {
           const share = total > 0 ? Math.round((item.value / total) * 100) : 0;
-          const tone = tones[index % tones.length];
+          const tone = breakdownToneColors[index % breakdownToneColors.length];
 
           return (
             <div className="space-y-1.5" key={item.label}>

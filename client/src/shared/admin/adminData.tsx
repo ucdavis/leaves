@@ -9,6 +9,10 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
+import {
+  statusSurfaceColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 
 export type AdminRole = 'faculty' | 'chair' | 'cao' | 'admin';
 export type AdminDesignation = 'fy' | 'ay' | 'nfa' | 'chair' | 'cao' | 'admin';
@@ -376,12 +380,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   if (dashboardQuery.isError || !dashboardQuery.data) {
     return (
-      <section className="card border border-main-border bg-rose-50">
+      <section className={`card ${statusSurfaceColors.dangerCard}`}>
         <div className="card-body p-6">
-          <h2 className="text-lg font-semibold text-rose-800">
+          <h2
+            className={`text-lg font-semibold ${statusTextColors.dangerStrong}`}
+          >
             Admin data unavailable
           </h2>
-          <p className="mt-2 text-sm text-rose-700">
+          <p className={`mt-2 text-sm ${statusTextColors.danger}`}>
             The admin pages could not load their database-backed data right now.
           </p>
         </div>

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import {
-  useAdminData,
-} from '@/shared/admin/adminData.tsx';
+import { useAdminData } from '@/shared/admin/adminData.tsx';
 import { HttpError } from '@/lib/api.ts';
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
 import { DepartmentSettingsModal } from '@/shared/admin/DepartmentSettingsModal.tsx';
+import { statusTextColors } from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
   component: AdminDepartmentsRoute,
@@ -65,8 +64,8 @@ function AdminDepartmentsRoute() {
                     {selectedDepartment.name}
                   </h2>
                   <p className="mt-2 text-sm text-base-content/70">
-                    This roster is derived from each user&apos;s latest leave request
-                    snapshot in the database.
+                    This roster is derived from each user&apos;s latest leave
+                    request snapshot in the database.
                   </p>
                 </div>
                 <div className="text-sm text-base-content/70">
@@ -92,7 +91,11 @@ function AdminDepartmentsRoute() {
                           {user.email ? (
                             user.email
                           ) : (
-                            <span className="italic text-rose-700">Missing</span>
+                            <span
+                              className={`italic ${statusTextColors.danger}`}
+                            >
+                              Missing
+                            </span>
                           )}
                         </td>
                         <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
@@ -123,71 +126,50 @@ function AdminDepartmentsRoute() {
   const editingDepartment =
     editingDepartmentId === null
       ? null
-      : departments.find((department) => department.id === editingDepartmentId) ??
-        null;
+      : (departments.find(
+          (department) => department.id === editingDepartmentId
+        ) ?? null);
 
   return (
-    <div className="space-y-6">
-      <section className="card border border-main-border bg-base-100">
-        <div className="card-body p-6">
-          <h2 className="text-lg font-semibold text-primary">
-            Department and cluster management
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-base-content/70">
-            These cards are now backed by the database. Cluster names, department
-            names, approval mode, and routing emails persist to SQL Server.
-          </p>
-          <p className="mt-3 text-sm text-base-content/70">
-            {readonlyReason}
-          </p>
-        </div>
-      </section>
+    <div className="space-y-2">
+      <div className="max-w-3xl space-y-2">
+        <h2 className="text-lg font-semibold text-primary">
+          Department and cluster management
+        </h2>
+        <p>
+          These cards are now backed by the database. Cluster names, department
+          names, approval mode, and routing emails persist to SQL Server.
+        </p>
+        <p>{readonlyReason}</p>
+        <p>
+          Cluster names and department assignments are live. Chair and CAO
+          assignments are still pending schema support.
+        </p>
+      </div>
 
       {clusterGroups.map((cluster) => (
-        <section
-          className="card border border-main-border bg-base-100"
-          key={cluster.id}
-        >
-          <div className="card-body p-6">
-            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.24em] text-secondary">
-                  Cluster
-                </label>
-                <div className="mt-2 w-full max-w-md rounded-2xl border border-base-300 bg-base-200 px-4 py-3 text-primary">
-                  {cluster.name}
-                </div>
-              </div>
+        <section className="my-8" key={cluster.id}>
+          <div className="flex flex-col lg:items-start lg:justify-between">
+            <div className="h2">{cluster.name}</div>
+          </div>
 
-              <div className="min-w-72 rounded-2xl bg-base-200 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50">
-                  Persisted fields
-                </div>
-                <p className="mt-3 text-sm text-base-content/70">
-                  Cluster names and department assignments are live. Chair and CAO
-                  assignments are still pending schema support.
-                </p>
-              </div>
-            </div>
+          <div className="space-y-3 ps-5 border-l-5 border-primary/20 mt-5">
+            {cluster.departments.map((department) => {
+              const linkedUserCount = users.filter(
+                (user) => user.departmentId === department.id && user.active
+              ).length;
 
-            <div className="space-y-3">
-              {cluster.departments.map((department) => {
-                const linkedUserCount = users.filter(
-                  (user) => user.departmentId === department.id && user.active
-                ).length;
-
-                return (
-                  <DepartmentRow
-                    department={department}
-                    key={department.id}
-                    linkedUserCount={linkedUserCount}
-                    onOpenRoster={() => setViewDepartmentId(department.id)}
-                    onOpenSettings={() => setEditingDepartmentId(department.id)}
-                    onRename={(name) => renameDepartment(department.id, name)}
-                  />
-                );
-              })}
-            </div>
+              return (
+                <DepartmentRow
+                  department={department}
+                  key={department.id}
+                  linkedUserCount={linkedUserCount}
+                  onOpenRoster={() => setViewDepartmentId(department.id)}
+                  onOpenSettings={() => setEditingDepartmentId(department.id)}
+                  onRename={(name) => renameDepartment(department.id, name)}
+                />
+              );
+            })}
           </div>
         </section>
       ))}
@@ -203,9 +185,12 @@ function AdminDepartmentsRoute() {
                 <DepartmentRow
                   department={department}
                   key={department.id}
-                  linkedUserCount={users.filter(
-                    (user) => user.departmentId === department.id && user.active
-                  ).length}
+                  linkedUserCount={
+                    users.filter(
+                      (user) =>
+                        user.departmentId === department.id && user.active
+                    ).length
+                  }
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
                   onRename={(name) => renameDepartment(department.id, name)}

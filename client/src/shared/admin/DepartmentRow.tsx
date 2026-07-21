@@ -36,7 +36,7 @@ export function DepartmentRow({
               wrapperClassName="w-full max-w-md"
             />
             <button
-              className="text-sm font-medium text-primary underline decoration-secondary decoration-2 underline-offset-4"
+              className="cursor-pointer text-sm font-medium text-primary underline decoration-secondary decoration-2 underline-offset-4"
               onClick={onOpenRoster}
               type="button"
             >

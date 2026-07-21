@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
 import type { AdminDataSource } from '@/shared/admin/adminData.tsx';
+import {
+  freshnessStatusBadgeColors,
+  issueToneDotColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 import { AdminMetricCard } from './AdminMetricCard.tsx';
 import { AdminTypeBreakdown } from './AdminTypeBreakdown.tsx';
 
@@ -57,14 +62,14 @@ export function AdminStatusContent({
           variant="summary"
         />
         <AdminMetricCard
-          accent="text-emerald-700"
+          accent={statusTextColors.success}
           label="Faculty split"
           subtitle={`${statusSnapshot.users.fyFaculty} FY and ${statusSnapshot.users.ayFaculty} AY`}
           value={`${statusSnapshot.users.fyFaculty + statusSnapshot.users.ayFaculty}`}
           variant="summary"
         />
         <AdminMetricCard
-          accent="text-amber-700"
+          accent={statusTextColors.warning}
           label="Pending requests"
           subtitle="Calculated from persisted leave request records"
           value={String(statusSnapshot.requests.pending)}
@@ -132,7 +137,7 @@ export function AdminStatusContent({
               value: String(statusSnapshot.users.fyFaculty),
             },
             {
-              accent: 'text-emerald-700',
+              accent: statusTextColors.success,
               label: 'AY faculty',
               value: String(statusSnapshot.users.ayFaculty),
             },
@@ -141,7 +146,7 @@ export function AdminStatusContent({
               value: String(statusSnapshot.users.chairs),
             },
             {
-              accent: 'text-violet-700',
+              accent: statusTextColors.accent,
               label: 'CAOs',
               value: String(statusSnapshot.users.caos),
             },
@@ -156,7 +161,7 @@ export function AdminStatusContent({
               value: String(statusSnapshot.departments.total),
             },
             {
-              accent: 'text-emerald-700',
+              accent: statusTextColors.success,
               label: 'With faculty',
               value: String(statusSnapshot.departments.withFaculty),
             },
@@ -176,12 +181,12 @@ export function AdminStatusContent({
                 value: String(statusSnapshot.requests.bySource.manual),
               },
               {
-                accent: 'text-violet-700',
+                accent: statusTextColors.accent,
                 label: 'External Cognos',
                 value: String(statusSnapshot.requests.bySource.cognos),
               },
               {
-                accent: 'text-amber-700',
+                accent: statusTextColors.warning,
                 label: 'Pending',
                 value: String(statusSnapshot.requests.pending),
               },
@@ -201,12 +206,12 @@ export function AdminStatusContent({
         <MetricSection
           items={[
             {
-              accent: 'text-rose-700',
+              accent: statusTextColors.danger,
               label: 'At cap',
               value: String(statusSnapshot.issues.facultyAtVacationCap),
             },
             {
-              accent: 'text-amber-700',
+              accent: statusTextColors.warning,
               label: 'Approaching cap',
               value: String(statusSnapshot.issues.approachingVacationCap),
             },
@@ -278,12 +283,7 @@ function FreshnessRow({
   const updatedLabel = updatedAt
     ? new Date(updatedAt).toLocaleString()
     : 'No rows loaded yet';
-  const tone =
-    status === 'ready'
-      ? 'text-emerald-700 bg-emerald-50'
-      : status === 'planned'
-        ? 'text-amber-700 bg-amber-50'
-        : 'text-slate-600 bg-slate-100';
+  const tone = freshnessStatusBadgeColors[status];
 
   return (
     <div className="flex flex-col gap-3 border-b border-base-300 py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
@@ -314,15 +314,11 @@ function IssueRow({
   label: string;
   tone: 'error' | 'warning' | 'neutral';
 }) {
-  const styles = {
-    error: 'bg-rose-600',
-    neutral: 'bg-slate-400',
-    warning: 'bg-amber-500',
-  } as const;
-
   return (
     <div className="flex items-center gap-3 border-b border-base-300 py-3 last:border-b-0">
-      <span className={`h-2.5 w-2.5 rounded-full ${styles[tone]}`} />
+      <span
+        className={`h-2.5 w-2.5 rounded-full ${issueToneDotColors[tone]}`}
+      />
       <span className="flex-1 text-sm text-base-content">{label}</span>
       <span className="font-mono text-sm font-semibold text-base-content">
         {count}

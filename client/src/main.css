@@ -67,7 +67,7 @@ body {
 }
 
 .card-stat-label {
-  @apply text-xs font-semibold uppercase tracking-[0.24em] text-secondary;
+  @apply text-xs font-semibold uppercase tracking-[0.16em] text-base-content/80;
 }
 
 .card-stat-value {

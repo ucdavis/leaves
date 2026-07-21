@@ -5,6 +5,10 @@ import type {
   AdminDepartment,
 } from '@/shared/admin/adminData.tsx';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
+import {
+  statusSurfaceColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
 const departmentSettingsSchema = z.object({
@@ -181,7 +185,7 @@ export function DepartmentSettingsModal({
                     {email.address}
                   </span>
                   <button
-                    className="btn btn-ghost btn-sm text-rose-700"
+                    className={`btn btn-ghost btn-sm ${statusTextColors.danger}`}
                     disabled={pendingRemovalEmailId === email.id}
                     onClick={() => {
                       void handleRemoveEmail(email.id);
@@ -202,7 +206,9 @@ export function DepartmentSettingsModal({
             </div>
 
             {routingEmailError ? (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div
+                className={`mt-4 rounded-xl px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
+              >
                 {routingEmailError}
               </div>
             ) : null}
@@ -235,7 +241,9 @@ export function DepartmentSettingsModal({
           </div>
 
           {saveError ? (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div
+              className={`mt-6 rounded-xl px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
+            >
               {saveError}
             </div>
           ) : null}
@@ -245,7 +253,7 @@ export function DepartmentSettingsModal({
               Cancel
             </button>
             <settingsForm.SubscribeButton
-              className="btn border-0 bg-secondary text-primary hover:bg-secondary/85"
+              className="btn btn-primary"
               label="Save changes"
               loadingLabel="Saving..."
             />

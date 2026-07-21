@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
+import {
+  statusBorderColors,
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 
 type InlineTextEditorValues = {
   value: string;
@@ -53,7 +57,7 @@ export function InlineTextEditor({
             <div className={wrapperClassName}>
               <input
                 className={`${inputClassName} ${
-                  hasError ? 'border-rose-400 focus:border-rose-500' : ''
+                  hasError ? statusBorderColors.dangerFocus : ''
                 }`}
                 disabled={field.form.state.isSubmitting}
                 onBlur={(event) => {
@@ -67,7 +71,7 @@ export function InlineTextEditor({
                 value={field.state.value}
               />
               {hasError ? (
-                <p className="mt-2 text-sm text-rose-700">
+                <p className={`mt-2 text-sm ${statusTextColors.danger}`}>
                   {field.state.meta.errors
                     .flatMap((issue) => (issue?.message ? [issue.message] : []))
                     .join(', ')}

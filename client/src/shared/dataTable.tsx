@@ -99,16 +99,33 @@ export const DataTable = <TData extends object>({
 
   const toolbarItems =
     globalFilter === 'left'
-      ? [filterControl, resolvedTableActions]
-      : [resolvedTableActions, filterControl];
-  const hasToolbar = toolbarItems.some(Boolean);
+      ? [
+          { content: filterControl, placement: 'filter' },
+          { content: resolvedTableActions, placement: 'actions' },
+        ]
+      : [
+          { content: resolvedTableActions, placement: 'actions' },
+          { content: filterControl, placement: 'filter' },
+        ];
+  const hasToolbar = toolbarItems.some((item) => item.content);
 
   return (
     <div className="space-y-4">
       {hasToolbar && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {toolbarItems.map((item, index) =>
-            item ? <div key={index}>{item}</div> : null
+            item.content ? (
+              <div
+                className={
+                  item.placement === 'filter'
+                    ? 'w-full lg:min-w-0 lg:max-w-sm lg:flex-1'
+                    : 'w-full lg:w-auto lg:flex-none'
+                }
+                key={index}
+              >
+                {item.content}
+              </div>
+            ) : null
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { z } from 'zod';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
+import { statusSurfaceColors } from '@/shared/statusColors.ts';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
 const userFormSchema = z.object({
@@ -116,7 +117,9 @@ export function AdminUserModal({
           ) : null}
 
           {submitError ? (
-            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div
+              className={`mt-4 rounded-xl px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
+            >
               {submitError}
             </div>
           ) : null}
@@ -126,7 +129,7 @@ export function AdminUserModal({
               Cancel
             </button>
             <form.SubscribeButton
-              className="btn border-0 bg-secondary text-primary hover:bg-secondary/85"
+              className="btn btn-primary"
               label={submitLabel}
               loadingLabel={submittingLabel}
             />
