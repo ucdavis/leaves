@@ -153,17 +153,15 @@ function AdminUsersRoute() {
       <section className="card border border-main-border bg-base-100">
         <div className="card-body p-6">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+            <div className="space-y-2 max-w-3xl">
               <h2 className="text-lg font-semibold text-primary">
                 User management
               </h2>
-              <p className="mt-2 text-sm text-base-content/70">
+              <p>
                 This table is now sourced from the database. Department values
                 are inferred from the user&apos;s latest leave request snapshot.
               </p>
-              <p className="mt-2 text-sm text-base-content/70">
-                {readonlyReason}
-              </p>
+              <p>{readonlyReason}</p>
             </div>
             <button
               className="btn btn-primary"
