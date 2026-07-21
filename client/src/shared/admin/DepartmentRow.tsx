@@ -1,3 +1,4 @@
+import { Cog6ToothIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import type { AdminDepartment } from '@/shared/admin/adminData.tsx';
 import { InlineTextEditor } from './InlineTextEditor.tsx';
 
@@ -35,13 +36,6 @@ export function DepartmentRow({
               savingMessage="Saving department name..."
               wrapperClassName="w-full max-w-md"
             />
-            <button
-              className="cursor-pointer text-sm font-medium text-primary underline decoration-secondary decoration-2 underline-offset-4"
-              onClick={onOpenRoster}
-              type="button"
-            >
-              View linked users
-            </button>
           </div>
           <div className="mt-1 font-mono text-sm text-base-content/70">
             {department.code}
@@ -54,17 +48,28 @@ export function DepartmentRow({
           </div>
         </div>
 
-        <div className="flex flex-col items-start gap-3 lg:w-72 lg:items-end lg:text-right">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50">
+        <div className="flex flex-col gap-3 items-end">
+          <div className="text-xs font-semibold uppercase text-base-content/50">
             Database-backed settings
           </div>
-          <button
-            className="btn btn-outline w-full max-w-xs lg:max-w-none"
-            onClick={onOpenSettings}
-            type="button"
-          >
-            Settings
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-nowrap">
+            <button
+              className="btn btn-primary"
+              onClick={onOpenRoster}
+              type="button"
+            >
+              <UserGroupIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+              Linked users
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={onOpenSettings}
+              type="button"
+            >
+              <Cog6ToothIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+              Settings
+            </button>
+          </div>
         </div>
       </div>
     </div>
