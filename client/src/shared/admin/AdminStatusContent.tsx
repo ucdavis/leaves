@@ -226,9 +226,11 @@ function AdminSectionCard({
   title: string;
 }) {
   return (
-    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">{title}</h2>
-      <div className="mt-4">{children}</div>
+    <section className="card border border-main-border bg-base-100">
+      <div className="card-body p-6">
+        <h2 className="text-lg font-semibold text-primary">{title}</h2>
+        <div className="mt-4">{children}</div>
+      </div>
     </section>
   );
 }
@@ -284,10 +286,10 @@ function FreshnessRow({
         : 'text-slate-600 bg-slate-100';
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--admin-border)] py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-base-300 py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <div className="font-semibold text-[var(--admin-ink)]">{label}</div>
-        <div className="mt-1 text-sm leading-6 text-[var(--admin-ink-muted)]">
+        <div className="font-semibold text-base-content">{label}</div>
+        <div className="mt-1 text-sm leading-6 text-base-content/70">
           {detail}
         </div>
       </div>
@@ -295,7 +297,7 @@ function FreshnessRow({
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>
           {status}
         </span>
-        <div className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+        <div className="mt-2 text-sm text-base-content/70">
           {updatedLabel}
         </div>
       </div>
@@ -319,10 +321,10 @@ function IssueRow({
   } as const;
 
   return (
-    <div className="flex items-center gap-3 border-b border-[var(--admin-border)] py-3 last:border-b-0">
+    <div className="flex items-center gap-3 border-b border-base-300 py-3 last:border-b-0">
       <span className={`h-2.5 w-2.5 rounded-full ${styles[tone]}`} />
-      <span className="flex-1 text-sm text-[var(--admin-ink)]">{label}</span>
-      <span className="font-mono text-sm font-semibold text-[var(--admin-ink)]">
+      <span className="flex-1 text-sm text-base-content">{label}</span>
+      <span className="font-mono text-sm font-semibold text-base-content">
         {count}
       </span>
     </div>

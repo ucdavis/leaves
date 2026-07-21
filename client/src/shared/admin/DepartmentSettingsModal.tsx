@@ -160,24 +160,24 @@ export function DepartmentSettingsModal({
             </settingsForm.AppField>
           </div>
 
-          <div className="mt-6 rounded-2xl bg-[var(--admin-sand)] p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--admin-gold-deep)]">
+          <div className="mt-6 rounded-2xl bg-base-200 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-secondary">
               Routing emails
             </h3>
-            <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+            <p className="mt-2 text-sm text-base-content/70">
               Routing emails are now stored in `DepartmentEmailRouting`.
             </p>
 
             <div className="mt-4 space-y-3">
               {department.routingEmails.map((email) => (
                 <div
-                  className="flex flex-col gap-3 rounded-xl border border-[var(--admin-border)] bg-white px-4 py-3 sm:flex-row sm:items-center"
+                  className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-100 px-4 py-3 sm:flex-row sm:items-center"
                   key={email.id}
                 >
-                  <span className="badge border-0 bg-[var(--admin-sand)] text-[var(--admin-blue)]">
+                  <span className="badge border-0 bg-base-200 text-primary">
                     EMAIL
                   </span>
-                  <span className="flex-1 text-sm text-[var(--admin-ink)]">
+                  <span className="flex-1 text-sm text-base-content">
                     {email.address}
                   </span>
                   <button
@@ -213,7 +213,7 @@ export function DepartmentSettingsModal({
                   <routingEmailForm.AppField name="address">
                     {(field) => (
                       <field.TextField
-                        inputClassName="input input-bordered w-full bg-white"
+                        inputClassName="input input-bordered w-full bg-base-100"
                         label="Add routing email"
                         placeholder="email@ucdavis.edu"
                         type="email"
@@ -245,7 +245,7 @@ export function DepartmentSettingsModal({
               Cancel
             </button>
             <settingsForm.SubscribeButton
-              className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
+              className="btn border-0 bg-secondary text-primary hover:bg-secondary/85"
               label="Save changes"
               loadingLabel="Saving..."
             />

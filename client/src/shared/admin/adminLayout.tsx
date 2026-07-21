@@ -12,21 +12,21 @@ export function AdminLayout() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--admin-sand)]">
-      <section className="border-b border-[var(--admin-border)] bg-[var(--admin-blue)] text-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+    <div className="bg-base-200">
+      <section className="border-b border-base-300 bg-primary text-primary-content py-4 mb-8">
+        <div className="container py-4">
           <nav className="overflow-x-auto">
-            <div className="inline-flex min-w-full gap-2 rounded-2xl border border-white/10 bg-white/6 p-1.5">
+            <div className="inline-flex min-w-full gap-2 rounded-sm p-1">
               {adminTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.to);
 
                 return (
                   <Link
                     activeOptions={{ exact: tab.to === '/admin/status' }}
-                    className={`admin-tab flex-1 rounded-xl px-4 py-2.5 text-center text-sm font-semibold transition ${
+                    className={`admin-tab flex-1 rounded-sm px-4 py-3 text-center font-semibold transition ${
                       isActive
-                        ? 'bg-white text-[var(--admin-blue)] shadow-sm'
-                        : 'text-white/78 hover:bg-white/10 hover:text-white'
+                        ? 'bg-primary-content/90 text-primary shadow-sm'
+                        : 'text-primary-content/70 hover:bg-primary-content/10 hover:text-primary-content'
                     }`}
                     key={tab.to}
                     to={tab.to}
@@ -40,7 +40,7 @@ export function AdminLayout() {
         </div>
       </section>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="container">
         <Outlet />
       </main>
     </div>

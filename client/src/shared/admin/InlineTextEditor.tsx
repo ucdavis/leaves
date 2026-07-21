@@ -73,7 +73,7 @@ export function InlineTextEditor({
                     .join(', ')}
                 </p>
               ) : field.form.state.isSubmitting ? (
-                <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+                <p className="mt-2 text-sm text-base-content/70">
                   {savingMessage}
                 </p>
               ) : null}

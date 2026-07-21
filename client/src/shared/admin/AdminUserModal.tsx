@@ -126,7 +126,7 @@ export function AdminUserModal({
               Cancel
             </button>
             <form.SubscribeButton
-              className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85"
+              className="btn border-0 bg-secondary text-primary hover:bg-secondary/85"
               label={submitLabel}
               loadingLabel={submittingLabel}
             />
