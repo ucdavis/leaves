@@ -1,9 +1,14 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import {
+  BuildingOffice2Icon,
+  ChartBarSquareIcon,
+  UserGroupIcon,
+} from '@heroicons/react/24/outline';
 
 const adminTabs = [
-  { label: 'Status', to: '/admin/status' },
-  { label: 'Users', to: '/admin/users' },
-  { label: 'Departments', to: '/admin/departments' },
+  { icon: ChartBarSquareIcon, label: 'Status', to: '/admin/status' },
+  { icon: UserGroupIcon, label: 'Users', to: '/admin/users' },
+  { icon: BuildingOffice2Icon, label: 'Departments', to: '/admin/departments' },
 ] as const;
 
 export function AdminLayout() {
@@ -13,25 +18,27 @@ export function AdminLayout() {
 
   return (
     <div className="bg-base-200">
-      <section className="border-b border-base-300 bg-primary text-primary-content py-4 mb-8">
-        <div className="container py-4">
+      <section className="py-8">
+        <div className="container">
           <nav className="overflow-x-auto">
-            <div className="inline-flex min-w-full gap-2 rounded-sm p-1">
+            <div className="inline-flex border border-primary/10 min-w-full gap-2 rounded-sm p-1">
               {adminTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.to);
+                const Icon = tab.icon;
 
                 return (
                   <Link
                     activeOptions={{ exact: tab.to === '/admin/status' }}
-                    className={`admin-tab flex-1 rounded-sm px-4 py-3 text-center font-semibold transition ${
+                    className={`admin-tab flex flex-1 items-center justify-center gap-2 rounded-sm px-4 py-3 text-center font-semibold transition ${
                       isActive
-                        ? 'bg-primary-content/90 text-primary shadow-sm'
-                        : 'text-primary-content/70 hover:bg-primary-content/10 hover:text-primary-content'
+                        ? 'bg-primary text-primary-content'
+                        : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'
                     }`}
                     key={tab.to}
                     to={tab.to}
                   >
-                    {tab.label}
+                    <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                    <span>{tab.label}</span>
                   </Link>
                 );
               })}

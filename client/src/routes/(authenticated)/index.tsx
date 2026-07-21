@@ -14,10 +14,10 @@ function RouteComponent() {
         <header className="mb-16 text-center">
           <div className="mb-8">
             <img
-              alt="CAES"
+              alt="Leaves"
               className="mx-auto"
               height={77}
-              src="/caes.svg"
+              src="/leaves-logo.svg"
               width={419}
             />
           </div>
