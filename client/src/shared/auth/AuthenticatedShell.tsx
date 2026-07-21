@@ -40,7 +40,7 @@ export const AuthenticatedShell = ({
                   Leaves
                 </div>
                 <div className="text-sm text-primary-content/80 uppercase">
-                  Administrative workspace
+                  CAES Administrative workspace
                 </div>
               </div>
             </Link>
