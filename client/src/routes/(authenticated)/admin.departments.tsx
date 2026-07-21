@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAdminData } from '@/shared/admin/adminData.tsx';
 import { HttpError } from '@/lib/api.ts';
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
@@ -53,6 +54,7 @@ function AdminDepartmentsRoute() {
             onClick={() => setViewDepartmentId(null)}
             type="button"
           >
+            <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
             Back to departments
           </button>
 
@@ -150,7 +152,7 @@ function AdminDepartmentsRoute() {
       {clusterGroups.map((cluster) => (
         <section className="my-8" key={cluster.id}>
           <div className="flex flex-col lg:items-start lg:justify-between">
-            <div className="h2">{cluster.name}</div>
+            <h3 className="h2">{cluster.name}</h3>
           </div>
 
           <div className="space-y-3 ps-5 border-l-5 border-primary/20 mt-5">
