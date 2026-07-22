@@ -1,19 +1,16 @@
 import { Cog6ToothIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import type { AdminDepartment } from '@/shared/admin/adminData.tsx';
-import { InlineTextEditor } from './InlineTextEditor.tsx';
 
 export function DepartmentRow({
   department,
   linkedUserCount,
   onOpenRoster,
   onOpenSettings,
-  onRename,
 }: {
   department: AdminDepartment;
   linkedUserCount: number;
   onOpenRoster: () => void;
   onOpenSettings: () => void;
-  onRename: (name: string) => Promise<void>;
 }) {
   const approvalLabel =
     department.approvalMode === 'approval'
@@ -27,15 +24,9 @@ export function DepartmentRow({
       <div className="card-body flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <InlineTextEditor
-              initialValue={department.name}
-              inputClassName="input input-ghost h-auto min-h-0 w-full max-w-md justify-start px-0 text-lg font-bold uppercase tracking-wide text-primary shadow-none focus:bg-transparent"
-              key={`${department.id}:${department.name}`}
-              onSave={onRename}
-              requiredMessage="Department name is required."
-              savingMessage="Saving department name..."
-              wrapperClassName="w-full max-w-md"
-            />
+            <div className="w-full max-w-md text-lg font-bold uppercase tracking-wide text-primary">
+              {department.name}
+            </div>
           </div>
           <div className="mt-1 font-mono text-sm text-base-content/70">
             {department.code}

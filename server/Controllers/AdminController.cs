@@ -112,8 +112,8 @@ public sealed class AdminController : ApiControllerBase
         return NoContent();
     }
 
-    [HttpPatch("people/{iamId}")]
-    public async Task<IActionResult> UpdatePerson(string iamId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
+    [HttpPatch("users/by-iam/{iamId}")]
+    public async Task<IActionResult> UpsertUserByIamId(string iamId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
         var normalizedIamId = iamId.Trim();
         if (string.IsNullOrWhiteSpace(normalizedIamId))
@@ -122,21 +122,43 @@ public sealed class AdminController : ApiControllerBase
         }
 
         var person = await _db.Set<Person>()
+            .AsNoTracking()
             .FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
-        if (person == null)
+        var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
+        if (user == null)
         {
-            return NotFound();
+            user = new AppUser
+            {
+                DisplayName = NullIfWhiteSpace(request.Name) ?? NullIfWhiteSpace(person?.FullName),
+                Email = NullIfWhiteSpace(request.Email) ?? NullIfWhiteSpace(person?.Email),
+                EmployeeId = NullIfWhiteSpace(person?.EmployeeId),
+                EntraObjectId = Guid.NewGuid(),
+                FirstLoginUtc = DateTime.UtcNow,
+                IamId = normalizedIamId,
+                IsActive = request.Active ?? true,
+                LastLoginUtc = null,
+                UpdatedUtc = DateTime.UtcNow,
+            };
+
+            _db.AppUsers.Add(user);
         }
 
         if (request.NameSet)
         {
-            person.FullName = NullIfWhiteSpace(request.Name);
+            user.DisplayName = NullIfWhiteSpace(request.Name);
         }
 
         if (request.EmailSet)
         {
-            person.Email = NullIfWhiteSpace(request.Email);
+            user.Email = NullIfWhiteSpace(request.Email);
         }
+
+        if (request.Active.HasValue)
+        {
+            user.IsActive = request.Active.Value;
+        }
+
+        user.UpdatedUtc = DateTime.UtcNow;
 
         if (request.DepartmentOverrideSet)
         {
@@ -149,7 +171,15 @@ public sealed class AdminController : ApiControllerBase
             }
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
+        {
+            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
+        }
+
         return NoContent();
     }
 

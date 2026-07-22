@@ -6,7 +6,6 @@ import {
   createAdminCluster,
   createAdminDepartment,
   removeAdminDepartmentRoutingEmail,
-  renameAdminDepartment,
   updateAdminDepartment,
   upsertAdminDepartmentRoutingEmail,
 } from '@/queries/adminDepartments.ts';
@@ -52,10 +51,6 @@ function AdminDepartmentsRoute() {
   });
   const createDepartmentMutation = useMutation({
     mutationFn: createAdminDepartment,
-    onSuccess: invalidateDepartments,
-  });
-  const renameDepartmentMutation = useMutation({
-    mutationFn: renameAdminDepartment,
     onSuccess: invalidateDepartments,
   });
   const updateDepartmentMutation = useMutation({
@@ -233,12 +228,6 @@ function AdminDepartmentsRoute() {
                   linkedUserCount={linkedUserCount}
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  onRename={(name) =>
-                    renameDepartmentMutation.mutateAsync({
-                      departmentId: department.id,
-                      name,
-                    })
-                  }
                 />
               );
             })}
@@ -265,12 +254,6 @@ function AdminDepartmentsRoute() {
                   }
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  onRename={(name) =>
-                    renameDepartmentMutation.mutateAsync({
-                      departmentId: department.id,
-                      name,
-                    })
-                  }
                 />
               ))}
             </div>

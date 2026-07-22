@@ -15,25 +15,31 @@ public sealed class AdminDataService
 
     public async Task<AdminDepartmentsResponse> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await LoadSnapshotAsync(includeDashboardData: false, cancellationToken);
+        var directoryData = await LoadAdminDirectoryDataAsync(cancellationToken);
+        var directoryResponses = BuildDirectoryResponses(directoryData);
+
         return new AdminDepartmentsResponse(
-            Clusters: snapshot.Clusters,
-            Departments: snapshot.Departments,
-            Users: snapshot.Users);
+            Clusters: directoryResponses.Clusters,
+            Departments: directoryResponses.Departments,
+            Users: directoryResponses.Users);
     }
 
     public async Task<AdminDashboardResponse> GetDashboardAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await LoadSnapshotAsync(includeDashboardData: true, cancellationToken);
+        var directoryData = await LoadAdminDirectoryDataAsync(cancellationToken);
+        var directoryResponses = BuildDirectoryResponses(directoryData);
+        var dashboardData = await LoadDashboardDataAsync(cancellationToken);
+        var dashboardResponseData = BuildDashboardResponseData(directoryData, directoryResponses.Users, dashboardData);
+
         return new AdminDashboardResponse(
-            Clusters: snapshot.Clusters,
-            DataSources: snapshot.DataSources,
-            Departments: snapshot.Departments,
-            StatusSnapshot: snapshot.StatusSnapshot!,
-            Users: snapshot.Users);
+            Clusters: directoryResponses.Clusters,
+            DataSources: dashboardResponseData.DataSources,
+            Departments: directoryResponses.Departments,
+            StatusSnapshot: dashboardResponseData.StatusSnapshot,
+            Users: directoryResponses.Users);
     }
 
-    private async Task<AdminSnapshot> LoadSnapshotAsync(bool includeDashboardData, CancellationToken cancellationToken)
+    private async Task<AdminDirectoryData> LoadAdminDirectoryDataAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -49,25 +55,105 @@ public sealed class AdminDataService
             .ToListAsync(cancellationToken);
 
         var people = await _db.People
+            .AsNoTracking()
             .OrderBy(person => person.FullName)
             .ThenBy(person => person.IamId)
             .ToListAsync(cancellationToken);
-
-        var adminIamIds = await _db.AppAdminAssignments
+        var appUsers = await _db.AppUsers
             .AsNoTracking()
-            .Select(assignment => assignment.IamId.Trim())
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.IamId)
             .ToListAsync(cancellationToken);
-        var adminIamIdSet = adminIamIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var adminIamIdSet = (await _db.AppAdminAssignments
+                .AsNoTracking()
+                .Select(assignment => assignment.IamId.Trim())
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var currentOverridesByIamId = await GetCurrentDepartmentOverridesByIamId(today, cancellationToken);
         var currentChairAssignmentsByDepartment = await GetCurrentChairAssignmentsByDepartment(today, cancellationToken);
         var currentCaoAssignmentsByCluster = await GetCurrentCaoAssignmentsByCluster(today, cancellationToken);
         var latestAccrualByEmployeeId = await GetLatestAccrualByEmployeeId(cancellationToken);
-        var userIdByIamId = people
-            .GroupBy(person => NormalizeKey(person.IamId), StringComparer.OrdinalIgnoreCase)
+
+        return new AdminDirectoryData(
+            AppUsers: appUsers,
+            Clusters: clusters,
+            Departments: departments,
+            People: people,
+            AdminIamIdSet: adminIamIdSet,
+            CurrentOverridesByIamId: currentOverridesByIamId,
+            CurrentChairAssignmentsByDepartment: currentChairAssignmentsByDepartment,
+            CurrentCaoAssignmentsByCluster: currentCaoAssignmentsByCluster,
+            LatestAccrualByEmployeeId: latestAccrualByEmployeeId);
+    }
+
+    private static AdminDirectoryResponses BuildDirectoryResponses(AdminDirectoryData directoryData)
+    {
+        var userIdByIamId = BuildUserIdByIamId(directoryData);
+
+        var departmentResponses = BuildDepartmentResponses(
+            directoryData.Departments,
+            directoryData.CurrentChairAssignmentsByDepartment,
+            userIdByIamId);
+        var clusterResponses = BuildClusterResponses(
+            directoryData.Clusters,
+            directoryData.CurrentCaoAssignmentsByCluster,
+            userIdByIamId);
+        var roleAssignments = BuildRoleAssignments(
+            directoryData.AdminIamIdSet,
+            directoryData.CurrentChairAssignmentsByDepartment,
+            directoryData.CurrentCaoAssignmentsByCluster);
+        var userResponses = BuildUserResponses(directoryData, roleAssignments);
+
+        return new AdminDirectoryResponses(
+            Clusters: clusterResponses,
+            Departments: departmentResponses,
+            Users: userResponses);
+    }
+
+    private async Task<DashboardData> LoadDashboardDataAsync(CancellationToken cancellationToken)
+    {
+        var leaveTypes = await _db.LeaveTypes
+            .AsNoTracking()
+            .ToDictionaryAsync(type => type.Id, cancellationToken);
+
+        var leaveRequests = await _db.LeaveRequests
+            .AsNoTracking()
+            .OrderByDescending(request => request.SubmittedAt)
+            .ThenByDescending(request => request.Id)
+            .ToListAsync(cancellationToken);
+
+        return new DashboardData(
+            LeaveTypes: leaveTypes,
+            LeaveRequests: leaveRequests);
+    }
+
+    private static Dictionary<string, string> BuildUserIdByIamId(AdminDirectoryData directoryData)
+    {
+        var userIdByIamId = directoryData.AppUsers
+            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
+            .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().IamId.Trim(), StringComparer.OrdinalIgnoreCase);
 
-        var departmentResponses = departments
+        foreach (var person in directoryData.People)
+        {
+            var key = NormalizeKey(person.IamId);
+            if (!userIdByIamId.ContainsKey(key))
+            {
+                userIdByIamId[key] = person.IamId.Trim();
+            }
+        }
+
+        return userIdByIamId;
+    }
+
+    private static IReadOnlyList<AdminDepartmentResponse> BuildDepartmentResponses(
+        IEnumerable<Department> departments,
+        IReadOnlyDictionary<string, DepartmentChairAssignment> currentChairAssignmentsByDepartment,
+        IReadOnlyDictionary<string, string> userIdByIamId)
+    {
+        return departments
             .Select(department =>
             {
                 currentChairAssignmentsByDepartment.TryGetValue(department.DepartmentCode.Trim(), out var chairAssignment);
@@ -92,8 +178,14 @@ public sealed class AdminDataService
                         .ToList());
             })
             .ToList();
+    }
 
-        var clusterResponses = clusters
+    private static IReadOnlyList<AdminClusterResponse> BuildClusterResponses(
+        IEnumerable<Cluster> clusters,
+        IReadOnlyDictionary<int, ClusterCaoAssignment> currentCaoAssignmentsByCluster,
+        IReadOnlyDictionary<string, string> userIdByIamId)
+    {
+        return clusters
             .Select(cluster =>
             {
                 currentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
@@ -107,7 +199,13 @@ public sealed class AdminDataService
                     Name: cluster.ClusterName);
             })
             .ToList();
+    }
 
+    private static RoleAssignments BuildRoleAssignments(
+        IReadOnlySet<string> adminIamIdSet,
+        IReadOnlyDictionary<string, DepartmentChairAssignment> currentChairAssignmentsByDepartment,
+        IReadOnlyDictionary<int, ClusterCaoAssignment> currentCaoAssignmentsByCluster)
+    {
         var chairIamIds = currentChairAssignmentsByDepartment.Values
             .Select(assignment => NormalizeKey(assignment.IamId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -115,111 +213,132 @@ public sealed class AdminDataService
             .Select(assignment => NormalizeKey(assignment.IamId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var userResponses = people
-            .Select(person =>
+        return new RoleAssignments(
+            AdminIamIds: adminIamIdSet,
+            ChairIamIds: chairIamIds,
+            CaoIamIds: caoIamIds);
+    }
+
+    private static IReadOnlyList<AdminUserResponse> BuildUserResponses(
+        AdminDirectoryData directoryData,
+        RoleAssignments roleAssignments)
+    {
+        var peopleByIamId = directoryData.People
+            .GroupBy(person => NormalizeKey(person.IamId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var appUsersByIamId = directoryData.AppUsers
+            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
+            .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        var allIamIds = peopleByIamId.Keys
+            .Concat(appUsersByIamId.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(key => appUsersByIamId.TryGetValue(key, out var appUser)
+                ? appUser.DisplayName ?? appUser.IamId
+                : peopleByIamId.TryGetValue(key, out var person)
+                    ? person.FullName ?? person.IamId
+                    : key,
+                StringComparer.OrdinalIgnoreCase)
+            .ThenBy(key => key, StringComparer.OrdinalIgnoreCase);
+
+        return allIamIds
+            .Select(lookupIamId =>
             {
-                var iamId = person.IamId.Trim();
-                var lookupIamId = NormalizeKey(person.IamId);
-                var employeeId = NormalizeEmployeeId(person.EmployeeId);
-                latestAccrualByEmployeeId.TryGetValue(employeeId ?? string.Empty, out var latestAccrual);
-                currentOverridesByIamId.TryGetValue(lookupIamId, out var currentOverride);
+                appUsersByIamId.TryGetValue(lookupIamId, out var appUser);
+                peopleByIamId.TryGetValue(lookupIamId, out var person);
+
+                var iamId = appUser?.IamId.Trim()
+                    ?? person?.IamId.Trim()
+                    ?? lookupIamId;
+                var employeeId = NormalizeEmployeeId(appUser?.EmployeeId)
+                    ?? NormalizeEmployeeId(person?.EmployeeId);
+                directoryData.LatestAccrualByEmployeeId.TryGetValue(employeeId ?? string.Empty, out var latestAccrual);
+                directoryData.CurrentOverridesByIamId.TryGetValue(lookupIamId, out var currentOverride);
 
                 var departmentCode = currentOverride?.DepartmentCode.Trim()
                     ?? latestAccrual?.Level5Dept.Trim();
-                var isAdmin = adminIamIdSet.Contains(lookupIamId);
-                var isChair = chairIamIds.Contains(lookupIamId);
-                var isCao = caoIamIds.Contains(lookupIamId);
-                var role = GetRole(isAdmin, isChair, isCao);
+                var role = GetRole(
+                    roleAssignments.AdminIamIds.Contains(lookupIamId),
+                    roleAssignments.ChairIamIds.Contains(lookupIamId),
+                    roleAssignments.CaoIamIds.Contains(lookupIamId));
 
                 return new AdminUserResponse(
                     Id: iamId,
-                    Active: true,
+                    Active: appUser?.IsActive ?? true,
                     DepartmentId: departmentCode,
                     DepartmentOverrideEndDate: currentOverride?.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     DepartmentOverrideId: currentOverride?.DepartmentCode,
                     DepartmentOverrideStartDate: currentOverride?.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     Designation: GetDesignation(role, person, latestAccrual),
-                    Email: person.Email ?? string.Empty,
+                    Email: appUser?.Email ?? person?.Email ?? string.Empty,
                     EmployeeId: employeeId ?? string.Empty,
+                    HasAppUser: appUser != null,
                     IamId: iamId,
-                    Name: person.FullName ?? iamId,
+                    Name: appUser?.DisplayName ?? person?.FullName ?? iamId,
                     Position: latestAccrual?.JobCodeDescription ?? string.Empty,
                     Role: role);
             })
             .ToList();
+    }
 
-        var dataSources = Array.Empty<AdminDataSourceResponse>();
-        AdminStatusSnapshotResponse? statusSnapshot = null;
+    private static DashboardResponseData BuildDashboardResponseData(
+        AdminDirectoryData directoryData,
+        IReadOnlyList<AdminUserResponse> userResponses,
+        DashboardData dashboardData)
+    {
+        var requestsByType = dashboardData.LeaveRequests
+            .GroupBy(request => dashboardData.LeaveTypes.TryGetValue(request.LeaveTypeId, out var leaveType) ? leaveType.DisplayName : "Unknown")
+            .OrderBy(group => group.Key)
+            .ToDictionary(group => group.Key, group => group.Count());
 
-        if (includeDashboardData)
+        var pendingRequests = dashboardData.LeaveRequests.Count(request => request.Status == LeaveRequestStatus.PendingApproval);
+        var vacationRows = directoryData.LatestAccrualByEmployeeId.Values
+            .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var dataSources = new[]
         {
-            var leaveTypes = await _db.LeaveTypes
-                .AsNoTracking()
-                .ToDictionaryAsync(type => type.Id, cancellationToken);
+            new AdminDataSourceResponse("db-people", "People", "Sourced from People records, with application roles and overrides joined by IAM ID.", "ready", GetLatestTimestamp(directoryData.People.Select(person => person.LastFetchedAt ?? person.ModifyDate ?? person.PromotedAt ?? person.FirstIngestedAt).OfType<DateTime>())),
+            new AdminDataSourceResponse("db-departments", "Departments", "Sourced from Department, Cluster, chair, CAO, and routing tables.", "ready", GetLatestTimestamp(directoryData.Departments.Select(department => department.UpdatedUtc))),
+            new AdminDataSourceResponse("db-accruals", "Employee accruals", "Sourced from the latest EmployeeAccrualBalances rows for reporting departments and positions.", directoryData.LatestAccrualByEmployeeId.Count > 0 ? "ready" : "planned", GetLatestTimestamp(directoryData.LatestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
+            new AdminDataSourceResponse("db-requests", "Leave requests", "Sourced from LeaveRequest history snapshots.", dashboardData.LeaveRequests.Count > 0 ? "ready" : "planned", GetLatestTimestamp(dashboardData.LeaveRequests.Select(request => request.UpdatedUtc))),
+        };
 
-            var leaveRequests = await _db.LeaveRequests
-                .AsNoTracking()
-                .OrderByDescending(request => request.SubmittedAt)
-                .ThenByDescending(request => request.Id)
-                .ToListAsync(cancellationToken);
+        var statusSnapshot = new AdminStatusSnapshotResponse(
+            Departments: new DepartmentStatusResponse(
+                Clustered: directoryData.Departments.Count(department => department.ClusterId.HasValue),
+                Total: directoryData.Departments.Count,
+                WithFaculty: userResponses
+                    .Where(user => user.Role is "faculty" or "chair")
+                    .Select(user => user.DepartmentId)
+                    .Where(departmentId => !string.IsNullOrWhiteSpace(departmentId))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count()),
+            Issues: new AdminIssuesResponse(
+                ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
+                ExcludedUsers: userResponses.Count(user => user.HasAppUser && !user.Active),
+                FacultyAtVacationCap: vacationRows.Count(row => row.HoursOverUnderPolicyMax >= 0),
+                MissingEmails: userResponses.Count(user => user.HasAppUser && string.IsNullOrWhiteSpace(user.Email)),
+                PendingRequests: pendingRequests),
+            Requests: new AdminRequestStatusResponse(
+                BySource: new RequestSourceStatusResponse(
+                    Cognos: 0,
+                    Manual: dashboardData.LeaveRequests.Count),
+                ByType: requestsByType,
+                Pending: pendingRequests,
+                Total: dashboardData.LeaveRequests.Count),
+            Users: new AdminUserStatusResponse(
+                Admins: userResponses.Count(user => user.Role == "admin"),
+                AyFaculty: userResponses.Count(user => user.Designation == "ay"),
+                Caos: userResponses.Count(user => user.Role == "cao"),
+                Chairs: userResponses.Count(user => user.Role == "chair"),
+                FyFaculty: userResponses.Count(user => user.Designation == "fy"),
+                Total: userResponses.Count));
 
-            var requestsByType = leaveRequests
-                .GroupBy(request => leaveTypes.TryGetValue(request.LeaveTypeId, out var leaveType) ? leaveType.DisplayName : "Unknown")
-                .OrderBy(group => group.Key)
-                .ToDictionary(group => group.Key, group => group.Count());
-
-            var pendingRequests = leaveRequests.Count(request => request.Status == LeaveRequestStatus.PendingApproval);
-            var activeUsers = userResponses;
-            var vacationRows = latestAccrualByEmployeeId.Values
-                .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            dataSources =
-            [
-                new("db-people", "People", "Sourced from People records, with application roles and overrides joined by IAM ID.", "ready", GetLatestTimestamp(people.Select(person => person.LastFetchedAt ?? person.ModifyDate ?? person.PromotedAt ?? person.FirstIngestedAt).OfType<DateTime>())),
-                new("db-departments", "Departments", "Sourced from Department, Cluster, chair, CAO, and routing tables.", "ready", GetLatestTimestamp(departments.Select(department => department.UpdatedUtc))),
-                new("db-accruals", "Employee accruals", "Sourced from the latest EmployeeAccrualBalances rows for reporting departments and positions.", latestAccrualByEmployeeId.Count > 0 ? "ready" : "planned", GetLatestTimestamp(latestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
-                new("db-requests", "Leave requests", "Sourced from LeaveRequest history snapshots.", leaveRequests.Count > 0 ? "ready" : "planned", GetLatestTimestamp(leaveRequests.Select(request => request.UpdatedUtc))),
-            ];
-
-            statusSnapshot = new AdminStatusSnapshotResponse(
-                Departments: new DepartmentStatusResponse(
-                    Clustered: departments.Count(department => department.ClusterId.HasValue),
-                    Total: departments.Count,
-                    WithFaculty: activeUsers
-                        .Where(user => user.Role is "faculty" or "chair")
-                        .Select(user => user.DepartmentId)
-                        .Where(departmentId => !string.IsNullOrWhiteSpace(departmentId))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count()),
-                Issues: new AdminIssuesResponse(
-                    ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
-                    ExcludedUsers: 0,
-                    FacultyAtVacationCap: vacationRows.Count(row => row.HoursOverUnderPolicyMax >= 0),
-                    MissingEmails: activeUsers.Count(user => string.IsNullOrWhiteSpace(user.Email)),
-                    PendingRequests: pendingRequests),
-                Requests: new AdminRequestStatusResponse(
-                    BySource: new RequestSourceStatusResponse(
-                        Cognos: 0,
-                        Manual: leaveRequests.Count),
-                    ByType: requestsByType,
-                    Pending: pendingRequests,
-                    Total: leaveRequests.Count),
-                Users: new AdminUserStatusResponse(
-                    Admins: activeUsers.Count(user => user.Role == "admin"),
-                    AyFaculty: activeUsers.Count(user => user.Designation == "ay"),
-                    Caos: activeUsers.Count(user => user.Role == "cao"),
-                    Chairs: activeUsers.Count(user => user.Role == "chair"),
-                    FyFaculty: activeUsers.Count(user => user.Designation == "fy"),
-                    Total: activeUsers.Count));
-        }
-
-        return new AdminSnapshot(
-            Clusters: clusterResponses,
+        return new DashboardResponseData(
             DataSources: dataSources,
-            Departments: departmentResponses,
-            StatusSnapshot: statusSnapshot,
-            Users: userResponses);
+            StatusSnapshot: statusSnapshot);
     }
 
     private async Task<Dictionary<string, EmployeeReportingDepartmentOverride>> GetCurrentDepartmentOverridesByIamId(
@@ -353,12 +472,34 @@ public sealed class AdminDataService
         return latest.ToString("O");
     }
 
-    private sealed record AdminSnapshot(
+    private sealed record AdminDirectoryData(
+        IReadOnlyList<AppUser> AppUsers,
+        IReadOnlyList<Cluster> Clusters,
+        IReadOnlyList<Department> Departments,
+        IReadOnlyList<Person> People,
+        IReadOnlySet<string> AdminIamIdSet,
+        IReadOnlyDictionary<string, EmployeeReportingDepartmentOverride> CurrentOverridesByIamId,
+        IReadOnlyDictionary<string, DepartmentChairAssignment> CurrentChairAssignmentsByDepartment,
+        IReadOnlyDictionary<int, ClusterCaoAssignment> CurrentCaoAssignmentsByCluster,
+        IReadOnlyDictionary<string, EmployeeAccrualBalance> LatestAccrualByEmployeeId);
+
+    private sealed record AdminDirectoryResponses(
         IReadOnlyList<AdminClusterResponse> Clusters,
-        IReadOnlyList<AdminDataSourceResponse> DataSources,
         IReadOnlyList<AdminDepartmentResponse> Departments,
-        AdminStatusSnapshotResponse? StatusSnapshot,
         IReadOnlyList<AdminUserResponse> Users);
+
+    private sealed record DashboardData(
+        IReadOnlyDictionary<int, LeaveType> LeaveTypes,
+        IReadOnlyList<LeaveRequest> LeaveRequests);
+
+    private sealed record DashboardResponseData(
+        IReadOnlyList<AdminDataSourceResponse> DataSources,
+        AdminStatusSnapshotResponse StatusSnapshot);
+
+    private sealed record RoleAssignments(
+        IReadOnlySet<string> AdminIamIds,
+        IReadOnlySet<string> ChairIamIds,
+        IReadOnlySet<string> CaoIamIds);
 }
 
 public sealed record AdminDashboardResponse(
@@ -397,6 +538,7 @@ public sealed record AdminUserResponse(
     string Designation,
     string Email,
     string EmployeeId,
+    bool HasAppUser,
     string IamId,
     string Name,
     string Position,

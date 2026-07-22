@@ -28,6 +28,7 @@ export type AdminUser = {
   designation: AdminDesignation;
   email: string;
   employeeId: string;
+  hasAppUser: boolean;
   iamId: string;
   id: string;
   name: string;
@@ -247,7 +248,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       updates: UpdateUserInput;
       userId: string;
     }) => {
-      await fetchJson<void>(`/api/admin/people/${encodeURIComponent(userId)}`, {
+      await fetchJson<void>(`/api/admin/users/by-iam/${encodeURIComponent(userId)}`, {
         body: JSON.stringify({
           active: updates.active,
           email: updates.email,

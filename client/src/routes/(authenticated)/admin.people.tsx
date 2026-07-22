@@ -56,7 +56,7 @@ function AdminPeopleRouteContent() {
   const activeUsers = users.filter((user) => user.active);
   const excludedCount = users.length - activeUsers.length;
   const missingEmailCount = activeUsers.filter(
-    (user) => !user.email.trim()
+    (user) => user.hasAppUser && !user.email.trim()
   ).length;
 
   const columns: ColumnDef<UserRow>[] = [
@@ -131,13 +131,13 @@ function AdminPeopleRouteContent() {
       <section className="grid gap-4 md:grid-cols-3">
         <SummaryCard
           label="People roster"
-          text={`${users.length} people are currently loaded from People.`}
+          text={`${users.length} people are currently available from the merged admin roster.`}
           value={String(users.length)}
         />
         <SummaryCard
           accent={statusTextColors.danger}
           label="Missing emails"
-          text="Useful for checking directory and onboarding completeness."
+          text="Counts app users that still need an app-owned email value."
           value={String(missingEmailCount)}
         />
         <SummaryCard
@@ -325,7 +325,7 @@ function getUserMutationErrorMessage(error: unknown, fallbackMessage: string) {
     }
 
     if (error.status === 409) {
-      return 'That person update conflicts with an existing record.';
+      return 'That user update conflicts with an existing record.';
     }
 
     return fallbackMessage;

@@ -23,11 +23,12 @@ public sealed class AdminRolesController : ApiControllerBase
     public async Task<IActionResult> GetRolesAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var users = await _db.AppUsers
+        var people = await _db.People
             .AsNoTracking()
-            .OrderBy(user => user.DisplayName)
+            .OrderBy(person => person.FullName)
+            .ThenBy(person => person.IamId)
             .ToListAsync(cancellationToken);
-        var usersByIamId = users.ToDictionary(user => user.IamId.Trim(), StringComparer.OrdinalIgnoreCase);
+        var peopleByIamId = people.ToDictionary(person => person.IamId.Trim(), StringComparer.OrdinalIgnoreCase);
 
         var departments = await _db.Departments
             .AsNoTracking()
@@ -66,7 +67,7 @@ public sealed class AdminRolesController : ApiControllerBase
                 targetId: null,
                 targetName: null,
                 type: "admin",
-                usersByIamId: usersByIamId))
+                peopleByIamId: peopleByIamId))
             .Concat(caoAssignments.Select(assignment =>
             {
                 clustersById.TryGetValue(assignment.ClusterId, out var cluster);
@@ -79,7 +80,7 @@ public sealed class AdminRolesController : ApiControllerBase
                     targetId: assignment.ClusterId.ToString(),
                     targetName: cluster?.ClusterName ?? $"Cluster {assignment.ClusterId}",
                     type: "cao",
-                    usersByIamId: usersByIamId);
+                    peopleByIamId: peopleByIamId);
             }))
             .Concat(chairAssignments.Select(assignment =>
             {
@@ -93,7 +94,7 @@ public sealed class AdminRolesController : ApiControllerBase
                     targetId: assignment.DepartmentCode,
                     targetName: department?.DepartmentName ?? assignment.DepartmentCode,
                     type: "chair",
-                    usersByIamId: usersByIamId);
+                    peopleByIamId: peopleByIamId);
             }))
             .OrderByDescending(assignment => assignment.Active)
             .ThenBy(assignment => assignment.Type)
@@ -105,10 +106,10 @@ public sealed class AdminRolesController : ApiControllerBase
             Assignments: assignments,
             Clusters: clusters.Select(cluster => new AdminRoleOption(cluster.Id.ToString(), cluster.ClusterName)).ToList(),
             Departments: departments.Select(department => new AdminRoleOption(department.DepartmentCode, department.DepartmentName)).ToList(),
-            Users: users.Select(user => new AdminRoleUserOption(
-                Email: user.Email ?? string.Empty,
-                IamId: user.IamId.Trim(),
-                Name: user.DisplayName ?? user.IamId.Trim())).ToList()));
+            Users: people.Select(person => new AdminRoleUserOption(
+                Email: person.Email ?? string.Empty,
+                IamId: person.IamId.Trim(),
+                Name: person.FullName ?? person.IamId.Trim())).ToList()));
     }
 
     [HttpPost("admins")]
@@ -355,19 +356,19 @@ public sealed class AdminRolesController : ApiControllerBase
         string? targetId,
         string? targetName,
         string type,
-        IReadOnlyDictionary<string, AppUser> usersByIamId)
+        IReadOnlyDictionary<string, Person> peopleByIamId)
     {
         var trimmedIamId = iamId.Trim();
-        usersByIamId.TryGetValue(trimmedIamId, out var user);
+        peopleByIamId.TryGetValue(trimmedIamId, out var person);
 
         return new AdminRoleAssignmentResponse(
             Active: active,
             EffectiveEndDate: effectiveEndDate,
             EffectiveStartDate: effectiveStartDate,
-            Email: user?.Email ?? string.Empty,
+            Email: person?.Email ?? string.Empty,
             Id: id,
             IamId: trimmedIamId,
-            Name: user?.DisplayName ?? trimmedIamId,
+            Name: person?.FullName ?? trimmedIamId,
             TargetId: targetId,
             TargetName: targetName,
             Type: type);

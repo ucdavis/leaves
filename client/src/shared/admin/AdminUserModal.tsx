@@ -82,7 +82,7 @@ export function AdminUserModal({
 
   return (
     <AdminModalFrame
-      description="Profile edits persist to People. Department overrides create dated reporting department rows."
+      description="Profile edits persist to AppUser. Department overrides create dated reporting department rows."
       title={title}
     >
       <form
