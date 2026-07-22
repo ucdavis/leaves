@@ -155,10 +155,6 @@ function AdminPeopleRouteContent() {
               <h2 className="text-lg font-semibold text-primary">
                 User management
               </h2>
-              <p>
-                This table is now sourced from the database. Department values
-                are inferred from the user&apos;s latest leave request snapshot.
-              </p>
             </div>
           </div>
 

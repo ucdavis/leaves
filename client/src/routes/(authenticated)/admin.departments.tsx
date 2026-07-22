@@ -187,15 +187,6 @@ function AdminDepartmentsRoute() {
           <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
             Department and cluster management
           </h2>
-          <p className="text-sm text-[var(--admin-ink-muted)]">
-            These records are now backed by SQL Server. Cluster names,
-            department names, approval mode, and routing emails persist to the
-            database.
-          </p>
-          <p className="text-sm text-[var(--admin-ink-muted)]">
-            Cluster names and department assignments are live. Chair and CAO
-            assignments are still pending schema support.
-          </p>
         </div>
       </section>
 
