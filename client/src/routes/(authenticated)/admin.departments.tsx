@@ -14,8 +14,11 @@ import { AdminDepartmentCreationPanel } from '@/shared/admin/AdminDepartmentCrea
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
 import { DepartmentSettingsModal } from '@/shared/admin/DepartmentSettingsModal.tsx';
 import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { statusTextColors } from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
+  component: AdminDepartmentsRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
   pendingComponent: () => (
@@ -28,7 +31,6 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
       </p>
     </section>
   ),
-  component: AdminDepartmentsRoute,
 });
 
 function AdminDepartmentsRoute() {
@@ -96,63 +98,70 @@ function AdminDepartmentsRoute() {
             onClick={() => setViewDepartmentId(null)}
             type="button"
           >
+            <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
             Back to departments
           </button>
 
-          <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold text-[var(--admin-blue)]">
-                  {selectedDepartment.name}
-                </h2>
-                <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-                  This roster is derived from each person&apos;s latest leave request
-                  snapshot in the database.
-                </p>
+          <section className="card border border-main-border bg-base-100">
+            <div className="card-body p-6">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-primary">
+                    {selectedDepartment.name}
+                  </h2>
+                  <p className="mt-2 text-sm text-base-content/70">
+                    This roster is derived from each user&apos;s latest leave
+                    request snapshot in the database.
+                  </p>
+                </div>
+                <div className="text-sm text-base-content/70">
+                  {departmentUsers.length} people linked by request history
+                </div>
               </div>
-              <div className="text-sm text-[var(--admin-ink-muted)]">
-                {departmentUsers.length} people linked by request history
-              </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>IAM ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {departmentUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td className="font-semibold">{user.name}</td>
-                      <td>
-                        {user.email ? (
-                          user.email
-                        ) : (
-                          <span className="italic text-rose-700">Missing</span>
-                        )}
-                      </td>
-                      <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
-                      <td className="font-mono text-xs">{user.iamId}</td>
-                    </tr>
-                  ))}
-                  {departmentUsers.length === 0 ? (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <td
-                        className="py-6 text-sm text-[var(--admin-ink-muted)]"
-                        colSpan={4}
-                      >
-                        No people currently map to this department from stored leave
-                        request snapshots.
-                      </td>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>IAM ID</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {departmentUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td className="font-semibold">{user.name}</td>
+                        <td>
+                          {user.email ? (
+                            user.email
+                          ) : (
+                            <span
+                              className={`italic ${statusTextColors.danger}`}
+                            >
+                              Missing
+                            </span>
+                          )}
+                        </td>
+                        <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
+                        <td className="font-mono text-xs">{user.iamId}</td>
+                      </tr>
+                    ))}
+                    {departmentUsers.length === 0 ? (
+                      <tr>
+                        <td
+                          className="py-6 text-sm text-base-content/70"
+                          colSpan={4}
+                        >
+                          No users currently map to this department from stored
+                          leave request snapshots.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         </div>
@@ -163,12 +172,12 @@ function AdminDepartmentsRoute() {
   const editingDepartment =
     editingDepartmentId === null
       ? null
-      : departments.find((department) => department.id === editingDepartmentId) ??
-        null;
+      : (departments.find(
+          (department) => department.id === editingDepartmentId
+        ) ?? null);
 
   return (
     <div className="space-y-6">
-
       <AdminDepartmentCreationPanel
         clusters={clusters}
         formatError={getAdminMutationErrorMessage}
@@ -177,6 +186,23 @@ function AdminDepartmentsRoute() {
           createDepartmentMutation.mutateAsync({ input })
         }
       />
+
+      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+        <div className="max-w-3xl space-y-2">
+          <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+            Department and cluster management
+          </h2>
+          <p className="text-sm text-[var(--admin-ink-muted)]">
+            These records are now backed by SQL Server. Cluster names,
+            department names, approval mode, and routing emails persist to the
+            database.
+          </p>
+          <p className="text-sm text-[var(--admin-ink-muted)]">
+            Cluster names and department assignments are live. Chair and CAO
+            assignments are still pending schema support.
+          </p>
+        </div>
+      </section>
 
       {clusterGroups.map((cluster) => (
         <section
@@ -194,7 +220,7 @@ function AdminDepartmentsRoute() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 border-l-4 border-[var(--admin-border-strong)] pl-5">
             {cluster.departments.map((department) => {
               const linkedUserCount = users.filter(
                 (user) => user.departmentId === department.id
@@ -221,28 +247,33 @@ function AdminDepartmentsRoute() {
       ))}
 
       {unassignedDepartments.length > 0 ? (
-        <section className="rounded-[1.25rem] border border-dashed border-[var(--admin-border)] bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-[var(--admin-ink-muted)]">
-            Unassigned to cluster
-          </h2>
-          <div className="mt-4 space-y-3">
-            {unassignedDepartments.map((department) => (
-              <DepartmentRow
-                department={department}
-                key={department.id}
-                linkedUserCount={users.filter(
-                  (user) => user.departmentId === department.id
-                ).length}
-                onOpenRoster={() => setViewDepartmentId(department.id)}
-                onOpenSettings={() => setEditingDepartmentId(department.id)}
-                onRename={(name) =>
-                  renameDepartmentMutation.mutateAsync({
-                    departmentId: department.id,
-                    name,
-                  })
-                }
-              />
-            ))}
+        <section className="card border border-dashed border-main-border bg-base-100">
+          <div className="card-body p-6">
+            <h2 className="text-lg font-semibold text-base-content/70">
+              Unassigned to cluster
+            </h2>
+            <div className="mt-4 space-y-3">
+              {unassignedDepartments.map((department) => (
+                <DepartmentRow
+                  department={department}
+                  key={department.id}
+                  linkedUserCount={
+                    users.filter(
+                      (user) =>
+                        user.departmentId === department.id && user.active
+                    ).length
+                  }
+                  onOpenRoster={() => setViewDepartmentId(department.id)}
+                  onOpenSettings={() => setEditingDepartmentId(department.id)}
+                  onRename={(name) =>
+                    renameDepartmentMutation.mutateAsync({
+                      departmentId: department.id,
+                      name,
+                    })
+                  }
+                />
+              ))}
+            </div>
           </div>
         </section>
       ) : null}

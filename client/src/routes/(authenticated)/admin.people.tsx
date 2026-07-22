@@ -11,6 +11,9 @@ import {
   useAdminData,
 } from '@/shared/admin/adminData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
+import {
+  statusTextColors,
+} from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/people')({
   component: AdminPeopleRoute,
@@ -33,12 +36,14 @@ function AdminPeopleRouteContent() {
   const [filterRole, setFilterRole] = useState('');
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const departmentNames = Object.fromEntries(
     departments.map((department) => [department.id, department.name])
   );
 
   const rows: UserRow[] = users
+    .filter((user) => (showExcluded ? true : user.active))
     .filter((user) => (filterRole ? user.role === filterRole : true))
     .filter((user) =>
       filterDepartmentId ? user.departmentId === filterDepartmentId : true
@@ -48,17 +53,21 @@ function AdminPeopleRouteContent() {
       departmentName: departmentNames[user.departmentId] ?? 'Not mapped',
     }));
 
-  const missingEmailCount = users.filter((user) => !user.email.trim()).length;
+  const activeUsers = users.filter((user) => user.active);
+  const excludedCount = users.length - activeUsers.length;
+  const missingEmailCount = activeUsers.filter(
+    (user) => !user.email.trim()
+  ).length;
 
   const columns: ColumnDef<UserRow>[] = [
     {
       accessorKey: 'name',
       cell: ({ row }) => (
         <div>
-          <div className="font-semibold text-[var(--admin-ink)]">
+          <div className="font-semibold text-base-content">
             {row.original.name}
           </div>
-          <div className="text-xs text-[var(--admin-ink-muted)]">
+          <div className="text-xs text-base-content/70">
             {row.original.role === 'admin'
               ? 'Application administrator'
               : 'Person'}
@@ -73,7 +82,7 @@ function AdminPeopleRouteContent() {
         row.original.email ? (
           <span>{row.original.email}</span>
         ) : (
-          <span className="italic text-rose-700">Missing</span>
+          <span className={`italic ${statusTextColors.danger}`}>Missing</span>
         ),
       header: 'Email',
     },
@@ -91,7 +100,7 @@ function AdminPeopleRouteContent() {
     {
       accessorKey: 'role',
       cell: ({ row }) => (
-        <span className="inline-flex rounded-full bg-[var(--admin-sand)] px-3 py-1 text-xs font-semibold text-[var(--admin-blue)]">
+        <span className="inline-flex rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-primary">
           {getRoleLabel(row.original.role)}
         </span>
       ),
@@ -115,7 +124,7 @@ function AdminPeopleRouteContent() {
   const editingUser =
     editingUserId === null
       ? null
-      : users.find((user) => user.id === editingUserId) ?? null;
+      : (users.find((user) => user.id === editingUserId) ?? null);
 
   return (
     <div className="space-y-6">
@@ -126,68 +135,85 @@ function AdminPeopleRouteContent() {
           value={String(users.length)}
         />
         <SummaryCard
-          accent="text-rose-700"
+          accent={statusTextColors.danger}
           label="Missing emails"
           text="Useful for checking directory and onboarding completeness."
           value={String(missingEmailCount)}
         />
         <SummaryCard
-          accent="text-slate-700"
-          label="Departments"
-          text="Mapped from reporting data and department overrides."
-          value={String(departments.length)}
+          accent={statusTextColors.neutral}
+          label="Excluded users"
+          text="Backed by the persisted AppUser.IsActive flag."
+          value={String(excludedCount)}
         />
       </section>
 
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-              People management
-            </h2>
-          </div>
-        </div>
-
-        <DataTable
-          columns={columns}
-          data={rows}
-          filterPlaceholder="Search name, email, IAM ID, or department..."
-          globalFilter="left"
-          initialState={{
-            pagination: {
-              pageSize: 8,
-            },
-          }}
-          tableActions={
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <select
-                className="select select-bordered"
-                onChange={(event) => setFilterRole(event.target.value)}
-                value={filterRole}
-              >
-                <option value="">All roles</option>
-                <option value="faculty">Faculty</option>
-                <option value="chair">Chair</option>
-                <option value="cao">CAO</option>
-                <option value="admin">Admin</option>
-              </select>
-
-              <select
-                className="select select-bordered"
-                onChange={(event) => setFilterDepartmentId(event.target.value)}
-                value={filterDepartmentId}
-              >
-                <option value="">All departments</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-
+      <section className="card border border-main-border bg-base-100">
+        <div className="card-body p-6">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2 max-w-3xl">
+              <h2 className="text-lg font-semibold text-primary">
+                User management
+              </h2>
+              <p>
+                This table is now sourced from the database. Department values
+                are inferred from the user&apos;s latest leave request snapshot.
+              </p>
             </div>
-          }
-        />
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={rows}
+            filterPlaceholder="Search name, email, IAM ID, or department..."
+            globalFilter="left"
+            initialState={{
+              pagination: {
+                pageSize: 8,
+              },
+            }}
+            tableActions={
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-center">
+                <select
+                  className="select select-bordered w-full sm:w-36"
+                  onChange={(event) => setFilterRole(event.target.value)}
+                  value={filterRole}
+                >
+                  <option value="">All roles</option>
+                  <option value="faculty">Faculty</option>
+                  <option value="admin">Admin</option>
+                </select>
+
+                <select
+                  className="select select-bordered w-full sm:w-64"
+                  onChange={(event) =>
+                    setFilterDepartmentId(event.target.value)
+                  }
+                  value={filterDepartmentId}
+                >
+                  <option value="">All departments</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="label w-full cursor-pointer gap-3 rounded-xl border border-base-300 px-4 py-2 sm:w-auto sm:flex-none">
+                  <span className="label-text text-sm text-base-content">
+                    Show excluded
+                  </span>
+                  <input
+                    checked={showExcluded}
+                    className="toggle toggle-sm"
+                    onChange={(event) => setShowExcluded(event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
+              </div>
+            }
+          />
+        </div>
       </section>
 
       {editingUser ? (
@@ -233,14 +259,14 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-5 shadow-sm">
-      <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
-        {label}
+    <section className="card border border-main-border bg-base-100">
+      <div className="card-body p-5">
+        <div className="card-stat-label">{label}</div>
+        <div className={`card-stat-value ${accent ?? 'text-primary'}`}>
+          {value}
+        </div>
+        <p className="card-stat-details">{text}</p>
       </div>
-      <div className={`mt-3 text-3xl font-bold ${accent ?? 'text-[var(--admin-blue)]'}`}>
-        {value}
-      </div>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">{text}</p>
     </section>
   );
 }
@@ -282,9 +308,7 @@ function getUserMutationErrorMessage(error: unknown, fallbackMessage: string) {
       };
 
       const validationMessage = body.errors
-        ? Object.values(body.errors)
-            .flat()
-            .find(Boolean)
+        ? Object.values(body.errors).flat().find(Boolean)
         : null;
 
       if (validationMessage) {
