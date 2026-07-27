@@ -102,7 +102,7 @@ export function AdminStatusContent({
           <div className="space-y-1">
             <IssueRow
               count={statusSnapshot.issues.missingEmails}
-              label="App users missing email addresses"
+              label="People missing email addresses"
               tone="error"
             />
             <IssueRow

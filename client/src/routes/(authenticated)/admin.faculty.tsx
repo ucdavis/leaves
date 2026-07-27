@@ -15,7 +15,7 @@ import {
   statusTextColors,
 } from '@/shared/statusColors.ts';
 
-export const Route = createFileRoute('/(authenticated)/admin/people')({
+export const Route = createFileRoute('/(authenticated)/admin/faculty')({
   component: AdminPeopleRoute,
 });
 
@@ -33,9 +33,12 @@ function AdminPeopleRoute() {
 
 function AdminPeopleRouteContent() {
   const { departments, updateUser, users } = useAdminData();
-  const [filterRole, setFilterRole] = useState('');
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [pendingExcludeChange, setPendingExcludeChange] = useState<{
+    nextActive: boolean;
+    userId: string;
+  } | null>(null);
   const [showExcluded, setShowExcluded] = useState(false);
 
   const departmentNames = Object.fromEntries(
@@ -43,8 +46,16 @@ function AdminPeopleRouteContent() {
   );
 
   const rows: UserRow[] = users
-    .filter((user) => (showExcluded ? true : user.active))
-    .filter((user) => (filterRole ? user.role === filterRole : true))
+    .filter((user) => {
+      const effectiveActive =
+        pendingExcludeChange?.userId === user.id
+          ? pendingExcludeChange.nextActive
+          : user.active;
+      const isPendingExcluded =
+        pendingExcludeChange?.userId === user.id && effectiveActive === false;
+
+      return showExcluded ? true : effectiveActive || isPendingExcluded;
+    })
     .filter((user) =>
       filterDepartmentId ? user.departmentId === filterDepartmentId : true
     )
@@ -52,12 +63,6 @@ function AdminPeopleRouteContent() {
       ...user,
       departmentName: departmentNames[user.departmentId] ?? 'Not mapped',
     }));
-
-  const activeUsers = users.filter((user) => user.active);
-  const excludedCount = users.length - activeUsers.length;
-  const missingEmailCount = activeUsers.filter(
-    (user) => user.hasAppUser && !user.email.trim()
-  ).length;
 
   const columns: ColumnDef<UserRow>[] = [
     {
@@ -119,6 +124,60 @@ function AdminPeopleRouteContent() {
       header: 'Actions',
       id: 'actions',
     },
+    {
+      cell: ({ row }) => {
+        const isSaving = pendingExcludeChange?.userId === row.original.id;
+        const effectiveActive =
+          pendingExcludeChange?.userId === row.original.id
+            ? pendingExcludeChange.nextActive
+            : row.original.active;
+        const inputId = `exclude-${row.original.id}`;
+
+        return (
+          <div className="flex w-full justify-center">
+            <label
+              className={isSaving ? 'cursor-progress' : 'cursor-pointer'}
+              htmlFor={inputId}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <input
+                aria-label={`Exclude ${row.original.name}`}
+                checked={!effectiveActive}
+                className="checkbox checkbox-sm"
+                id={inputId}
+                onChange={async (event) => {
+                  if (pendingExcludeChange !== null) {
+                    return;
+                  }
+
+                  const nextActive = !event.target.checked;
+                  setPendingExcludeChange({
+                    nextActive,
+                    userId: row.original.id,
+                  });
+
+                  try {
+                    await updateUser(row.original.id, {
+                      active: nextActive,
+                    });
+                  } finally {
+                    setPendingExcludeChange((currentChange) =>
+                      currentChange?.userId === row.original.id
+                        ? null
+                        : currentChange
+                    );
+                  }
+                }}
+                onClick={(event) => event.stopPropagation()}
+                type="checkbox"
+              />
+            </label>
+          </div>
+        );
+      },
+      header: () => <div className="text-center">Exclude</div>,
+      id: 'exclude',
+    },
   ];
 
   const editingUser =
@@ -128,32 +187,13 @@ function AdminPeopleRouteContent() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-3">
-        <SummaryCard
-          label="People roster"
-          text={`${users.length} people are currently available from the merged admin roster.`}
-          value={String(users.length)}
-        />
-        <SummaryCard
-          accent={statusTextColors.danger}
-          label="Missing emails"
-          text="Counts app users that still need an app-owned email value."
-          value={String(missingEmailCount)}
-        />
-        <SummaryCard
-          accent={statusTextColors.neutral}
-          label="Excluded users"
-          text="Backed by the persisted AppUser.IsActive flag."
-          value={String(excludedCount)}
-        />
-      </section>
 
       <section className="card border border-main-border bg-base-100">
         <div className="card-body p-6">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2 max-w-3xl">
               <h2 className="text-lg font-semibold text-primary">
-                User management
+                Faculty management
               </h2>
             </div>
           </div>
@@ -170,16 +210,6 @@ function AdminPeopleRouteContent() {
             }}
             tableActions={
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-center">
-                <select
-                  className="select select-bordered w-full sm:w-36"
-                  onChange={(event) => setFilterRole(event.target.value)}
-                  value={filterRole}
-                >
-                  <option value="">All roles</option>
-                  <option value="faculty">Faculty</option>
-                  <option value="admin">Admin</option>
-                </select>
-
                 <select
                   className="select select-bordered w-full sm:w-64"
                   onChange={(event) =>
@@ -240,30 +270,6 @@ function AdminPeopleRouteContent() {
         />
       ) : null}
     </div>
-  );
-}
-
-function SummaryCard({
-  accent,
-  label,
-  text,
-  value,
-}: {
-  accent?: string;
-  label: string;
-  text: string;
-  value: string;
-}) {
-  return (
-    <section className="card border border-main-border bg-base-100">
-      <div className="card-body p-5">
-        <div className="card-stat-label">{label}</div>
-        <div className={`card-stat-value ${accent ?? 'text-primary'}`}>
-          {value}
-        </div>
-        <p className="card-stat-details">{text}</p>
-      </div>
-    </section>
   );
 }
 

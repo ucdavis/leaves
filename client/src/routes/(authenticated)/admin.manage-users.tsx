@@ -19,8 +19,8 @@ import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
 import { DataTable } from '@/shared/dataTable.tsx';
 import { WarningModal } from '@/shared/WarningModal.tsx';
 
-export const Route = createFileRoute('/(authenticated)/admin/roles')({
-  component: AdminRolesRoute,
+export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
+  component: AdminUsersRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminRolesQueryOptions()),
   pendingComponent: () => (
@@ -57,7 +57,7 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function AdminRolesRoute() {
+function AdminUsersRoute() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminRolesQueryOptions());
   const [type, setType] = useState<AdminAssignableRoleType>('admin');

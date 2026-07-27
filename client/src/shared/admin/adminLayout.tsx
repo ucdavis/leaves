@@ -8,8 +8,8 @@ import {
 
 const adminTabs = [
   { icon: ChartBarSquareIcon, label: 'Status', to: '/admin/status' },
-  { icon: UserGroupIcon, label: 'People', to: '/admin/people' },
-  { icon: ShieldCheckIcon, label: 'Roles', to: '/admin/roles' },
+  { icon: UserGroupIcon, label: 'Faculty', to: '/admin/faculty' },
+  { icon: ShieldCheckIcon, label: 'Manage users', to: '/admin/manage-users' },
   { icon: BuildingOffice2Icon, label: 'Departments', to: '/admin/departments' },
 ] as const;
 

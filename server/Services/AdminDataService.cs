@@ -231,26 +231,19 @@ public sealed class AdminDataService
             .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        var allIamIds = peopleByIamId.Keys
-            .Concat(appUsersByIamId.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(key => appUsersByIamId.TryGetValue(key, out var appUser)
-                ? appUser.DisplayName ?? appUser.IamId
-                : peopleByIamId.TryGetValue(key, out var person)
+        return peopleByIamId.Keys
+            .OrderBy(key =>
+                peopleByIamId.TryGetValue(key, out var person)
                     ? person.FullName ?? person.IamId
                     : key,
                 StringComparer.OrdinalIgnoreCase)
-            .ThenBy(key => key, StringComparer.OrdinalIgnoreCase);
-
-        return allIamIds
+            .ThenBy(key => key, StringComparer.OrdinalIgnoreCase)
             .Select(lookupIamId =>
             {
                 appUsersByIamId.TryGetValue(lookupIamId, out var appUser);
                 peopleByIamId.TryGetValue(lookupIamId, out var person);
 
-                var iamId = appUser?.IamId.Trim()
-                    ?? person?.IamId.Trim()
-                    ?? lookupIamId;
+                var iamId = person?.IamId.Trim() ?? lookupIamId;
                 var employeeId = NormalizeEmployeeId(appUser?.EmployeeId)
                     ?? NormalizeEmployeeId(person?.EmployeeId);
                 directoryData.LatestAccrualByEmployeeId.TryGetValue(employeeId ?? string.Empty, out var latestAccrual);
@@ -299,7 +292,7 @@ public sealed class AdminDataService
 
         var dataSources = new[]
         {
-            new AdminDataSourceResponse("db-people", "People", "Sourced from People records, with application roles and overrides joined by IAM ID.", "ready", GetLatestTimestamp(directoryData.People.Select(person => person.LastFetchedAt ?? person.ModifyDate ?? person.PromotedAt ?? person.FirstIngestedAt).OfType<DateTime>())),
+            new AdminDataSourceResponse("db-people", "People", "Sourced from People records, with app-owned exclude state, role assignments, and department overrides joined by IAM ID.", "ready", GetLatestTimestamp(directoryData.People.Select(person => person.LastFetchedAt ?? person.ModifyDate ?? person.PromotedAt ?? person.FirstIngestedAt).OfType<DateTime>())),
             new AdminDataSourceResponse("db-departments", "Departments", "Sourced from Department, Cluster, chair, CAO, and routing tables.", "ready", GetLatestTimestamp(directoryData.Departments.Select(department => department.UpdatedUtc))),
             new AdminDataSourceResponse("db-accruals", "Employee accruals", "Sourced from the latest EmployeeAccrualBalances rows for reporting departments and positions.", directoryData.LatestAccrualByEmployeeId.Count > 0 ? "ready" : "planned", GetLatestTimestamp(directoryData.LatestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
             new AdminDataSourceResponse("db-requests", "Leave requests", "Sourced from LeaveRequest history snapshots.", dashboardData.LeaveRequests.Count > 0 ? "ready" : "planned", GetLatestTimestamp(dashboardData.LeaveRequests.Select(request => request.UpdatedUtc))),
@@ -317,9 +310,9 @@ public sealed class AdminDataService
                     .Count()),
             Issues: new AdminIssuesResponse(
                 ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
-                ExcludedUsers: userResponses.Count(user => user.HasAppUser && !user.Active),
+                ExcludedUsers: userResponses.Count(user => !user.Active),
                 FacultyAtVacationCap: vacationRows.Count(row => row.HoursOverUnderPolicyMax >= 0),
-                MissingEmails: userResponses.Count(user => user.HasAppUser && string.IsNullOrWhiteSpace(user.Email)),
+                MissingEmails: userResponses.Count(user => string.IsNullOrWhiteSpace(user.Email)),
                 PendingRequests: pendingRequests),
             Requests: new AdminRequestStatusResponse(
                 BySource: new RequestSourceStatusResponse(
