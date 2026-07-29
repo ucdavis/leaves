@@ -13,18 +13,29 @@ namespace Server.Controllers;
 public sealed class AdminController : ApiControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly AdminDataService _adminDataService;
+    private readonly AdminFacultyService _adminFacultyService;
+    private readonly AdminStatusService _adminStatusService;
 
-    public AdminController(AppDbContext db, AdminDataService adminDataService)
+    public AdminController(
+        AppDbContext db,
+        AdminFacultyService adminFacultyService,
+        AdminStatusService adminStatusService)
     {
         _db = db;
-        _adminDataService = adminDataService;
+        _adminFacultyService = adminFacultyService;
+        _adminStatusService = adminStatusService;
     }
 
-    [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus(CancellationToken cancellationToken)
     {
-        return Ok(await _adminDataService.GetDashboardAsync(cancellationToken));
+        return Ok(await _adminStatusService.GetStatusAsync(cancellationToken));
+    }
+
+    [HttpGet("faculty")]
+    public async Task<IActionResult> GetFaculty(CancellationToken cancellationToken)
+    {
+        return Ok(await _adminFacultyService.GetFacultyAsync(cancellationToken));
     }
 
     [HttpPost("users")]
@@ -183,12 +194,6 @@ public sealed class AdminController : ApiControllerBase
         return NoContent();
     }
 
-    [HttpGet("status")]
-    public IActionResult Status()
-    {
-        return Ok(new AdminStatusResponse("Admin access granted."));
-    }
-
     private static bool IsDuplicateAppUser(DbUpdateException exception)
     {
         return exception.InnerException is SqlException sqlException &&
@@ -309,7 +314,6 @@ public sealed class AdminController : ApiControllerBase
         return value.Trim();
     }
 
-    private sealed record AdminStatusResponse(string Message);
     public sealed record CreateUserRequest(bool Active, string? Email, string? EmployeeId, string IamId, string? Name);
     public sealed record UpdateUserRequest(
         bool? Active,

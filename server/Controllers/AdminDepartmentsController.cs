@@ -16,19 +16,19 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private const int ClusterNameMaxLength = 100;
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
+    private readonly AdminDepartmentsService _adminDepartmentsService;
     private readonly AppDbContext _db;
-    private readonly AdminDataService _adminDataService;
 
-    public AdminDepartmentsController(AppDbContext db, AdminDataService adminDataService)
+    public AdminDepartmentsController(AppDbContext db, AdminDepartmentsService adminDepartmentsService)
     {
         _db = db;
-        _adminDataService = adminDataService;
+        _adminDepartmentsService = adminDepartmentsService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        return Ok(await _adminDataService.GetDepartmentsAsync(cancellationToken));
+        return Ok(await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken));
     }
 
     [HttpPost("clusters")]
@@ -502,7 +502,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
-        var departmentData = await _adminDataService.GetDepartmentsAsync(cancellationToken);
+        var departmentData = await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken);
         var userBelongsToDepartment = departmentData.Users.Any(user =>
             string.Equals(user.Id, normalizedChairUserId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(user.DepartmentId, departmentCode, StringComparison.OrdinalIgnoreCase));

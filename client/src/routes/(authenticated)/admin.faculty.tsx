@@ -2,20 +2,33 @@ import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { HttpError } from '@/lib/api.ts';
+import { adminFacultyQueryOptions } from '@/queries/adminFaculty.ts';
 import { AdminUserModal } from '@/shared/admin/AdminUserModal.tsx';
 import type {
   AdminUser,
 } from '@/shared/admin/adminData.tsx';
 import {
-  AdminDataProvider,
-  useAdminData,
-} from '@/shared/admin/adminData.tsx';
+  AdminFacultyDataProvider,
+  useAdminFacultyData,
+} from '@/shared/admin/adminFacultyData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
 import {
   statusTextColors,
 } from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/faculty')({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(adminFacultyQueryOptions()),
+  pendingComponent: () => (
+    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+        Loading faculty data
+      </h2>
+      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+        Pulling the current faculty records from the database.
+      </p>
+    </section>
+  ),
   component: AdminPeopleRoute,
 });
 
@@ -25,14 +38,14 @@ type UserRow = AdminUser & {
 
 function AdminPeopleRoute() {
   return (
-    <AdminDataProvider>
+    <AdminFacultyDataProvider>
       <AdminPeopleRouteContent />
-    </AdminDataProvider>
+    </AdminFacultyDataProvider>
   );
 }
 
 function AdminPeopleRouteContent() {
-  const { departments, facultyUsers, updateUser } = useAdminData();
+  const { departments, facultyUsers, updateUser } = useAdminFacultyData();
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingExcludeChange, setPendingExcludeChange] = useState<{

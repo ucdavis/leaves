@@ -48,7 +48,10 @@ try
 
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
-    builder.Services.AddScoped<AdminDataService>();
+    builder.Services.AddScoped<AdminDirectoryService>();
+    builder.Services.AddScoped<AdminDepartmentsService>();
+    builder.Services.AddScoped<AdminFacultyService>();
+    builder.Services.AddScoped<AdminStatusService>();
     builder.Services.AddScoped<IUserService, UserService>();
     // add auth policies here
 

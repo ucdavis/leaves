@@ -8,31 +8,10 @@ import {
 import { AdminMetricCard } from './AdminMetricCard.tsx';
 
 type StatusSnapshot = {
-  departments: {
-    clustered: number;
-    total: number;
-    withFaculty: number;
-  };
   issues: {
     approachingVacationCap: number;
-    excludedUsers: number;
     facultyAtVacationCap: number;
-    missingEmails: number;
     pendingRequests: number;
-  };
-  requests: {
-    bySource: Record<'cognos' | 'manual', number>;
-    byType: Record<string, number>;
-    pending: number;
-    total: number;
-  };
-  users: {
-    admins: number;
-    ayFaculty: number;
-    caos: number;
-    chairs: number;
-    fyFaculty: number;
-    total: number;
   };
 };
 
@@ -104,9 +83,6 @@ export function AdminStatusContent({
             />
           </div>
         </AdminSectionCard>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
       </section>
     </div>
   );
