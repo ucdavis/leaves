@@ -9,14 +9,6 @@ const userFormSchema = z.object({
   departmentOverrideEndDate: z.string(),
   departmentOverrideId: z.string(),
   departmentOverrideStartDate: z.string(),
-  email: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value.length === 0 || z.email().safeParse(value).success,
-      'Enter a valid email address.'
-    ),
-  name: z.string().trim().min(1, 'Display name is required.'),
 }).refine(
   (value) =>
     !value.departmentOverrideId.trim() ||
@@ -68,8 +60,6 @@ export function AdminUserModal({
           departmentOverrideEndDate: value.departmentOverrideEndDate,
           departmentOverrideId: value.departmentOverrideId,
           departmentOverrideStartDate: value.departmentOverrideStartDate,
-          email: value.email.trim(),
-          name: value.name.trim(),
         });
       } catch (error) {
         setSubmitError(submitErrorMessage(error));
@@ -82,7 +72,6 @@ export function AdminUserModal({
 
   return (
     <AdminModalFrame
-      description="Profile edits persist to AppUser. Department overrides create dated reporting department rows."
       title={title}
     >
       <form
@@ -92,16 +81,7 @@ export function AdminUserModal({
         }}
       >
         <form.AppForm>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <form.AppField name="name">
-              {(field) => <field.TextField label="Display name" />}
-            </form.AppField>
-            <form.AppField name="email">
-              {(field) => <field.TextField label="Email" type="email" />}
-            </form.AppField>
-          </div>
-
-          <div className="mt-6 rounded-2xl bg-[var(--admin-sand)] p-5">
+          <div className="rounded-2xl bg-[var(--admin-sand)] p-5">
             <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--admin-gold-deep)]">
               Department override
             </h3>
@@ -116,7 +96,7 @@ export function AdminUserModal({
                       value: department.id,
                     }))}
                     placeholder="No override"
-                    selectClassName="select select-bordered w-full bg-white"
+                    selectClassName="select select-bordered w-full truncate overflow-hidden whitespace-nowrap pr-10 text-ellipsis bg-white"
                   />
                 )}
               </form.AppField>

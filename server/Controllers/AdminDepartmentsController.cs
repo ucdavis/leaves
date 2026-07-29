@@ -46,7 +46,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         }
 
         var duplicateExists = await _db.Clusters.AnyAsync(
-            cluster => cluster.ClusterName == name,
+            cluster => cluster.IsActive && cluster.ClusterName == name,
             cancellationToken);
         if (duplicateExists)
         {
@@ -64,6 +64,91 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             IsActive = true,
             UpdatedUtc = now,
         });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPatch("clusters/{clusterId:int}")]
+    public async Task<IActionResult> UpdateCluster(int clusterId, [FromBody] UpdateClusterRequest request, CancellationToken cancellationToken)
+    {
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == clusterId,
+            cancellationToken);
+
+        if (cluster == null)
+        {
+            return NotFound();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            var name = request.Name.Trim();
+            if (name.Length > ClusterNameMaxLength)
+            {
+                return ValidationProblem($"Cluster name must be {ClusterNameMaxLength} characters or fewer.");
+            }
+
+            var duplicateExists = await _db.Clusters.AnyAsync(
+                item => item.Id != clusterId && item.IsActive && item.ClusterName == name,
+                cancellationToken);
+            if (duplicateExists)
+            {
+                return Conflict("A cluster with that name already exists.");
+            }
+
+            cluster.ClusterName = name;
+        }
+
+        if (request.CaoUserIdSet)
+        {
+            var caoUpdateResult = await UpdateClusterCaoAssignmentAsync(
+                cluster.Id,
+                request.CaoUserId,
+                cancellationToken);
+            if (caoUpdateResult != null)
+            {
+                return caoUpdateResult;
+            }
+        }
+
+        cluster.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("clusters/{clusterId:int}")]
+    public async Task<IActionResult> DeleteCluster(int clusterId, CancellationToken cancellationToken)
+    {
+        var cluster = await _db.Clusters
+            .Include(item => item.Departments)
+            .Include(item => item.ClusterCaoAssignments)
+            .FirstOrDefaultAsync(item => item.Id == clusterId, cancellationToken);
+
+        if (cluster == null)
+        {
+            return NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        var caoUpdateResult = await UpdateClusterCaoAssignmentAsync(cluster.Id, null, cancellationToken);
+        if (caoUpdateResult != null)
+        {
+            return caoUpdateResult;
+        }
+
+        foreach (var department in cluster.Departments)
+        {
+            department.ClusterId = null;
+            department.UpdatedUtc = now;
+        }
+
+        if (cluster.ClusterCaoAssignments.Count > 0)
+        {
+            _db.ClusterCaoAssignments.RemoveRange(cluster.ClusterCaoAssignments);
+        }
+
+        _db.Clusters.Remove(cluster);
 
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
@@ -165,7 +250,64 @@ public sealed class AdminDepartmentsController : ApiControllerBase
                 : WorkflowMode.DirectSubmission;
         }
 
+        if (request.ChairUserIdSet)
+        {
+            var chairUpdateResult = await UpdateDepartmentChairAssignmentAsync(
+                department.DepartmentCode,
+                request.ChairUserId,
+                cancellationToken);
+            if (chairUpdateResult != null)
+            {
+                return chairUpdateResult;
+            }
+        }
+
         department.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("{departmentCode}")]
+    public async Task<IActionResult> DeleteDepartment(string departmentCode, CancellationToken cancellationToken)
+    {
+        var department = await _db.Departments
+            .Include(item => item.DepartmentChairAssignments)
+            .Include(item => item.DepartmentEmailRoutings)
+            .Include(item => item.EmployeeReportingDepartmentOverrides)
+            .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
+
+        if (department == null)
+        {
+            return NotFound();
+        }
+
+        var chairUpdateResult = await UpdateDepartmentChairAssignmentAsync(
+            department.DepartmentCode,
+            null,
+            cancellationToken);
+        if (chairUpdateResult != null)
+        {
+            return chairUpdateResult;
+        }
+
+        if (department.DepartmentChairAssignments.Count > 0)
+        {
+            _db.DepartmentChairAssignments.RemoveRange(department.DepartmentChairAssignments);
+        }
+
+        if (department.DepartmentEmailRoutings.Count > 0)
+        {
+            _db.DepartmentEmailRoutings.RemoveRange(department.DepartmentEmailRoutings);
+        }
+
+        if (department.EmployeeReportingDepartmentOverrides.Count > 0)
+        {
+            _db.EmployeeReportingDepartmentOverrides.RemoveRange(
+                department.EmployeeReportingDepartmentOverrides);
+        }
+
+        _db.Departments.Remove(department);
+
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -260,6 +402,211 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task<IActionResult?> UpdateClusterCaoAssignmentAsync(
+        int clusterId,
+        string? caoUserId,
+        CancellationToken cancellationToken)
+    {
+        var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (adminUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before cluster CAOs can be updated.");
+        }
+
+        var normalizedCaoUserId = caoUserId?.Trim();
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var currentAssignment = await _db.ClusterCaoAssignments
+            .Where(item => item.ClusterId == clusterId &&
+                           item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
+            .OrderByDescending(item => item.EffectiveStartDate)
+            .ThenByDescending(item => item.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(normalizedCaoUserId))
+        {
+            if (currentAssignment != null)
+            {
+                CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
+            }
+
+            return null;
+        }
+
+        if (currentAssignment != null &&
+            string.Equals(currentAssignment.IamId, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var hasDuplicateActiveAssignment = await HasActiveClusterCaoAssignmentAsync(
+            clusterId,
+            normalizedCaoUserId,
+            today,
+            cancellationToken,
+            currentAssignment?.Id);
+        if (hasDuplicateActiveAssignment)
+        {
+            return Conflict("That user already has an active CAO assignment for this cluster.");
+        }
+
+        if (currentAssignment != null)
+        {
+            CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
+        }
+
+        _db.ClusterCaoAssignments.Add(new ClusterCaoAssignment
+        {
+            ClusterId = clusterId,
+            CreatedByAppUserId = adminUserId.Value,
+            CreatedUtc = now,
+            EffectiveStartDate = today,
+            IamId = normalizedCaoUserId,
+        });
+
+        return null;
+    }
+
+    private async Task<IActionResult?> UpdateDepartmentChairAssignmentAsync(
+        string departmentCode,
+        string? chairUserId,
+        CancellationToken cancellationToken)
+    {
+        var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (adminUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before department chairs can be updated.");
+        }
+
+        var normalizedChairUserId = chairUserId?.Trim();
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var currentAssignment = await _db.DepartmentChairAssignments
+            .Where(item => item.DepartmentCode == departmentCode &&
+                           item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
+            .OrderByDescending(item => item.EffectiveStartDate)
+            .ThenByDescending(item => item.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(normalizedChairUserId))
+        {
+            if (currentAssignment != null)
+            {
+                CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
+            }
+
+            return null;
+        }
+
+        var departmentData = await _adminDataService.GetDepartmentsAsync(cancellationToken);
+        var userBelongsToDepartment = departmentData.Users.Any(user =>
+            string.Equals(user.Id, normalizedChairUserId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(user.DepartmentId, departmentCode, StringComparison.OrdinalIgnoreCase));
+        if (!userBelongsToDepartment)
+        {
+            return ValidationProblem("Selected chair must currently belong to this department.");
+        }
+
+        if (currentAssignment != null &&
+            string.Equals(currentAssignment.IamId, normalizedChairUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var hasDuplicateActiveAssignment = await HasActiveDepartmentChairAssignmentAsync(
+            departmentCode,
+            normalizedChairUserId,
+            today,
+            cancellationToken,
+            currentAssignment?.Id);
+        if (hasDuplicateActiveAssignment)
+        {
+            return Conflict("That user already has an active department chair assignment for this department.");
+        }
+
+        if (currentAssignment != null)
+        {
+            CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
+        }
+
+        _db.DepartmentChairAssignments.Add(new DepartmentChairAssignment
+        {
+            CreatedByAppUserId = adminUserId.Value,
+            CreatedUtc = now,
+            DepartmentCode = departmentCode,
+            EffectiveStartDate = today,
+            IamId = normalizedChairUserId,
+        });
+
+        return null;
+    }
+
+    private static void CloseClusterCaoAssignment(
+        ClusterCaoAssignment assignment,
+        int closedByAppUserId,
+        DateTime closedUtc,
+        DateOnly today)
+    {
+        assignment.ClosedByAppUserId = closedByAppUserId;
+        assignment.ClosedUtc = closedUtc;
+        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
+        {
+            assignment.EffectiveEndDateExclusive = today;
+        }
+    }
+
+    private static void CloseDepartmentChairAssignment(
+        DepartmentChairAssignment assignment,
+        int closedByAppUserId,
+        DateTime closedUtc,
+        DateOnly today)
+    {
+        assignment.ClosedByAppUserId = closedByAppUserId;
+        assignment.ClosedUtc = closedUtc;
+        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
+        {
+            assignment.EffectiveEndDateExclusive = today;
+        }
+    }
+
+    private Task<bool> HasActiveClusterCaoAssignmentAsync(
+        int clusterId,
+        string iamId,
+        DateOnly onDate,
+        CancellationToken cancellationToken,
+        int? excludeAssignmentId = null)
+    {
+        return _db.ClusterCaoAssignments.AnyAsync(
+            assignment => assignment.ClusterId == clusterId &&
+                          assignment.ClosedUtc == null &&
+                          assignment.IamId == iamId &&
+                          assignment.EffectiveStartDate <= onDate &&
+                          (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > onDate) &&
+                          (!excludeAssignmentId.HasValue || assignment.Id != excludeAssignmentId.Value),
+            cancellationToken);
+    }
+
+    private Task<bool> HasActiveDepartmentChairAssignmentAsync(
+        string departmentCode,
+        string iamId,
+        DateOnly onDate,
+        CancellationToken cancellationToken,
+        int? excludeAssignmentId = null)
+    {
+        return _db.DepartmentChairAssignments.AnyAsync(
+            assignment => assignment.DepartmentCode == departmentCode &&
+                          assignment.ClosedUtc == null &&
+                          assignment.IamId == iamId &&
+                          assignment.EffectiveStartDate <= onDate &&
+                          (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > onDate) &&
+                          (!excludeAssignmentId.HasValue || assignment.Id != excludeAssignmentId.Value),
+            cancellationToken);
+    }
+
     private static bool IsDuplicateDepartmentRoutingEmail(DbUpdateException exception)
     {
         return exception.InnerException is SqlException sqlException &&
@@ -267,7 +614,8 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     }
 
     public sealed record CreateClusterRequest(string? Name);
+    public sealed record UpdateClusterRequest(string? Name, string? CaoUserId, bool CaoUserIdSet);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
-    public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode);
+    public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, string? ChairUserId, bool ChairUserIdSet);
     public sealed record UpsertRoutingEmailRequest(string? Address);
 }

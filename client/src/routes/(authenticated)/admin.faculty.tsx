@@ -32,7 +32,7 @@ function AdminPeopleRoute() {
 }
 
 function AdminPeopleRouteContent() {
-  const { departments, updateUser, users } = useAdminData();
+  const { departments, facultyUsers, updateUser } = useAdminData();
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingExcludeChange, setPendingExcludeChange] = useState<{
@@ -45,7 +45,7 @@ function AdminPeopleRouteContent() {
     departments.map((department) => [department.id, department.name])
   );
 
-  const rows: UserRow[] = users
+  const rows: UserRow[] = facultyUsers
     .filter((user) => {
       const effectiveActive =
         pendingExcludeChange?.userId === user.id
@@ -183,7 +183,7 @@ function AdminPeopleRouteContent() {
   const editingUser =
     editingUserId === null
       ? null
-      : (users.find((user) => user.id === editingUserId) ?? null);
+      : (facultyUsers.find((user) => user.id === editingUserId) ?? null);
 
   return (
     <div className="space-y-6">
@@ -249,8 +249,6 @@ function AdminPeopleRouteContent() {
             departmentOverrideEndDate: editingUser.departmentOverrideEndDate,
             departmentOverrideId: editingUser.departmentOverrideId,
             departmentOverrideStartDate: editingUser.departmentOverrideStartDate,
-            email: editingUser.email,
-            name: editingUser.name,
           }}
           onClose={() => setEditingUserId(null)}
           onSubmit={async (value) => {
@@ -258,15 +256,13 @@ function AdminPeopleRouteContent() {
               departmentOverrideEndDate: value.departmentOverrideEndDate,
               departmentOverrideId: value.departmentOverrideId,
               departmentOverrideStartDate: value.departmentOverrideStartDate,
-              email: value.email,
-              name: value.name,
             });
             setEditingUserId(null);
           }}
           submitErrorMessage={getUserUpdateErrorMessage}
           submitLabel="Save changes"
           submittingLabel="Saving..."
-          title={`Edit ${editingUser.name}`}
+          title={`Change ${editingUser.name}'s Department`}
         />
       ) : null}
     </div>

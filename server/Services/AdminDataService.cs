@@ -29,6 +29,7 @@ public sealed class AdminDataService
         var directoryData = await LoadAdminDirectoryDataAsync(cancellationToken);
         var directoryResponses = BuildDirectoryResponses(directoryData);
         var dashboardData = await LoadDashboardDataAsync(cancellationToken);
+        var facultyUsers = BuildFacultyUserResponses(directoryData, directoryResponses.Users);
         var dashboardResponseData = BuildDashboardResponseData(directoryData, directoryResponses.Users, dashboardData);
 
         return new AdminDashboardResponse(
@@ -36,6 +37,7 @@ public sealed class AdminDataService
             DataSources: dashboardResponseData.DataSources,
             Departments: directoryResponses.Departments,
             StatusSnapshot: dashboardResponseData.StatusSnapshot,
+            FacultyUsers: facultyUsers,
             Users: directoryResponses.Users);
     }
 
@@ -45,6 +47,7 @@ public sealed class AdminDataService
 
         var clusters = await _db.Clusters
             .AsNoTracking()
+            .Where(cluster => cluster.IsActive)
             .OrderBy(cluster => cluster.ClusterName)
             .ToListAsync(cancellationToken);
 
@@ -275,11 +278,56 @@ public sealed class AdminDataService
             .ToList();
     }
 
+    private static IReadOnlyList<AdminUserResponse> BuildFacultyUserResponses(
+        AdminDirectoryData directoryData,
+        IReadOnlyList<AdminUserResponse> allUsers)
+    {
+        var usersByEmployeeId = allUsers
+            .Where(user => !string.IsNullOrWhiteSpace(user.EmployeeId))
+            .GroupBy(user => NormalizeEmployeeId(user.EmployeeId)!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        return directoryData.LatestAccrualByEmployeeId
+            .OrderBy(
+                item => item.Value.EmployeeName,
+                StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(item =>
+            {
+                var employeeId = item.Key;
+                var latestAccrual = item.Value;
+                usersByEmployeeId.TryGetValue(employeeId, out var matchedUser);
+
+                return new AdminUserResponse(
+                    Id: matchedUser?.Id ?? employeeId,
+                    Active: matchedUser?.Active ?? true,
+                    DepartmentId: matchedUser?.DepartmentId ?? latestAccrual.Level5Dept.Trim(),
+                    DepartmentOverrideEndDate: matchedUser?.DepartmentOverrideEndDate,
+                    DepartmentOverrideId: matchedUser?.DepartmentOverrideId,
+                    DepartmentOverrideStartDate: matchedUser?.DepartmentOverrideStartDate,
+                    Designation: matchedUser?.Designation ?? GetDesignation("faculty", null, latestAccrual),
+                    Email: matchedUser?.Email ?? latestAccrual.EmployeeEmail ?? string.Empty,
+                    EmployeeId: employeeId,
+                    HasAppUser: matchedUser?.HasAppUser ?? false,
+                    IamId: matchedUser?.IamId ?? string.Empty,
+                    Name: matchedUser?.Name ?? latestAccrual.EmployeeName,
+                    Position: latestAccrual.JobCodeDescription ?? string.Empty,
+                    Role: matchedUser?.Role ?? "faculty");
+            })
+            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
+            .ToList();
+    }
+
     private static DashboardResponseData BuildDashboardResponseData(
         AdminDirectoryData directoryData,
         IReadOnlyList<AdminUserResponse> userResponses,
         DashboardData dashboardData)
     {
+        var latestPeoplePromotionAt = directoryData.People
+            .Select(person => person.PromotedAt)
+            .OfType<DateTime>()
+            .DefaultIfEmpty()
+            .Max();
         var requestsByType = dashboardData.LeaveRequests
             .GroupBy(request => dashboardData.LeaveTypes.TryGetValue(request.LeaveTypeId, out var leaveType) ? leaveType.DisplayName : "Unknown")
             .OrderBy(group => group.Key)
@@ -292,10 +340,13 @@ public sealed class AdminDataService
 
         var dataSources = new[]
         {
-            new AdminDataSourceResponse("db-people", "People", "Sourced from People records, with app-owned exclude state, role assignments, and department overrides joined by IAM ID.", "ready", GetLatestTimestamp(directoryData.People.Select(person => person.LastFetchedAt ?? person.ModifyDate ?? person.PromotedAt ?? person.FirstIngestedAt).OfType<DateTime>())),
-            new AdminDataSourceResponse("db-departments", "Departments", "Sourced from Department, Cluster, chair, CAO, and routing tables.", "ready", GetLatestTimestamp(directoryData.Departments.Select(department => department.UpdatedUtc))),
-            new AdminDataSourceResponse("db-accruals", "Employee accruals", "Sourced from the latest EmployeeAccrualBalances rows for reporting departments and positions.", directoryData.LatestAccrualByEmployeeId.Count > 0 ? "ready" : "planned", GetLatestTimestamp(directoryData.LatestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
-            new AdminDataSourceResponse("db-requests", "Leave requests", "Sourced from LeaveRequest history snapshots.", dashboardData.LeaveRequests.Count > 0 ? "ready" : "planned", GetLatestTimestamp(dashboardData.LeaveRequests.Select(request => request.UpdatedUtc))),
+            new AdminDataSourceResponse(
+                "db-people",
+                "People",
+                "Monthly report.",
+                GetPeoplePromotionStatus(latestPeoplePromotionAt),
+                latestPeoplePromotionAt == default ? null : latestPeoplePromotionAt.ToString("O")),
+            new AdminDataSourceResponse("db-accruals", "Employee accruals", "Bi-weekly report.", directoryData.LatestAccrualByEmployeeId.Count > 0 ? "ready" : "planned", GetLatestTimestamp(directoryData.LatestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
         };
 
         var statusSnapshot = new AdminStatusSnapshotResponse(
@@ -443,6 +494,18 @@ public sealed class AdminDataService
                string.Equals(value?.Trim(), "True", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static string GetPeoplePromotionStatus(DateTime latestPeoplePromotionAt)
+    {
+        if (latestPeoplePromotionAt == default)
+        {
+            return "planned";
+        }
+
+        return latestPeoplePromotionAt < DateTime.UtcNow.AddDays(-30)
+            ? "deferred"
+            : "ready";
+    }
+
     private static string NormalizeKey(string? value)
     {
         return value?.Trim().ToLowerInvariant() ?? string.Empty;
@@ -500,6 +563,7 @@ public sealed record AdminDashboardResponse(
     IReadOnlyList<AdminDataSourceResponse> DataSources,
     IReadOnlyList<AdminDepartmentResponse> Departments,
     AdminStatusSnapshotResponse StatusSnapshot,
+    IReadOnlyList<AdminUserResponse> FacultyUsers,
     IReadOnlyList<AdminUserResponse> Users);
 
 public sealed record AdminDepartmentsResponse(

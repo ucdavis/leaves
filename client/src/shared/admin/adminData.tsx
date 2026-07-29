@@ -115,6 +115,7 @@ type AdminDashboardResponse = {
   clusters: AdminCluster[];
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
+  facultyUsers: Array<AdminUser & { departmentId: string | null }>;
   statusSnapshot: AdminStatusSnapshot;
   users: Array<AdminUser & { departmentId: string | null }>;
 };
@@ -123,6 +124,7 @@ type AdminDataContextValue = {
   clusters: AdminCluster[];
   dataSources: AdminDataSource[];
   departments: AdminDepartment[];
+  facultyUsers: AdminUser[];
   removeRoutingEmail: (departmentId: string, emailId: string) => Promise<void>;
   renameDepartment: (departmentId: string, name: string) => Promise<void>;
   statusSnapshot: AdminStatusSnapshot;
@@ -193,6 +195,20 @@ function normalizeDesignation(designation: string): AdminDesignation {
   return 'fy';
 }
 
+function normalizeAdminUser(
+  user: AdminUser & { departmentId: string | null }
+): AdminUser {
+  return {
+    ...user,
+    departmentId: user.departmentId ?? '',
+    departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
+    departmentOverrideId: user.departmentOverrideId ?? '',
+    departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
+    designation: normalizeDesignation(user.designation),
+    role: normalizeRole(user.role),
+  };
+}
+
 function normalizeDashboardResponse(
   response: AdminDashboardResponse
 ): AdminDashboardResponse {
@@ -208,15 +224,8 @@ function normalizeDashboardResponse(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    users: response.users.map((user) => ({
-      ...user,
-      departmentId: user.departmentId ?? '',
-      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
-      departmentOverrideId: user.departmentOverrideId ?? '',
-      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      designation: normalizeDesignation(user.designation),
-      role: normalizeRole(user.role),
-    })),
+    facultyUsers: response.facultyUsers.map(normalizeAdminUser),
+    users: response.users.map(normalizeAdminUser),
   };
 }
 
@@ -251,12 +260,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       await fetchJson<void>(`/api/admin/users/by-iam/${encodeURIComponent(userId)}`, {
         body: JSON.stringify({
           active: updates.active,
-          email: updates.email,
-          emailSet: Object.hasOwn(updates, 'email'),
           departmentOverrideEndDate: updates.departmentOverrideEndDate,
           departmentOverrideId: updates.departmentOverrideId,
           departmentOverrideSet: Object.hasOwn(updates, 'departmentOverrideId'),
           departmentOverrideStartDate: updates.departmentOverrideStartDate,
+          email: updates.email,
+          emailSet: Object.hasOwn(updates, 'email'),
           name: updates.name,
           nameSet: Object.hasOwn(updates, 'name'),
         }),
@@ -368,6 +377,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         clusters: data.clusters,
         dataSources: data.dataSources,
         departments: data.departments,
+        facultyUsers: data.facultyUsers,
         removeRoutingEmail: async (departmentId, emailId) => {
           await removeRoutingEmailMutation.mutateAsync({ departmentId, emailId });
         },

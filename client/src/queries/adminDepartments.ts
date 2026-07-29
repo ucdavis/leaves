@@ -111,6 +111,45 @@ export async function createAdminCluster({
   );
 }
 
+export async function updateAdminCluster({
+  clusterId,
+  signal,
+  updates,
+}: {
+  clusterId: string;
+  signal?: AbortSignal;
+  updates: Partial<Pick<AdminCluster, 'caoUserId' | 'name'>>;
+}) {
+  const caoUserIdWasProvided = Object.hasOwn(updates, 'caoUserId');
+
+  await fetchJson<void>(
+    `/api/admin/departments/clusters/${encodeURIComponent(clusterId)}`,
+    {
+      body: JSON.stringify({
+        caoUserId: updates.caoUserId,
+        caoUserIdSet: caoUserIdWasProvided,
+        name: updates.name,
+      }),
+      method: 'PATCH',
+    },
+    signal
+  );
+}
+
+export async function deleteAdminCluster({
+  clusterId,
+  signal,
+}: {
+  clusterId: string;
+  signal?: AbortSignal;
+}) {
+  await fetchJson<void>(
+    `/api/admin/departments/clusters/${encodeURIComponent(clusterId)}`,
+    { method: 'DELETE' },
+    signal
+  );
+}
+
 export async function createAdminDepartment({
   input,
   signal,
@@ -152,15 +191,32 @@ export async function renameAdminDepartment({
   );
 }
 
-export async function updateAdminDepartment({
+export async function deleteAdminDepartment({
   departmentId,
-  updates,
   signal,
 }: {
   departmentId: string;
-  updates: Partial<Pick<AdminDepartment, 'approvalMode' | 'clusterId'>>;
   signal?: AbortSignal;
 }) {
+  await fetchJson<void>(
+    `/api/admin/departments/${encodeURIComponent(departmentId)}`,
+    { method: 'DELETE' },
+    signal
+  );
+}
+
+export async function updateAdminDepartment({
+  departmentId,
+  signal,
+  updates,
+}: {
+  departmentId: string;
+  signal?: AbortSignal;
+  updates: Partial<
+    Pick<AdminDepartment, 'approvalMode' | 'chairUserId' | 'clusterId' | 'name'>
+  >;
+}) {
+  const chairUserIdWasProvided = Object.hasOwn(updates, 'chairUserId');
   const clusterIdWasProvided = Object.hasOwn(updates, 'clusterId');
 
   await fetchJson<void>(
@@ -168,8 +224,11 @@ export async function updateAdminDepartment({
     {
       body: JSON.stringify({
         approvalMode: updates.approvalMode,
+        chairUserId: updates.chairUserId,
+        chairUserIdSet: chairUserIdWasProvided,
         clusterId: updates.clusterId ? Number(updates.clusterId) : null,
         clusterIdSet: clusterIdWasProvided,
+        name: updates.name,
       }),
       method: 'PATCH',
     },

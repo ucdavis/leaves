@@ -7,8 +7,8 @@ export type AdminRoleAssignment = {
   effectiveEndDate: string | null;
   effectiveStartDate: string | null;
   email: string;
-  id: string;
   iamId: string;
+  id: string;
   name: string;
   targetId: string | null;
   targetName: string | null;
@@ -21,6 +21,9 @@ export type AdminRoleOption = {
 };
 
 export type AdminRoleUserOption = {
+  departmentId: string | null;
+  departmentName: string | null;
+  departmentOptions: AdminRoleOption[];
   email: string;
   iamId: string;
   name: string;
@@ -63,14 +66,10 @@ export async function addAdminAssignment({
 
 export async function addCaoAssignment({
   clusterId,
-  effectiveEndDate,
-  effectiveStartDate,
   iamId,
   signal,
 }: {
   clusterId: string;
-  effectiveEndDate: string;
-  effectiveStartDate: string;
   iamId: string;
   signal?: AbortSignal;
 }) {
@@ -79,8 +78,6 @@ export async function addCaoAssignment({
     {
       body: JSON.stringify({
         clusterId: Number(clusterId),
-        effectiveEndDate,
-        effectiveStartDate,
         iamId,
       }),
       method: 'POST',
@@ -91,14 +88,10 @@ export async function addCaoAssignment({
 
 export async function addChairAssignment({
   departmentCode,
-  effectiveEndDate,
-  effectiveStartDate,
   iamId,
   signal,
 }: {
   departmentCode: string;
-  effectiveEndDate: string;
-  effectiveStartDate: string;
   iamId: string;
   signal?: AbortSignal;
 }) {
@@ -107,8 +100,6 @@ export async function addChairAssignment({
     {
       body: JSON.stringify({
         departmentCode,
-        effectiveEndDate,
-        effectiveStartDate,
         iamId,
       }),
       method: 'POST',
@@ -119,12 +110,12 @@ export async function addChairAssignment({
 
 export async function removeRoleAssignment({
   id,
-  type,
   signal,
+  type,
 }: {
   id: string;
-  type: AdminAssignableRoleType;
   signal?: AbortSignal;
+  type: AdminAssignableRoleType;
 }) {
   await fetchJson<void>(
     `/api/admin/roles/${type}s/${encodeURIComponent(id)}`,

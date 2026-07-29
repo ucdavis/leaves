@@ -18,12 +18,15 @@ function AdminStatusRoute() {
 }
 
 function AdminStatusRouteContent() {
-  const { dataSources, departments, statusSnapshot } = useAdminData();
+  const { clusters, dataSources, departments, statusSnapshot } = useAdminData();
 
   return (
     <AdminStatusContent
+      clusterCount={clusters.length}
+      clustersMissingCaos={clusters.filter((cluster) => !cluster.caoUserId).length}
       dataSources={dataSources}
       departmentCount={departments.length}
+      departmentsMissingChairs={departments.filter((department) => !department.chairUserId).length}
       statusSnapshot={statusSnapshot}
     />
   );
