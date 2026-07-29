@@ -7,12 +7,6 @@ import {
 } from '@/shared/statusColors.ts';
 import { AdminMetricCard } from './AdminMetricCard.tsx';
 
-type MetricItem = {
-  accent?: string;
-  label: string;
-  value: string;
-};
-
 type StatusSnapshot = {
   departments: {
     clustered: number;
@@ -132,35 +126,6 @@ function AdminSectionCard({
         <div className="mt-4">{children}</div>
       </div>
     </section>
-  );
-}
-
-function MetricGrid({ items }: { items: MetricItem[] }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {items.map((item) => (
-        <AdminMetricCard
-          accent={item.accent}
-          key={item.label}
-          label={item.label}
-          value={item.value}
-        />
-      ))}
-    </div>
-  );
-}
-
-function MetricSection({
-  items,
-  title,
-}: {
-  items: MetricItem[];
-  title: string;
-}) {
-  return (
-    <AdminSectionCard title={title}>
-      <MetricGrid items={items} />
-    </AdminSectionCard>
   );
 }
 
