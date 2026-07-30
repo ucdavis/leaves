@@ -546,8 +546,6 @@ function PersonSearchField({
   selectedIamId: string;
   users: AdminRolePersonOption[];
 }) {
-  const selectedUser =
-    allUsers.find((user) => user.iamId === selectedIamId) ?? null;
   const showResults = isOpen && query.trim().length > 0;
 
   return (
@@ -602,11 +600,6 @@ function PersonSearchField({
         </div>
       ) : null}
 
-      {selectedUser ? (
-        <div className="text-xs text-[var(--admin-ink-muted)]">
-          Selected: {selectedUser.name} ({selectedUser.iamId})
-        </div>
-      ) : null}
     </div>
   );
 }
