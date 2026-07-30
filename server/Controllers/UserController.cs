@@ -15,10 +15,10 @@ public class UserController : ApiControllerBase
     }
 
     [HttpGet("me")]
-    public async Task<IActionResult> Me()
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var userName = await _userService.GetDisplayNameForUser(userId)
+        var userName = await _userService.GetDisplayNameForUser(userId, cancellationToken)
             ?? User.FindFirstValue("name")
             ?? User.Identity?.Name
             ?? userId;
@@ -28,10 +28,12 @@ public class UserController : ApiControllerBase
             ?? userName;
         var entraObjectId = GetClaimValue("oid");
 
-        var userRoles = User.FindAll(ClaimTypes.Role)
-            .Select(c => c.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var userRoles = User.HasClaim("dev_persona", "true")
+            ? User.FindAll(ClaimTypes.Role)
+                .Select(c => c.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : (await _userService.GetRolesForUser(userId, cancellationToken)).ToArray();
 
         return Ok(new UserResponse(userId, entraObjectId, userName, userEmail, userRoles));
     }

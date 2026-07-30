@@ -53,8 +53,8 @@ public class EmployeeAccrualBalanceTests
         await using var db = TestDbContextFactory.CreateInMemory();
         var initializer = new DbInitializer(db, NullLogger<DbInitializer>.Instance);
 
-        await initializer.InitializeAsync();
-        await initializer.InitializeAsync();
+        await initializer.InitializeAsync(seedDevelopmentData: true);
+        await initializer.InitializeAsync(seedDevelopmentData: true);
 
         db.ChangeTracker.Clear();
         var balances = await db.EmployeeAccrualBalances.ToListAsync();
@@ -83,5 +83,16 @@ public class EmployeeAccrualBalanceTests
         balances.Where(balance => balance.EmployeeId == "66510837")
             .Max(balance => balance.AsOfDate)
             .Should().Be(new DateOnly(2026, 6, 30));
+    }
+
+    [Fact]
+    public async Task InitializationSkipsDevelopmentSeedWhenDisabled()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var initializer = new DbInitializer(db, NullLogger<DbInitializer>.Instance);
+
+        await initializer.InitializeAsync(seedDevelopmentData: false);
+
+        (await db.AppUsers.AnyAsync()).Should().BeFalse();
     }
 }

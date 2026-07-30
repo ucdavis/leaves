@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Helpers;
+using Server.Services;
 
 namespace Server.Controllers;
 
@@ -13,26 +14,81 @@ namespace Server.Controllers;
 public sealed class AdminRolesController : ApiControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly AdminDirectoryService _directoryService;
 
-    public AdminRolesController(AppDbContext db)
+    public AdminRolesController(AppDbContext db, AdminDirectoryService directoryService)
     {
         _db = db;
+        _directoryService = directoryService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetRolesAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentAccrualRows = await _directoryService.LoadCurrentAccrualRowsAsync(cancellationToken);
+        var currentAccrualGroups = currentAccrualRows
+            .Where(row => !string.IsNullOrWhiteSpace(row.EmployeeId))
+            .GroupBy(row => NormalizeEmployeeId(row.EmployeeId)!, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var latestAccrualByEmployeeId = currentAccrualGroups
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(row => row.AsOfDate)
+                    .ThenByDescending(row => row.LastUpdated)
+                    .ThenBy(row => row.LeaveTypeNumber)
+                    .ThenBy(row => row.PositionNumber, StringComparer.OrdinalIgnoreCase)
+                    .First(),
+                StringComparer.OrdinalIgnoreCase);
+        var currentDepartmentCodesByEmployeeId = currentAccrualGroups
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var latestAsOfDate = group.Max(row => row.AsOfDate);
+                    return (IReadOnlyList<string>)group
+                        .Where(row => row.AsOfDate == latestAsOfDate)
+                        .Select(row => row.Level5Dept.Trim())
+                        .Where(code => !string.IsNullOrWhiteSpace(code))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                },
+                StringComparer.OrdinalIgnoreCase);
+
         var people = await _db.People
             .AsNoTracking()
+            .Where(person =>
+                person.EmployeeId != null &&
+                _db.EmployeeAccrualBalances.Any(row => row.EmployeeId == person.EmployeeId))
             .OrderBy(person => person.FullName)
             .ThenBy(person => person.IamId)
+            .Select(person => new Person
+            {
+                IamId = person.IamId,
+                EmployeeId = person.EmployeeId,
+                Email = person.Email,
+                FullName = person.FullName,
+            })
             .ToListAsync(cancellationToken);
         var appUsersByIamId = (await _db.AppUsers
                 .AsNoTracking()
-                .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
+                .Where(user => !string.IsNullOrWhiteSpace(user.IamId) &&
+                               ((user.EmployeeId != null &&
+                                 _db.EmployeeAccrualBalances.Any(row => row.EmployeeId == user.EmployeeId)) ||
+                                _db.AppAdminAssignments.Any(assignment => assignment.IamId == user.IamId) ||
+                                _db.ClusterCaoAssignments.Any(assignment => assignment.IamId == user.IamId) ||
+                                _db.DepartmentChairAssignments.Any(assignment => assignment.IamId == user.IamId)))
                 .OrderBy(user => user.DisplayName)
                 .ThenBy(user => user.IamId)
+                .Select(user => new AppUser
+                {
+                    IamId = user.IamId,
+                    EmployeeId = user.EmployeeId,
+                    DisplayName = user.DisplayName,
+                    Email = user.Email,
+                })
                 .ToListAsync(cancellationToken))
             .ToDictionary(user => user.IamId.Trim(), StringComparer.OrdinalIgnoreCase);
         var peopleByEmployeeId = people
@@ -47,77 +103,131 @@ public sealed class AdminRolesController : ApiControllerBase
         var departments = await _db.Departments
             .AsNoTracking()
             .OrderBy(department => department.DepartmentName)
+            .Select(department => new Department
+            {
+                DepartmentCode = department.DepartmentCode,
+                DepartmentName = department.DepartmentName,
+            })
             .ToListAsync(cancellationToken);
         var departmentsByCode = departments.ToDictionary(department => department.DepartmentCode, StringComparer.OrdinalIgnoreCase);
         var currentOverridesByIamId = await GetCurrentDepartmentOverridesByIamId(today, cancellationToken);
-        var latestAccrualByEmployeeId = await GetLatestAccrualByEmployeeId(cancellationToken);
-        var currentDepartmentCodesByEmployeeId = await GetCurrentDepartmentCodesByEmployeeId(cancellationToken);
 
         var clusters = await _db.Clusters
             .AsNoTracking()
             .Where(cluster => cluster.IsActive)
             .OrderBy(cluster => cluster.ClusterName)
+            .Select(cluster => new Cluster
+            {
+                Id = cluster.Id,
+                ClusterName = cluster.ClusterName,
+            })
             .ToListAsync(cancellationToken);
         var clustersById = clusters.ToDictionary(cluster => cluster.Id);
 
-        var adminAssignments = await _db.AppAdminAssignments
+        var adminAssignments = _db.AppAdminAssignments
             .AsNoTracking()
-            .OrderBy(assignment => assignment.IamId)
-            .ToListAsync(cancellationToken);
-        var caoAssignments = await _db.ClusterCaoAssignments
+            .Select(assignment => new
+            {
+                Type = "admin",
+                assignment.Id,
+                assignment.IamId,
+                EffectiveStartDate = (DateOnly?)null,
+                EffectiveEndDateExclusive = (DateOnly?)null,
+                ClosedUtc = (DateTime?)null,
+                ClusterId = (int?)null,
+                DepartmentCode = (string?)null,
+            });
+        var caoAssignments = _db.ClusterCaoAssignments
             .AsNoTracking()
-            .OrderBy(assignment => assignment.ClusterId)
-            .ThenBy(assignment => assignment.IamId)
-            .ToListAsync(cancellationToken);
-        var chairAssignments = await _db.DepartmentChairAssignments
+            .Select(assignment => new
+            {
+                Type = "cao",
+                assignment.Id,
+                assignment.IamId,
+                EffectiveStartDate = (DateOnly?)assignment.EffectiveStartDate,
+                assignment.EffectiveEndDateExclusive,
+                assignment.ClosedUtc,
+                ClusterId = (int?)assignment.ClusterId,
+                DepartmentCode = (string?)null,
+            });
+        var chairAssignments = _db.DepartmentChairAssignments
             .AsNoTracking()
-            .OrderBy(assignment => assignment.DepartmentCode)
-            .ThenBy(assignment => assignment.IamId)
+            .Select(assignment => new
+            {
+                Type = "chair",
+                assignment.Id,
+                assignment.IamId,
+                EffectiveStartDate = (DateOnly?)assignment.EffectiveStartDate,
+                assignment.EffectiveEndDateExclusive,
+                assignment.ClosedUtc,
+                ClusterId = (int?)null,
+                DepartmentCode = (string?)assignment.DepartmentCode,
+            });
+        var assignmentRows = await adminAssignments
+            .Concat(caoAssignments)
+            .Concat(chairAssignments)
             .ToListAsync(cancellationToken);
 
-        var assignments = adminAssignments
-            .Select(assignment => CreateAssignmentResponse(
-                active: true,
-                effectiveEndDate: null,
-                effectiveStartDate: null,
-                id: assignment.Id.ToString(),
-                iamId: assignment.IamId,
-                targetId: null,
-                targetName: null,
-                type: "admin",
-                appUsersByIamId: appUsersByIamId))
-            .Concat(caoAssignments.Select(assignment =>
+        var assignments = assignmentRows
+            .Select(assignment =>
             {
-                clustersById.TryGetValue(assignment.ClusterId, out var cluster);
+                if (assignment.Type == "admin")
+                {
+                    return CreateAssignmentResponse(
+                        active: true,
+                        effectiveEndDate: null,
+                        effectiveStartDate: null,
+                        id: assignment.Id.ToString(),
+                        iamId: assignment.IamId,
+                        targetId: null,
+                        targetName: null,
+                        type: assignment.Type,
+                        appUsersByIamId: appUsersByIamId);
+                }
+
+                if (assignment.Type == "cao")
+                {
+                    var clusterId = assignment.ClusterId!.Value;
+                    clustersById.TryGetValue(clusterId, out var cluster);
+                    return CreateAssignmentResponse(
+                        active: IsActive(
+                            assignment.EffectiveStartDate!.Value,
+                            assignment.EffectiveEndDateExclusive,
+                            today,
+                            assignment.ClosedUtc),
+                        effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
+                        effectiveStartDate: assignment.EffectiveStartDate.Value.ToString("yyyy-MM-dd"),
+                        id: assignment.Id.ToString(),
+                        iamId: assignment.IamId,
+                        targetId: clusterId.ToString(),
+                        targetName: cluster?.ClusterName ?? $"Cluster {clusterId}",
+                        type: assignment.Type,
+                        appUsersByIamId: appUsersByIamId);
+                }
+
+                var departmentCode = assignment.DepartmentCode!;
+                departmentsByCode.TryGetValue(departmentCode, out var department);
                 return CreateAssignmentResponse(
-                    active: IsActive(assignment.EffectiveStartDate, assignment.EffectiveEndDateExclusive, today, assignment.ClosedUtc),
+                    active: IsActive(
+                        assignment.EffectiveStartDate!.Value,
+                        assignment.EffectiveEndDateExclusive,
+                        today,
+                        assignment.ClosedUtc),
                     effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
-                    effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
+                    effectiveStartDate: assignment.EffectiveStartDate.Value.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
                     iamId: assignment.IamId,
-                    targetId: assignment.ClusterId.ToString(),
-                    targetName: cluster?.ClusterName ?? $"Cluster {assignment.ClusterId}",
-                    type: "cao",
+                    targetId: departmentCode,
+                    targetName: department?.DepartmentName ?? departmentCode,
+                    type: assignment.Type,
                     appUsersByIamId: appUsersByIamId);
-            }))
-            .Concat(chairAssignments.Select(assignment =>
-            {
-                departmentsByCode.TryGetValue(assignment.DepartmentCode, out var department);
-                return CreateAssignmentResponse(
-                    active: IsActive(assignment.EffectiveStartDate, assignment.EffectiveEndDateExclusive, today, assignment.ClosedUtc),
-                    effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
-                    effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
-                    id: assignment.Id.ToString(),
-                    iamId: assignment.IamId,
-                    targetId: assignment.DepartmentCode,
-                    targetName: department?.DepartmentName ?? assignment.DepartmentCode,
-                    type: "chair",
-                    appUsersByIamId: appUsersByIamId);
-            }))
+            })
             .OrderByDescending(assignment => assignment.Active)
             .ThenBy(assignment => assignment.Type)
             .ThenBy(assignment => assignment.TargetName)
             .ThenBy(assignment => assignment.Name)
+            .ThenBy(assignment => assignment.IamId)
+            .ThenBy(assignment => assignment.Id)
             .ToList();
 
         var users = latestAccrualByEmployeeId
@@ -431,11 +541,16 @@ public sealed class AdminRolesController : ApiControllerBase
         DateOnly today,
         CancellationToken cancellationToken)
     {
-        var activeOverrides = await _db.EmployeeReportingDepartmentOverrides
+        var activeOverridesQuery = _db.EmployeeReportingDepartmentOverrides
             .AsNoTracking()
             .Where(item => item.ClosedUtc == null &&
                            item.EffectiveStartDate <= today &&
-                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today));
+        var activeOverrides = await activeOverridesQuery
+            .Where(item => !activeOverridesQuery.Any(other =>
+                other.IamId == item.IamId &&
+                (other.EffectiveStartDate > item.EffectiveStartDate ||
+                 (other.EffectiveStartDate == item.EffectiveStartDate && other.Id > item.Id))))
             .OrderByDescending(item => item.EffectiveStartDate)
             .ThenByDescending(item => item.Id)
             .ToListAsync(cancellationToken);
@@ -445,75 +560,57 @@ public sealed class AdminRolesController : ApiControllerBase
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
     }
 
-    private async Task<Dictionary<string, EmployeeAccrualBalance>> GetLatestAccrualByEmployeeId(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> GetCurrentDepartmentCodesAsync(
+        string iamId,
+        DateOnly today,
+        CancellationToken cancellationToken)
     {
-        var accrualRows = await _db.EmployeeAccrualBalances
+        var currentOverrideDepartmentCode = await _db.EmployeeReportingDepartmentOverrides
             .AsNoTracking()
-            .OrderByDescending(row => row.AsOfDate)
-            .ThenByDescending(row => row.LastUpdated)
-            .ThenBy(row => row.LeaveTypeNumber)
-            .ToListAsync(cancellationToken);
-
-        return accrualRows
-            .Where(row => !string.IsNullOrWhiteSpace(row.EmployeeId))
-            .GroupBy(row => NormalizeEmployeeId(row.EmployeeId)!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-    }
-
-    private async Task<Dictionary<string, IReadOnlyList<string>>> GetCurrentDepartmentCodesByEmployeeId(CancellationToken cancellationToken)
-    {
-        var accrualRows = await _db.EmployeeAccrualBalances
-            .AsNoTracking()
-            .Where(row => !string.IsNullOrWhiteSpace(row.EmployeeId) &&
-                          !string.IsNullOrWhiteSpace(row.Level5Dept))
-            .OrderByDescending(row => row.AsOfDate)
-            .ThenByDescending(row => row.LastUpdated)
-            .ThenBy(row => row.LeaveTypeNumber)
-            .ToListAsync(cancellationToken);
-
-        return accrualRows
-            .GroupBy(row => NormalizeEmployeeId(row.EmployeeId)!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group =>
-                {
-                    return group.Key;
-                },
-                group =>
-                {
-                    var latestAsOfDate = group.Max(row => row.AsOfDate);
-                    return (IReadOnlyList<string>)group
-                        .Where(row => row.AsOfDate == latestAsOfDate)
-                        .Select(row => row.Level5Dept.Trim())
-                        .Where(code => !string.IsNullOrWhiteSpace(code))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                },
-                StringComparer.OrdinalIgnoreCase);
-    }
-
-    private async Task<IReadOnlyList<string>> GetCurrentDepartmentCodesAsync(string iamId, DateOnly today, CancellationToken cancellationToken)
-    {
-        var normalizedIamId = NormalizeKey(iamId);
-        var currentOverridesByIamId = await GetCurrentDepartmentOverridesByIamId(today, cancellationToken);
-        if (currentOverridesByIamId.TryGetValue(normalizedIamId, out var currentOverride))
+            .Where(item => item.IamId == iamId &&
+                           item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
+            .OrderByDescending(item => item.EffectiveStartDate)
+            .ThenByDescending(item => item.Id)
+            .Select(item => item.DepartmentCode)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(currentOverrideDepartmentCode))
         {
-            return new[] { currentOverride.DepartmentCode.Trim() };
+            return [currentOverrideDepartmentCode.Trim()];
         }
 
-        var person = await _db.People
+        var employeeId = NormalizeEmployeeId(await _db.People
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.IamId == iamId, cancellationToken);
-        var employeeId = NormalizeEmployeeId(person?.EmployeeId);
+            .Where(item => item.IamId == iamId)
+            .Select(item => item.EmployeeId)
+            .FirstOrDefaultAsync(cancellationToken));
         if (employeeId == null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
-        var currentDepartmentCodesByEmployeeId = await GetCurrentDepartmentCodesByEmployeeId(cancellationToken);
-        return currentDepartmentCodesByEmployeeId.TryGetValue(employeeId, out var departmentCodes)
-            ? departmentCodes
-            : Array.Empty<string>();
+        var latestAsOfDate = await _db.EmployeeAccrualBalances
+            .Where(row => row.EmployeeId == employeeId)
+            .OrderByDescending(row => row.AsOfDate)
+            .Select(row => (DateOnly?)row.AsOfDate)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!latestAsOfDate.HasValue)
+        {
+            return [];
+        }
+
+        var departmentCodes = await _db.EmployeeAccrualBalances
+            .Where(row => row.EmployeeId == employeeId &&
+                          row.AsOfDate == latestAsOfDate.Value &&
+                          !string.IsNullOrWhiteSpace(row.Level5Dept))
+            .Select(row => row.Level5Dept.Trim())
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return departmentCodes
+            .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)

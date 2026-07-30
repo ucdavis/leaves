@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
@@ -38,7 +39,6 @@ public static class AuthenticationHelper
         {
             options.Events = new CookieAuthenticationEvents
             {
-                OnValidatePrincipal = OnValidatePrincipal,
                 OnRedirectToAccessDenied = ctx =>
                 {
                     // If the request is for an API endpoint, don't redirect to the access denied page
@@ -74,11 +74,10 @@ public static class AuthenticationHelper
     }
 
     /// <summary>
-    /// Handles token validation - loads user roles on first login
+    /// Handles token validation by synchronizing the user profile at sign-in.
     /// </summary>
     private static async Task OnTokenValidated(Microsoft.AspNetCore.Authentication.OpenIdConnect.TokenValidatedContext ctx)
     {
-        // Load up the roles on first login (can also change other user info/claims here if needed)
         var principal = ctx.Principal;
         if (principal == null)
         {
@@ -86,57 +85,49 @@ public static class AuthenticationHelper
         }
 
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-        var hasUserId = principal.TryGetUserId(out var userId);
-
-        if (!hasUserId) return;
+        if (!principal.TryGetUserId(out _))
+        {
+            return;
+        }
 
         await userService.EnsureUserProfileAsync(
             principal,
             recordSignIn: true,
             cancellationToken: ctx.HttpContext.RequestAborted);
-
-        var roles = await userService.GetRolesForUser(userId);
-
-        if (principal.Identity is not ClaimsIdentity identity)
-        {
-            return;
-        }
-
-        foreach (var role in roles)
-        {
-            identity.AddClaim(new Claim(ClaimTypes.Role, role));
-        }
     }
+}
 
-    /// <summary>
-    /// Validates cookie principal on every request - updates user roles/claims if needed
-    /// </summary>
-    private static async Task OnValidatePrincipal(Microsoft.AspNetCore.Authentication.Cookies.CookieValidatePrincipalContext ctx)
+public sealed class AdminAuthorizationRequirement : IAuthorizationRequirement;
+
+public sealed class AdminAuthorizationHandler(IUserService userService)
+    : AuthorizationHandler<AdminAuthorizationRequirement>
+{
+    protected override async Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        AdminAuthorizationRequirement requirement)
     {
-        var principal = ctx.Principal;
-        if (principal?.HasClaim("dev_persona", "true") == true)
+        if (context.User.HasClaim("dev_persona", "true"))
+        {
+            if (context.User.IsInRole("Admin"))
+            {
+                context.Succeed(requirement);
+            }
+
+            return;
+        }
+
+        if (!context.User.TryGetUserId(out var userId))
         {
             return;
         }
 
-        if (principal == null)
-        {
-            return;
-        }
+        var cancellationToken = (context.Resource as HttpContext)?.RequestAborted
+            ?? CancellationToken.None;
+        var roles = await userService.GetRolesForUser(userId, cancellationToken);
 
-        // On every request with a cookie, check if the user's roles/claims need updating
-        // We could use a cache here or roleVersion or timestamp or something, but for simplicity we'll just hit the DB every time
-        var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-        await userService.EnsureUserProfileAsync(
-            principal,
-            recordSignIn: false,
-            cancellationToken: ctx.HttpContext.RequestAborted);
-        var updated = await userService.UpdateUserPrincipalIfNeeded(principal);
-
-        if (updated != null)
+        if (roles.Contains("Admin", StringComparer.OrdinalIgnoreCase))
         {
-            ctx.ReplacePrincipal(updated);
-            ctx.ShouldRenew = true; // Renew the cookie with the new principal
+            context.Succeed(requirement);
         }
     }
 }

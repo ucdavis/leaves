@@ -13,7 +13,7 @@ public sealed class AdminDirectoryService
         _db = db;
     }
 
-    public async Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
+    internal async Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -25,7 +25,7 @@ public sealed class AdminDirectoryService
 
         var departments = await _db.Departments
             .AsNoTracking()
-            .Include(department => department.DepartmentEmailRoutings)
+            .Include(department => department.DepartmentEmailRoutings.Where(routing => routing.IsActive))
             .OrderBy(department => department.DepartmentName)
             .ToListAsync(cancellationToken);
 
@@ -33,11 +33,27 @@ public sealed class AdminDirectoryService
             .AsNoTracking()
             .OrderBy(person => person.FullName)
             .ThenBy(person => person.IamId)
+            .Select(person => new Person
+            {
+                IamId = person.IamId,
+                EmployeeId = person.EmployeeId,
+                FullName = person.FullName,
+                Email = person.Email,
+                IsFaculty = person.IsFaculty,
+            })
             .ToListAsync(cancellationToken);
         var appUsers = await _db.AppUsers
             .AsNoTracking()
             .OrderBy(user => user.DisplayName)
             .ThenBy(user => user.IamId)
+            .Select(user => new AppUser
+            {
+                IamId = user.IamId,
+                EmployeeId = user.EmployeeId,
+                DisplayName = user.DisplayName,
+                Email = user.Email,
+                IsActive = user.IsActive,
+            })
             .ToListAsync(cancellationToken);
 
         var adminIamIdSet = (await _db.AppAdminAssignments
@@ -63,15 +79,72 @@ public sealed class AdminDirectoryService
             LatestAccrualByEmployeeId: latestAccrualByEmployeeId);
     }
 
-    public async Task<AdminStatusData> LoadStatusDataAsync(CancellationToken cancellationToken)
+    internal async Task<AdminStatusData> LoadStatusDataAsync(CancellationToken cancellationToken)
     {
-        var leaveRequests = await _db.LeaveRequests
-            .AsNoTracking()
-            .OrderByDescending(request => request.SubmittedAt)
-            .ThenByDescending(request => request.Id)
-            .ToListAsync(cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        return new AdminStatusData(LeaveRequests: leaveRequests);
+        var clusterCount = await _db.Clusters
+            .AsNoTracking()
+            .Where(cluster => cluster.IsActive)
+            .CountAsync(cancellationToken);
+        var clustersMissingCaos = await _db.Clusters
+            .AsNoTracking()
+            .CountAsync(cluster => cluster.IsActive &&
+                !_db.ClusterCaoAssignments.Any(assignment =>
+                    assignment.ClusterId == cluster.Id &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)),
+                cancellationToken);
+
+        var departmentCount = await _db.Departments
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+        var departmentsMissingChairs = await _db.Departments
+            .AsNoTracking()
+            .CountAsync(department => !_db.DepartmentChairAssignments.Any(assignment =>
+                    assignment.DepartmentCode == department.DepartmentCode &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)),
+                cancellationToken);
+
+        var latestPeoplePromotionAt = await _db.People
+            .AsNoTracking()
+            .MaxAsync(person => person.PromotedAt, cancellationToken);
+
+        var pendingRequests = await _db.LeaveRequests
+            .AsNoTracking()
+            .CountAsync(request => request.Status == LeaveRequestStatus.PendingApproval, cancellationToken);
+
+        var accrualCounts = await LatestAccrualRowsQuery()
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Count = group.Count(),
+                LatestUpdatedAt = group.Max(row => (DateTime?)row.LastUpdated),
+                ApproachingVacationCap = group.Count(row =>
+                    row.TypeLabel.Contains("Vacation") &&
+                    (row.ApproachingMax.Trim() == "Y" ||
+                     row.ApproachingMax.Trim() == "Yes" ||
+                     row.ApproachingMax.Trim() == "True")),
+                FacultyAtVacationCap = group.Count(row =>
+                    row.TypeLabel.Contains("Vacation") &&
+                    row.HoursOverUnderPolicyMax >= 0),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return new AdminStatusData(
+            ClusterCount: clusterCount,
+            ClustersMissingCaos: clustersMissingCaos,
+            DepartmentCount: departmentCount,
+            DepartmentsMissingChairs: departmentsMissingChairs,
+            LatestPeoplePromotionAt: latestPeoplePromotionAt,
+            LatestAccrualCount: accrualCounts?.Count ?? 0,
+            LatestAccrualUpdatedAt: accrualCounts?.LatestUpdatedAt,
+            ApproachingVacationCap: accrualCounts?.ApproachingVacationCap ?? 0,
+            FacultyAtVacationCap: accrualCounts?.FacultyAtVacationCap ?? 0,
+            PendingRequests: pendingRequests);
     }
 
     private async Task<Dictionary<string, EmployeeReportingDepartmentOverride>> GetCurrentDepartmentOverridesByIamIdAsync(
@@ -80,15 +153,20 @@ public sealed class AdminDirectoryService
     {
         var overrides = await _db.EmployeeReportingDepartmentOverrides
             .AsNoTracking()
-            .Where(item => item.EffectiveStartDate <= today &&
-                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
-            .OrderByDescending(item => item.EffectiveStartDate)
-            .ThenByDescending(item => item.Id)
+            .Where(item => item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today) &&
+                           !_db.EmployeeReportingDepartmentOverrides.Any(candidate =>
+                               candidate.IamId == item.IamId &&
+                               candidate.ClosedUtc == null &&
+                               candidate.EffectiveStartDate <= today &&
+                               (!candidate.EffectiveEndDateExclusive.HasValue || candidate.EffectiveEndDateExclusive.Value > today) &&
+                               (candidate.EffectiveStartDate > item.EffectiveStartDate ||
+                                (candidate.EffectiveStartDate == item.EffectiveStartDate && candidate.Id > item.Id))))
             .ToListAsync(cancellationToken);
 
         return overrides
-            .GroupBy(item => NormalizeKey(item.IamId), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(item => NormalizeKey(item.IamId), StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task<Dictionary<string, DepartmentChairAssignment>> GetCurrentChairAssignmentsByDepartmentAsync(
@@ -97,15 +175,20 @@ public sealed class AdminDirectoryService
     {
         var assignments = await _db.DepartmentChairAssignments
             .AsNoTracking()
-            .Where(item => item.EffectiveStartDate <= today &&
-                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
-            .OrderByDescending(item => item.EffectiveStartDate)
-            .ThenByDescending(item => item.Id)
+            .Where(item => item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today) &&
+                           !_db.DepartmentChairAssignments.Any(candidate =>
+                               candidate.DepartmentCode == item.DepartmentCode &&
+                               candidate.ClosedUtc == null &&
+                               candidate.EffectiveStartDate <= today &&
+                               (!candidate.EffectiveEndDateExclusive.HasValue || candidate.EffectiveEndDateExclusive.Value > today) &&
+                               (candidate.EffectiveStartDate > item.EffectiveStartDate ||
+                                (candidate.EffectiveStartDate == item.EffectiveStartDate && candidate.Id > item.Id))))
             .ToListAsync(cancellationToken);
 
         return assignments
-            .GroupBy(item => item.DepartmentCode.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(item => item.DepartmentCode.Trim(), StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task<Dictionary<int, ClusterCaoAssignment>> GetCurrentCaoAssignmentsByClusterAsync(
@@ -114,29 +197,77 @@ public sealed class AdminDirectoryService
     {
         var assignments = await _db.ClusterCaoAssignments
             .AsNoTracking()
-            .Where(item => item.EffectiveStartDate <= today &&
-                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
-            .OrderByDescending(item => item.EffectiveStartDate)
-            .ThenByDescending(item => item.Id)
+            .Where(item => item.ClosedUtc == null &&
+                           item.EffectiveStartDate <= today &&
+                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today) &&
+                           !_db.ClusterCaoAssignments.Any(candidate =>
+                               candidate.ClusterId == item.ClusterId &&
+                               candidate.ClosedUtc == null &&
+                               candidate.EffectiveStartDate <= today &&
+                               (!candidate.EffectiveEndDateExclusive.HasValue || candidate.EffectiveEndDateExclusive.Value > today) &&
+                               (candidate.EffectiveStartDate > item.EffectiveStartDate ||
+                                (candidate.EffectiveStartDate == item.EffectiveStartDate && candidate.Id > item.Id))))
             .ToListAsync(cancellationToken);
 
         return assignments
-            .GroupBy(item => item.ClusterId)
-            .ToDictionary(group => group.Key, group => group.First());
+            .ToDictionary(item => item.ClusterId);
     }
 
-    private async Task<Dictionary<string, EmployeeAccrualBalance>> GetLatestAccrualByEmployeeIdAsync(CancellationToken cancellationToken)
+    internal Task<List<AdminAccrualRow>> LoadCurrentAccrualRowsAsync(CancellationToken cancellationToken)
     {
-        var accrualRows = await _db.EmployeeAccrualBalances
-            .OrderByDescending(row => row.AsOfDate)
-            .ThenByDescending(row => row.LastUpdated)
-            .ThenBy(row => row.LeaveTypeNumber)
+        return ProjectAccrualRows(CurrentAccrualRowsQuery())
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<string, AdminAccrualRow>> GetLatestAccrualByEmployeeIdAsync(CancellationToken cancellationToken)
+    {
+        var accrualRows = await ProjectAccrualRows(LatestAccrualRowsQuery())
             .ToListAsync(cancellationToken);
 
         return accrualRows
-            .Where(row => !string.IsNullOrWhiteSpace(row.EmployeeId))
-            .GroupBy(row => NormalizeEmployeeId(row.EmployeeId)!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(row => NormalizeEmployeeId(row.EmployeeId)!, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private IQueryable<EmployeeAccrualBalance> LatestAccrualRowsQuery()
+    {
+        return _db.EmployeeAccrualBalances
+            .AsNoTracking()
+            .Where(row => !_db.EmployeeAccrualBalances.Any(candidate =>
+                candidate.EmployeeId == row.EmployeeId &&
+                (candidate.AsOfDate > row.AsOfDate ||
+                 (candidate.AsOfDate == row.AsOfDate &&
+                  (candidate.LastUpdated > row.LastUpdated ||
+                   (candidate.LastUpdated == row.LastUpdated &&
+                    (candidate.LeaveTypeNumber < row.LeaveTypeNumber ||
+                     (candidate.LeaveTypeNumber == row.LeaveTypeNumber &&
+                      candidate.PositionNumber.CompareTo(row.PositionNumber) < 0))))))));
+    }
+
+    private IQueryable<EmployeeAccrualBalance> CurrentAccrualRowsQuery()
+    {
+        return _db.EmployeeAccrualBalances
+            .AsNoTracking()
+            .Where(row => !_db.EmployeeAccrualBalances.Any(candidate =>
+                candidate.EmployeeId == row.EmployeeId &&
+                candidate.AsOfDate > row.AsOfDate));
+    }
+
+    private static IQueryable<AdminAccrualRow> ProjectAccrualRows(IQueryable<EmployeeAccrualBalance> query)
+    {
+        return query.Select(row => new AdminAccrualRow(
+            row.EmployeeId,
+            row.AsOfDate,
+            row.PositionNumber,
+            row.LeaveTypeNumber,
+            row.EmployeeEmail,
+            row.EmployeeName,
+            row.EmployeeClassDescription,
+            row.JobCodeDescription,
+            row.TypeLabel,
+            row.ApproachingMax,
+            row.HoursOverUnderPolicyMax,
+            row.Level5Dept,
+            row.LastUpdated));
     }
 
     private static string NormalizeKey(string? value)
@@ -151,7 +282,7 @@ public sealed class AdminDirectoryService
     }
 }
 
-public sealed record AdminDirectoryData(
+internal sealed record AdminDirectoryData(
     IReadOnlyList<AppUser> AppUsers,
     IReadOnlyList<Cluster> Clusters,
     IReadOnlyList<Department> Departments,
@@ -160,7 +291,31 @@ public sealed record AdminDirectoryData(
     IReadOnlyDictionary<string, EmployeeReportingDepartmentOverride> CurrentOverridesByIamId,
     IReadOnlyDictionary<string, DepartmentChairAssignment> CurrentChairAssignmentsByDepartment,
     IReadOnlyDictionary<int, ClusterCaoAssignment> CurrentCaoAssignmentsByCluster,
-    IReadOnlyDictionary<string, EmployeeAccrualBalance> LatestAccrualByEmployeeId);
+    IReadOnlyDictionary<string, AdminAccrualRow> LatestAccrualByEmployeeId);
 
-public sealed record AdminStatusData(
-    IReadOnlyList<LeaveRequest> LeaveRequests);
+internal sealed record AdminStatusData(
+    int ClusterCount,
+    int ClustersMissingCaos,
+    int DepartmentCount,
+    int DepartmentsMissingChairs,
+    DateTime? LatestPeoplePromotionAt,
+    int LatestAccrualCount,
+    DateTime? LatestAccrualUpdatedAt,
+    int ApproachingVacationCap,
+    int FacultyAtVacationCap,
+    int PendingRequests);
+
+internal sealed record AdminAccrualRow(
+    string EmployeeId,
+    DateOnly AsOfDate,
+    string PositionNumber,
+    int LeaveTypeNumber,
+    string? EmployeeEmail,
+    string EmployeeName,
+    string EmployeeClassDescription,
+    string JobCodeDescription,
+    string TypeLabel,
+    string ApproachingMax,
+    decimal HoursOverUnderPolicyMax,
+    string Level5Dept,
+    DateTime LastUpdated);

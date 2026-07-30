@@ -6,7 +6,7 @@ namespace Server.Core.Data;
 
 public interface IDbInitializer
 {
-    Task InitializeAsync(CancellationToken cancellationToken = default);
+    Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken = default);
 }
 
 public class DbInitializer : IDbInitializer
@@ -143,7 +143,7 @@ public class DbInitializer : IDbInitializer
         _logger = logger;
     }
 
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken = default)
     {
         if (_db.Database.IsRelational())
         {
@@ -158,7 +158,10 @@ public class DbInitializer : IDbInitializer
             _logger.LogInformation("Database ensured.");
         }
 
-        await SeedDevelopmentAsync(cancellationToken);
+        if (seedDevelopmentData)
+        {
+            await SeedDevelopmentAsync(cancellationToken);
+        }
     }
 
     private async Task SeedDevelopmentAsync(CancellationToken ct)

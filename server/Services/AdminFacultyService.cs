@@ -207,7 +207,7 @@ public sealed class AdminFacultyService
         return isChair ? "chair" : "faculty";
     }
 
-    private static string GetDesignation(string role, Server.Core.Domain.Person? person, Server.Core.Domain.EmployeeAccrualBalance? latestAccrual)
+    private static string GetDesignation(string role, Server.Core.Domain.Person? person, AdminAccrualRow? latestAccrual)
     {
         if (role is "admin" or "cao" or "chair")
         {
@@ -222,7 +222,7 @@ public sealed class AdminFacultyService
         return GetFacultyDesignation(latestAccrual);
     }
 
-    private static string GetFacultyDesignation(Server.Core.Domain.EmployeeAccrualBalance? latestAccrual)
+    private static string GetFacultyDesignation(AdminAccrualRow? latestAccrual)
     {
         var description = latestAccrual?.EmployeeClassDescription ?? string.Empty;
         if (description.Contains("Academic Year", StringComparison.OrdinalIgnoreCase) ||

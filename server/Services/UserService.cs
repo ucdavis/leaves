@@ -15,11 +15,13 @@ public interface IUserService
         bool recordSignIn = true,
         CancellationToken cancellationToken = default);
 
-    Task<string?> GetDisplayNameForUser(string userId);
+    Task<string?> GetDisplayNameForUser(
+        string userId,
+        CancellationToken cancellationToken = default);
 
-    Task<List<string>> GetRolesForUser(string userId);
-
-    Task<ClaimsPrincipal?> UpdateUserPrincipalIfNeeded(ClaimsPrincipal principal);
+    Task<List<string>> GetRolesForUser(
+        string userId,
+        CancellationToken cancellationToken = default);
 }
 
 public class UserService : IUserService
@@ -139,7 +141,9 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<string?> GetDisplayNameForUser(string userId)
+    public async Task<string?> GetDisplayNameForUser(
+        string userId,
+        CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(userId, out var entraObjectId))
         {
@@ -150,21 +154,39 @@ public class UserService : IUserService
             .AsNoTracking()
             .Where(appUser => appUser.EntraObjectId == entraObjectId)
             .Select(appUser => appUser.DisplayName)
-            .SingleOrDefaultAsync();
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<List<string>> GetRolesForUser(string userId)
+    public async Task<List<string>> GetRolesForUser(
+        string userId,
+        CancellationToken cancellationToken = default)
     {
-        var iamId = await ResolveIamIdAsync(userId);
-        if (string.IsNullOrWhiteSpace(iamId))
+        bool isAdmin;
+        if (Guid.TryParse(userId, out var entraObjectId))
         {
-            _logger.LogDebug("Could not resolve an IAM ID for user {UserId}; no app roles will be added.", userId);
-            return [];
+            isAdmin = await (
+                    from appUser in _dbContext.AppUsers.AsNoTracking()
+                    join assignment in _dbContext.AppAdminAssignments.AsNoTracking()
+                        on appUser.IamId equals assignment.IamId
+                    where appUser.EntraObjectId == entraObjectId
+                    select assignment.Id)
+                .AnyAsync(cancellationToken);
         }
+        else
+        {
+            var iamId = NormalizeIamId(userId);
+            if (iamId == null)
+            {
+                _logger.LogDebug(
+                    "Could not resolve an IAM ID for user {UserId}; no app roles will be added.",
+                    userId);
+                return [];
+            }
 
-        var isAdmin = await _dbContext.AppAdminAssignments
-            .AsNoTracking()
-            .AnyAsync(assignment => assignment.IamId == iamId);
+            isAdmin = await _dbContext.AppAdminAssignments
+                .AsNoTracking()
+                .AnyAsync(assignment => assignment.IamId == iamId, cancellationToken);
+        }
 
         if (!isAdmin)
         {
@@ -172,58 +194,6 @@ public class UserService : IUserService
         }
 
         return [AdminRole];
-    }
-
-    public async Task<ClaimsPrincipal?> UpdateUserPrincipalIfNeeded(ClaimsPrincipal principal)
-    {
-        if (!principal.TryGetUserId(out var userId))
-        {
-            return null;
-        }
-
-        var currentRoles = await GetRolesForUser(userId);
-
-        var cookieRoles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var changed = currentRoles.Count != cookieRoles.Count ||
-                      currentRoles.Except(cookieRoles).Any();
-
-        if (!changed)
-        {
-            return null;
-        }
-
-        var newId = new ClaimsIdentity(principal.Claims, authenticationType: principal.Identity?.AuthenticationType);
-
-        foreach (var roleClaim in newId.FindAll(ClaimTypes.Role).ToList())
-        {
-            newId.RemoveClaim(roleClaim);
-        }
-
-        foreach (var role in currentRoles)
-        {
-            newId.AddClaim(new Claim(ClaimTypes.Role, role));
-        }
-
-        return new ClaimsPrincipal(newId);
-    }
-
-    private async Task<string?> ResolveIamIdAsync(string userId)
-    {
-        if (Guid.TryParse(userId, out var entraObjectId))
-        {
-            var appUserIamId = await _dbContext.AppUsers
-                .AsNoTracking()
-                .Where(appUser => appUser.EntraObjectId == entraObjectId)
-                .Select(appUser => appUser.IamId)
-                .SingleOrDefaultAsync();
-
-            if (!string.IsNullOrWhiteSpace(appUserIamId))
-            {
-                return NormalizeIamId(appUserIamId);
-            }
-        }
-
-        return NormalizeIamId(userId);
     }
 
     private static string? NormalizeIamId(string? iamId)
@@ -331,13 +301,12 @@ public class UserService : IUserService
             return null;
         }
 
-        var matches = await _dbContext.People
-            .Where(person => person.Email != null && person.Email.ToLower() == normalizedEmail)
+        return await _dbContext.People
+            .AsNoTracking()
+            .Where(person => person.Email == normalizedEmail)
             .OrderByDescending(person => person.PromotedAt)
             .ThenByDescending(person => person.ModifyDate)
-            .ToListAsync(cancellationToken);
-
-        return matches.FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static string? NormalizeEmail(string? email)

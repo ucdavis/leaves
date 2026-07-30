@@ -202,7 +202,7 @@ public sealed class AdminDepartmentsService
         return isChair ? "chair" : "faculty";
     }
 
-    private static string GetDesignation(string role, Person? person, EmployeeAccrualBalance? latestAccrual)
+    private static string GetDesignation(string role, Person? person, AdminAccrualRow? latestAccrual)
     {
         if (role is "admin" or "cao" or "chair")
         {

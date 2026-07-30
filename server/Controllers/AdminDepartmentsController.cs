@@ -123,6 +123,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         var cluster = await _db.Clusters
             .Include(item => item.Departments)
             .Include(item => item.ClusterCaoAssignments)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(item => item.Id == clusterId, cancellationToken);
 
         if (cluster == null)
@@ -274,6 +275,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             .Include(item => item.DepartmentChairAssignments)
             .Include(item => item.DepartmentEmailRoutings)
             .Include(item => item.EmployeeReportingDepartmentOverrides)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
 
         if (department == null)

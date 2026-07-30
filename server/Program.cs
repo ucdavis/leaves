@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,8 +40,13 @@ try
     builder.Services.AddNotificationServices(builder.Configuration);
     builder.Services.AddAuthorization(options =>
     {
-        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+        options.AddPolicy("AdminOnly", policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.AddRequirements(new AdminAuthorizationRequirement());
+        });
     });
+    builder.Services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
 
     // Add response caching for pages that opt-in
     // https://learn.microsoft.com/en-us/aspnet/core/performance/caching/middleware?view=aspnetcore-9.0
@@ -97,7 +103,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-        await init.InitializeAsync();
+        await init.InitializeAsync(seedDevelopmentData: app.Environment.IsDevelopment());
     }
 
     app.UseForwardedHeaders();
