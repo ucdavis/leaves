@@ -435,6 +435,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
+        var departmentData = await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken);
+        var userExists = departmentData.Users.Any(user =>
+            string.Equals(user.Id, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase));
+        if (!userExists)
+        {
+            return ValidationProblem("Selected CAO must be a valid directory user.");
+        }
+
         if (currentAssignment != null &&
             string.Equals(currentAssignment.IamId, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase))
         {

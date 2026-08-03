@@ -144,6 +144,7 @@ export function DepartmentSettingsModal({
     <>
       <AdminModalFrame
         maxWidthClassName="max-w-3xl"
+        onRequestClose={onClose}
         title="Department settings"
       >
         <form

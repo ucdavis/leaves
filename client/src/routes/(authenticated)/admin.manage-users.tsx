@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   useMutation,
   useQueryClient,
@@ -390,7 +390,9 @@ function AdminUsersRoute() {
           )}
 
           <button
-            className="btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85 lg:self-end"
+            className={`btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85 lg:self-end ${
+              !pendingAction && error ? 'opacity-60' : ''
+            }`}
             disabled={
               isSaving ||
               !iamId ||
@@ -411,7 +413,7 @@ function AdminUsersRoute() {
           </button>
         </div>
 
-        {error ? (
+        {!pendingAction && error ? (
           <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
           </div>
@@ -450,8 +452,12 @@ function AdminUsersRoute() {
       {pendingAction ? (
         <RoleWarningModal
           action={pendingAction}
+          errorMessage={error}
           isSaving={isSaving}
-          onCancel={() => setPendingAction(null)}
+          onCancel={() => {
+            setPendingAction(null);
+            setError(null);
+          }}
           onConfirm={() => {
             void handleConfirmAction();
           }}
@@ -503,11 +509,13 @@ function getRoleWarningModalText(action: PendingRoleAction) {
 
 function RoleWarningModal({
   action,
+  errorMessage,
   isSaving,
   onCancel,
   onConfirm,
 }: {
   action: PendingRoleAction;
+  errorMessage: string | null;
   isSaving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -517,6 +525,8 @@ function RoleWarningModal({
   return (
     <WarningModal
       confirmLabel={confirmLabel}
+      errorMessage={errorMessage}
+      isConfirmDisabled={Boolean(errorMessage)}
       isSaving={isSaving}
       onCancel={onCancel}
       onConfirm={onConfirm}
@@ -547,20 +557,30 @@ function PersonSearchField({
   users: AdminRolePersonOption[];
 }) {
   const showResults = isOpen && query.trim().length > 0;
+  const resultsId = useId();
 
   return (
     <div className="relative mt-2 space-y-2">
       <input
         className="input input-bordered w-full"
+        aria-autocomplete="list"
+        aria-controls={resultsId}
+        aria-expanded={showResults}
+        onBlur={() => onChangeOpen(false)}
         onChange={(event) => onChangeQuery(event.target.value)}
         onFocus={() => onChangeOpen(true)}
         placeholder="Search name, email, IAM ID, or department"
+        role="combobox"
         type="text"
         value={query}
       />
 
       {showResults ? (
-        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-white shadow-lg">
+        <div
+          className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-white shadow-lg"
+          id={resultsId}
+          role="listbox"
+        >
           {users.slice(0, 8).map((user) => {
             const isSelected = user.iamId === selectedIamId;
 
@@ -572,6 +592,8 @@ function PersonSearchField({
                 key={user.iamId}
                 onClick={() => onSelectUser(user)}
                 onMouseDown={(event) => event.preventDefault()}
+                aria-selected={isSelected}
+                role="option"
                 type="button"
               >
                 <span>

@@ -34,7 +34,8 @@ public sealed class AdminRolesController : ApiControllerBase
                 .OrderBy(user => user.DisplayName)
                 .ThenBy(user => user.IamId)
                 .ToListAsync(cancellationToken))
-            .ToDictionary(user => user.IamId.Trim(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(user => user.IamId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var peopleByEmployeeId = people
             .Where(person => !string.IsNullOrWhiteSpace(person.EmployeeId))
             .GroupBy(person => NormalizeEmployeeId(person.EmployeeId)!, StringComparer.OrdinalIgnoreCase)

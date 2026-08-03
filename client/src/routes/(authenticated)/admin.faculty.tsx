@@ -4,21 +4,19 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { HttpError } from '@/lib/api.ts';
 import { adminFacultyQueryOptions } from '@/queries/adminFaculty.ts';
 import { AdminUserModal } from '@/shared/admin/AdminUserModal.tsx';
-import type {
-  AdminUser,
-} from '@/shared/admin/adminData.tsx';
+import type { AdminUser } from '@/shared/admin/adminData.tsx';
 import {
   AdminFacultyDataProvider,
   useAdminFacultyData,
 } from '@/shared/admin/adminFacultyData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
-import {
-  statusTextColors,
-} from '@/shared/statusColors.ts';
+import { statusTextColors } from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/faculty')({
+  component: AdminPeopleRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminFacultyQueryOptions()),
+
   pendingComponent: () => (
     <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
@@ -29,7 +27,6 @@ export const Route = createFileRoute('/(authenticated)/admin/faculty')({
       </p>
     </section>
   ),
-  component: AdminPeopleRoute,
 });
 
 type UserRow = AdminUser & {
@@ -157,6 +154,7 @@ function AdminPeopleRouteContent() {
                 aria-label={`Exclude ${row.original.name}`}
                 checked={!effectiveActive}
                 className="checkbox checkbox-sm"
+                disabled={pendingExcludeChange !== null}
                 id={inputId}
                 onChange={async (event) => {
                   if (pendingExcludeChange !== null) {
@@ -200,7 +198,6 @@ function AdminPeopleRouteContent() {
 
   return (
     <div className="space-y-6">
-
       <section className="card border border-main-border bg-base-100">
         <div className="card-body p-6">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -261,7 +258,8 @@ function AdminPeopleRouteContent() {
           initialValues={{
             departmentOverrideEndDate: editingUser.departmentOverrideEndDate,
             departmentOverrideId: editingUser.departmentOverrideId,
-            departmentOverrideStartDate: editingUser.departmentOverrideStartDate,
+            departmentOverrideStartDate:
+              editingUser.departmentOverrideStartDate,
           }}
           onClose={() => setEditingUserId(null)}
           onSubmit={async (value) => {

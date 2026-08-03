@@ -56,6 +56,7 @@ export function DepartmentRow({
             >
               <PencilSquareIcon
                 aria-hidden="true"
+                aria-label="Edit ${department.name} chair"
                 className="h-4 w-4 shrink-0"
               />
             </button>

@@ -72,6 +72,7 @@ export function ClusterSettingsModal({
     <>
       <AdminModalFrame
         maxWidthClassName="max-w-2xl"
+        onRequestClose={onClose}
         title="Cluster settings"
       >
         <form

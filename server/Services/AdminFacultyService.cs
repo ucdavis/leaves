@@ -39,9 +39,14 @@ public sealed class AdminFacultyService
         foreach (var person in directoryData.People)
         {
             var key = NormalizeKey(person.IamId);
+            if (string.IsNullOrEmpty(key))
+            {
+                continue;
+            }
+
             if (!userIdByIamId.ContainsKey(key))
             {
-                userIdByIamId[key] = person.IamId.Trim();
+                userIdByIamId[key] = person.IamId?.Trim() ?? string.Empty;
             }
         }
 
@@ -122,7 +127,7 @@ public sealed class AdminFacultyService
                 appUsersByIamId.TryGetValue(lookupIamId, out var appUser);
                 peopleByIamId.TryGetValue(lookupIamId, out var person);
 
-                var iamId = person?.IamId.Trim() ?? lookupIamId;
+                var iamId = person?.IamId?.Trim() ?? lookupIamId;
                 var employeeId = NormalizeEmployeeId(appUser?.EmployeeId)
                     ?? NormalizeEmployeeId(person?.EmployeeId);
                 directoryData.LatestAccrualByEmployeeId.TryGetValue(employeeId ?? string.Empty, out var latestAccrual);
@@ -142,7 +147,7 @@ public sealed class AdminFacultyService
                     DepartmentOverrideEndDate: currentOverride?.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     DepartmentOverrideId: currentOverride?.DepartmentCode,
                     DepartmentOverrideStartDate: currentOverride?.EffectiveStartDate.ToString("yyyy-MM-dd"),
-                    Designation: GetDesignation(role, person, latestAccrual),
+                    Designation: GetDesignation(role, person),
                     Email: appUser?.Email ?? person?.Email ?? string.Empty,
                     EmployeeId: employeeId ?? string.Empty,
                     HasAppUser: appUser != null,
@@ -179,7 +184,7 @@ public sealed class AdminFacultyService
                     DepartmentOverrideEndDate: matchedUser?.DepartmentOverrideEndDate,
                     DepartmentOverrideId: matchedUser?.DepartmentOverrideId,
                     DepartmentOverrideStartDate: matchedUser?.DepartmentOverrideStartDate,
-                    Designation: matchedUser?.Designation ?? GetFacultyDesignation(latestAccrual),
+                    Designation: matchedUser?.Designation ?? "faculty",
                     Email: matchedUser?.Email ?? latestAccrual.EmployeeEmail ?? string.Empty,
                     EmployeeId: employeeId,
                     HasAppUser: matchedUser?.HasAppUser ?? false,
@@ -207,7 +212,7 @@ public sealed class AdminFacultyService
         return isChair ? "chair" : "faculty";
     }
 
-    private static string GetDesignation(string role, Server.Core.Domain.Person? person, Server.Core.Domain.EmployeeAccrualBalance? latestAccrual)
+    private static string GetDesignation(string role, Server.Core.Domain.Person? person)
     {
         if (role is "admin" or "cao" or "chair")
         {
@@ -219,19 +224,7 @@ public sealed class AdminFacultyService
             return "nfa";
         }
 
-        return GetFacultyDesignation(latestAccrual);
-    }
-
-    private static string GetFacultyDesignation(Server.Core.Domain.EmployeeAccrualBalance? latestAccrual)
-    {
-        var description = latestAccrual?.EmployeeClassDescription ?? string.Empty;
-        if (description.Contains("Academic Year", StringComparison.OrdinalIgnoreCase) ||
-            description.Contains("AY", StringComparison.OrdinalIgnoreCase))
-        {
-            return "ay";
-        }
-
-        return "fy";
+        return "faculty";
     }
 
     private static string NormalizeKey(string? value)

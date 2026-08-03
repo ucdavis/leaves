@@ -175,7 +175,7 @@ public sealed class AdminDepartmentsService
                     DepartmentOverrideEndDate: currentOverride?.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     DepartmentOverrideId: currentOverride?.DepartmentCode,
                     DepartmentOverrideStartDate: currentOverride?.EffectiveStartDate.ToString("yyyy-MM-dd"),
-                    Designation: GetDesignation(role, person, latestAccrual),
+                    Designation: GetDesignation(role, person),
                     Email: appUser?.Email ?? person?.Email ?? string.Empty,
                     EmployeeId: employeeId ?? string.Empty,
                     HasAppUser: appUser != null,
@@ -202,7 +202,7 @@ public sealed class AdminDepartmentsService
         return isChair ? "chair" : "faculty";
     }
 
-    private static string GetDesignation(string role, Person? person, EmployeeAccrualBalance? latestAccrual)
+    private static string GetDesignation(string role, Person? person)
     {
         if (role is "admin" or "cao" or "chair")
         {
@@ -214,14 +214,7 @@ public sealed class AdminDepartmentsService
             return "nfa";
         }
 
-        var description = latestAccrual?.EmployeeClassDescription ?? string.Empty;
-        if (description.Contains("Academic Year", StringComparison.OrdinalIgnoreCase) ||
-            description.Contains("AY", StringComparison.OrdinalIgnoreCase))
-        {
-            return "ay";
-        }
-
-        return "fy";
+        return "faculty";
     }
 
     internal static string NormalizeKey(string? value)

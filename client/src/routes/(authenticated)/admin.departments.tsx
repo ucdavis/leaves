@@ -62,6 +62,9 @@ function AdminDepartmentsRoute() {
     nextCaoName: string;
     nextCaoUserId: string;
   } | null>(null);
+  const [pendingCaoChangeError, setPendingCaoChangeError] = useState<
+    string | null
+  >(null);
   const [pendingChairChange, setPendingChairChange] = useState<{
     currentChairName: string | null;
     departmentId: string;
@@ -69,6 +72,9 @@ function AdminDepartmentsRoute() {
     nextChairName: string;
     nextChairUserId: string;
   } | null>(null);
+  const [pendingChairChangeError, setPendingChairChangeError] = useState<
+    string | null
+  >(null);
   const [viewDepartmentId, setViewDepartmentId] = useState<string | null>(null);
   const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
     string | null
@@ -197,6 +203,7 @@ function AdminDepartmentsRoute() {
                               className="btn btn-ghost btn-sm"
                               disabled={updateDepartmentMutation.isPending}
                               onClick={() => {
+                                setPendingChairChangeError(null);
                                 setPendingChairChange({
                                   currentChairName:
                                     departmentUsers.find(
@@ -238,17 +245,26 @@ function AdminDepartmentsRoute() {
           pendingChairChange.departmentId === selectedDepartment.id ? (
             <DepartmentChairWarningModal
               action={pendingChairChange}
+              errorMessage={pendingChairChangeError}
               isSaving={updateDepartmentMutation.isPending}
-              onCancel={() => setPendingChairChange(null)}
+              onCancel={() => {
+                setPendingChairChange(null);
+                setPendingChairChangeError(null);
+              }}
               onConfirm={() => {
-                void updateDepartmentMutation
-                  .mutateAsync({
-                    departmentId: pendingChairChange.departmentId,
-                    updates: { chairUserId: pendingChairChange.nextChairUserId },
-                  })
-                  .then(() => {
+                void (async () => {
+                  setPendingChairChangeError(null);
+
+                  try {
+                    await updateDepartmentMutation.mutateAsync({
+                      departmentId: pendingChairChange.departmentId,
+                      updates: { chairUserId: pendingChairChange.nextChairUserId },
+                    });
                     setPendingChairChange(null);
-                  });
+                  } catch (error) {
+                    setPendingChairChangeError(getAdminMutationErrorMessage(error));
+                  }
+                })();
               }}
             />
           ) : null}
@@ -328,6 +344,7 @@ function AdminDepartmentsRoute() {
                     return;
                   }
 
+                  setPendingCaoChangeError(null);
                   setPendingCaoChange({
                     clusterId: cluster.id,
                     clusterName: cluster.name,
@@ -506,21 +523,30 @@ function AdminDepartmentsRoute() {
       {pendingCaoChange ? (
         <ClusterCaoWarningModal
           action={pendingCaoChange}
+          errorMessage={pendingCaoChangeError}
           isSaving={updateClusterMutation.isPending}
-          onCancel={() => setPendingCaoChange(null)}
+          onCancel={() => {
+            setPendingCaoChange(null);
+            setPendingCaoChangeError(null);
+          }}
           onConfirm={() => {
-            void updateClusterMutation
-              .mutateAsync({
-                clusterId: pendingCaoChange.clusterId,
-                updates: { caoUserId: pendingCaoChange.nextCaoUserId },
-              })
-                .then(() => {
-                  setPendingCaoChange(null);
-                  setEditingClusterCaoId(null);
-                  setClusterCaoQuery('');
-                  setIsClusterCaoSearchOpen(false);
-                  setSelectedClusterCaoUserId('');
+            void (async () => {
+              setPendingCaoChangeError(null);
+
+              try {
+                await updateClusterMutation.mutateAsync({
+                  clusterId: pendingCaoChange.clusterId,
+                  updates: { caoUserId: pendingCaoChange.nextCaoUserId },
                 });
+                setPendingCaoChange(null);
+                setEditingClusterCaoId(null);
+                setClusterCaoQuery('');
+                setIsClusterCaoSearchOpen(false);
+                setSelectedClusterCaoUserId('');
+              } catch (error) {
+                setPendingCaoChangeError(getAdminMutationErrorMessage(error));
+              }
+            })();
           }}
         />
       ) : null}
@@ -603,7 +629,7 @@ function ClusterCaoEditor({
           onClick={onEdit}
           type="button"
         >
-          <PencilSquareIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <PencilSquareIcon aria-hidden="true" aria-label="Edit CAO" className="h-4 w-4 shrink-0" />
         </button>
       </div>
 
@@ -672,6 +698,7 @@ function ClusterCaoEditor({
 
 function DepartmentChairWarningModal({
   action,
+  errorMessage,
   isSaving,
   onCancel,
   onConfirm,
@@ -683,6 +710,7 @@ function DepartmentChairWarningModal({
     nextChairName: string;
     nextChairUserId: string;
   };
+  errorMessage: string | null;
   isSaving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -694,6 +722,7 @@ function DepartmentChairWarningModal({
   return (
     <WarningModal
       confirmLabel={action.currentChairName ? 'Change chair' : 'Add chair'}
+      errorMessage={errorMessage}
       isSaving={isSaving}
       onCancel={onCancel}
       onConfirm={onConfirm}
@@ -719,6 +748,7 @@ function DepartmentChairWarningModal({
 
 function ClusterCaoWarningModal({
   action,
+  errorMessage,
   isSaving,
   onCancel,
   onConfirm,
@@ -730,6 +760,7 @@ function ClusterCaoWarningModal({
     nextCaoName: string;
     nextCaoUserId: string;
   };
+  errorMessage: string | null;
   isSaving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -737,6 +768,7 @@ function ClusterCaoWarningModal({
   return (
     <WarningModal
       confirmLabel={action.currentCaoName ? 'Change CAO' : 'Add CAO'}
+      errorMessage={errorMessage}
       isSaving={isSaving}
       onCancel={onCancel}
       onConfirm={onConfirm}
