@@ -59,10 +59,10 @@ export function AdminModalFrame({
 
   useEffect(() => {
     const dialogElement = dialogRef.current;
-    const close = onRequestClose;
-    if (!dialogElement || !close) {
+    if (!dialogElement || !onRequestClose) {
       return undefined;
     }
+    const close = onRequestClose;
 
     function handleCancel(event: Event) {
       event.preventDefault();
