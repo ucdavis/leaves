@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AppAdminAssignment> AppAdminAssignments => Set<AppAdminAssignment>();
     public DbSet<Cluster> Clusters => Set<Cluster>();
     public DbSet<ClusterCaoAssignment> ClusterCaoAssignments => Set<ClusterCaoAssignment>();
+    public IQueryable<CurrentEmployee> CurrentEmployees => Set<CurrentEmployee>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<DepartmentChairAssignment> DepartmentChairAssignments => Set<DepartmentChairAssignment>();
     public DbSet<DepartmentEmailRouting> DepartmentEmailRoutings => Set<DepartmentEmailRouting>();
@@ -29,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         AppAdminAssignment.Configure(modelBuilder.Entity<AppAdminAssignment>());
         Cluster.Configure(modelBuilder.Entity<Cluster>());
         ClusterCaoAssignment.Configure(modelBuilder.Entity<ClusterCaoAssignment>());
+        CurrentEmployee.Configure(modelBuilder.Entity<CurrentEmployee>());
         Department.Configure(modelBuilder.Entity<Department>());
         DepartmentChairAssignment.Configure(modelBuilder.Entity<DepartmentChairAssignment>());
         DepartmentEmailRouting.Configure(modelBuilder.Entity<DepartmentEmailRouting>());
