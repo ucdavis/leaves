@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Server.Core.Data;
 
@@ -11,9 +12,11 @@ using Server.Core.Data;
 namespace server.core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260803211046_AddCurrentEmployeeView")]
+    partial class AddCurrentEmployeeView
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -201,62 +204,6 @@ namespace server.core.Migrations
                         .HasDatabaseName("IX_CaoAssignment_Cluster_EffectiveDates");
 
                     b.ToTable("ClusterCaoAssignment");
-                });
-
-            modelBuilder.Entity("Server.Core.Domain.CurrentAccrualBalance", b =>
-                {
-                    b.Property<decimal>("AccrualLimit")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<decimal>("AccrualPercentage")
-                        .HasPrecision(7, 2)
-                        .HasColumnType("decimal(7,2)");
-
-                    b.Property<string>("ApproachingMax")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("CalculatedBal")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<string>("EmployeeId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("HasDivergentPositionBalances")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("IamId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("char(10)");
-
-                    b.Property<DateOnly>("LatestAsOfDate")
-                        .HasColumnType("date");
-
-                    b.Property<int>("LeaveTypeNumber")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("MaxCalculatedBal")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<decimal>("MinCalculatedBal")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<int>("PositionRowCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TypeLabel")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.ToTable((string)null);
-
-                    b.ToView("vw_CurrentAccrualBalance", "dbo");
                 });
 
             modelBuilder.Entity("Server.Core.Domain.CurrentEmployee", b =>
