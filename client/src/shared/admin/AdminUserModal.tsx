@@ -71,9 +71,7 @@ export function AdminUserModal({
   });
 
   return (
-    <AdminModalFrame
-      title={title}
-    >
+    <AdminModalFrame onRequestClose={onClose} title={title}>
       <form
         onSubmit={(event) => {
           event.preventDefault();

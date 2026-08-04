@@ -30,6 +30,8 @@ public class DepartmentEmailRouting
     [Column(TypeName = "datetime2")]
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
+    public Department? Department { get; set; }
+
     public static void Configure(EntityTypeBuilder<DepartmentEmailRouting> entity)
     {
         entity.HasKey(e => e.Id);
@@ -43,7 +45,7 @@ public class DepartmentEmailRouting
             .IsUnique()
             .HasDatabaseName("UX_DepartmentEmailRouting_DepartmentCode_ToEmail");
 
-        entity.HasOne<Department>()
+        entity.HasOne(e => e.Department)
             .WithMany(e => e.DepartmentEmailRoutings)
             .HasForeignKey(e => e.DepartmentCode)
             .OnDelete(DeleteBehavior.Restrict);

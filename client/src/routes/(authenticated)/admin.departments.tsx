@@ -318,7 +318,7 @@ function AdminDepartmentsRoute() {
               </div>
             </div>
 
-            <div className="flex w-full max-w-md items-start gap-3">
+            <div className="flex w-full max-w-md items-stretch gap-3">
               <ClusterCaoEditor
                 currentCaoName={
                   users.find((user) => user.id === cluster.caoUserId)?.name ?? null
@@ -373,7 +373,7 @@ function AdminDepartmentsRoute() {
 
               <button
                 aria-label={`Open settings for ${cluster.name}`}
-                className="btn btn-outline mt-2 shrink-0 px-4"
+                className="btn btn-outline h-12 self-stretch shrink-0 px-4"
                 onClick={() => setEditingClusterSettingsId(cluster.id)}
                 type="button"
               >
@@ -617,15 +617,19 @@ function ClusterCaoEditor({
   const showResults = isSearchOpen && query.trim().length > 0;
 
   return (
-    <div className="w-full max-w-md rounded-xl border border-[var(--admin-border)] bg-white px-4 py-2.5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+    <div
+      className={`w-full max-w-md self-stretch rounded-xl border border-[var(--admin-border)] bg-white px-4 shadow-sm ${
+        isEditing ? 'py-2.5' : 'h-12 py-0'
+      }`}
+    >
+      <div className={`flex h-full items-center justify-between gap-3`}>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink)]">
             CAO: {currentCaoName ?? 'Add CAO'}
           </div>
         </div>
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost btn-sm h-8"
           onClick={onEdit}
           type="button"
         >

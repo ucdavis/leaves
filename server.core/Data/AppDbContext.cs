@@ -28,11 +28,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         AppUser.Configure(modelBuilder.Entity<AppUser>());
         AppAdminAssignment.Configure(modelBuilder.Entity<AppAdminAssignment>());
         Cluster.Configure(modelBuilder.Entity<Cluster>());
+        modelBuilder.Entity<Cluster>().HasQueryFilter(cluster => cluster.IsActive);
         ClusterCaoAssignment.Configure(modelBuilder.Entity<ClusterCaoAssignment>());
+        modelBuilder.Entity<ClusterCaoAssignment>().HasQueryFilter(assignment =>
+            assignment.Cluster != null && assignment.Cluster.IsActive);
         Department.Configure(modelBuilder.Entity<Department>());
+        modelBuilder.Entity<Department>().HasQueryFilter(department =>
+            department.IsActive && (department.Cluster == null || department.Cluster.IsActive));
         DepartmentChairAssignment.Configure(modelBuilder.Entity<DepartmentChairAssignment>());
+        modelBuilder.Entity<DepartmentChairAssignment>().HasQueryFilter(assignment =>
+            assignment.Department != null &&
+            assignment.Department.IsActive &&
+            (assignment.Department.Cluster == null || assignment.Department.Cluster.IsActive));
         DepartmentEmailRouting.Configure(modelBuilder.Entity<DepartmentEmailRouting>());
+        modelBuilder.Entity<DepartmentEmailRouting>().HasQueryFilter(routing =>
+            routing.Department != null &&
+            routing.Department.IsActive &&
+            (routing.Department.Cluster == null || routing.Department.Cluster.IsActive));
         EmployeeReportingDepartmentOverride.Configure(modelBuilder.Entity<EmployeeReportingDepartmentOverride>());
+        modelBuilder.Entity<EmployeeReportingDepartmentOverride>().HasQueryFilter(overrideRecord =>
+            overrideRecord.Department != null &&
+            overrideRecord.Department.IsActive &&
+            (overrideRecord.Department.Cluster == null || overrideRecord.Department.Cluster.IsActive));
         EmployeeAccrualBalance.Configure(modelBuilder.Entity<EmployeeAccrualBalance>());
         Person.Configure(modelBuilder.Entity<Person>());
         LeaveRequest.Configure(modelBuilder.Entity<LeaveRequest>());

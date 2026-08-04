@@ -211,10 +211,10 @@ public sealed class AdminController : ApiControllerBase
             return null;
         }
 
-        var departmentExists = await _db.Departments.AnyAsync(
-            department => department.DepartmentCode == departmentCode,
+        var department = await _db.Departments.FirstOrDefaultAsync(
+            item => item.DepartmentCode == departmentCode,
             cancellationToken);
-        if (!departmentExists)
+        if (department == null || !department.IsActive)
         {
             return ValidationProblem("Selected department does not exist.");
         }

@@ -53,7 +53,7 @@ type PendingRoleAction =
       kind: 'remove';
     };
 
-type AdminRolePersonOption = {
+export type AdminRolePersonOption = {
   departmentId: string | null;
   departmentName: string | null;
   departmentOptions: Array<{
@@ -537,7 +537,7 @@ function RoleWarningModal({
   );
 }
 
-function PersonSearchField({
+export function PersonSearchField({
   allUsers,
   isOpen,
   onChangeOpen,
@@ -558,17 +558,43 @@ function PersonSearchField({
 }) {
   const showResults = isOpen && query.trim().length > 0;
   const resultsId = useId();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const visibleUsers = users.slice(0, 8);
 
   return (
-    <div className="relative mt-2 space-y-2">
+    <div
+      className="relative mt-2 space-y-2"
+      onBlur={(event) => {
+        const nextFocusedElement = event.relatedTarget;
+
+        if (
+          !isNode(nextFocusedElement) ||
+          !event.currentTarget.contains(nextFocusedElement)
+        ) {
+          onChangeOpen(false);
+        }
+      }}
+    >
       <input
-        className="input input-bordered w-full"
         aria-autocomplete="list"
         aria-controls={resultsId}
         aria-expanded={showResults}
-        onBlur={() => onChangeOpen(false)}
-        onChange={(event) => onChangeQuery(event.target.value)}
-        onFocus={() => onChangeOpen(true)}
+        className="input input-bordered w-full"
+        onChange={(event) => {
+          onChangeQuery(event.target.value);
+          onChangeOpen(true);
+          setActiveIndex(0);
+        }}
+        onFocus={() => {
+          onChangeOpen(true);
+          setActiveIndex(0);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            onChangeOpen(false);
+          }
+        }}
         placeholder="Search name, email, IAM ID, or department"
         role="combobox"
         type="text"
@@ -581,19 +607,23 @@ function PersonSearchField({
           id={resultsId}
           role="listbox"
         >
-          {users.slice(0, 8).map((user) => {
+          {visibleUsers.map((user, index) => {
             const isSelected = user.iamId === selectedIamId;
+            const isActive = index === activeIndex;
 
             return (
               <button
+                aria-selected={isSelected}
                 className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-[var(--admin-sand)] ${
-                  isSelected ? 'bg-[var(--admin-sand)]' : ''
+                  isSelected || isActive ? 'bg-[var(--admin-sand)]' : ''
                 }`}
+                id={`person-search-option-${user.iamId}`}
                 key={user.iamId}
                 onClick={() => onSelectUser(user)}
+                onFocus={() => setActiveIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
-                aria-selected={isSelected}
                 role="option"
+                tabIndex={0}
                 type="button"
               >
                 <span>
@@ -614,7 +644,7 @@ function PersonSearchField({
             );
           })}
 
-          {users.length === 0 ? (
+          {visibleUsers.length === 0 ? (
             <div className="px-4 py-3 text-sm text-[var(--admin-ink-muted)]">
               No people match that search.
             </div>
@@ -624,4 +654,8 @@ function PersonSearchField({
 
     </div>
   );
+}
+
+function isNode(value: EventTarget | null): value is Node {
+  return value !== null && typeof value === 'object' && 'nodeType' in value;
 }

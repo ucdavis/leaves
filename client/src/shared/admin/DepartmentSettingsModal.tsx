@@ -249,8 +249,8 @@ export function DepartmentSettingsModal({
               ) : null}
 
               <routingEmailForm.AppForm>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
-                  <div className="flex-1">
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <div className="min-w-0">
                     <routingEmailForm.AppField name="address">
                       {(field) => (
                         <field.TextField
@@ -263,7 +263,7 @@ export function DepartmentSettingsModal({
                     </routingEmailForm.AppField>
                   </div>
                   <routingEmailForm.SubscribeButton
-                    className="btn btn-outline sm:mt-8"
+                    className="btn btn-outline sm:self-end"
                     label="Add email"
                     loadingLabel="Adding..."
                     onClick={() => {
@@ -298,7 +298,7 @@ export function DepartmentSettingsModal({
                 onClick={() => setIsDeleteConfirmOpen(true)}
                 type="button"
               >
-                Delete department
+                Deactivate department
               </button>
               <button className="btn btn-ghost" onClick={onClose} type="button">
                 Cancel
@@ -315,16 +315,16 @@ export function DepartmentSettingsModal({
 
       {isDeleteConfirmOpen ? (
         <WarningModal
-          confirmLabel="Delete department"
+          confirmLabel="Deactivate department"
           isSaving={isDeleting}
           onCancel={() => setIsDeleteConfirmOpen(false)}
           onConfirm={() => {
             void handleDelete();
           }}
-          title="Delete department?"
+          title="Deactivate department?"
         >
           <span>
-            Delete <strong>{department.name}</strong>?
+            Deactivate <strong>{department.name}</strong>? Users will no longer be able to submit requests to this department.
           </span>
         </WarningModal>
       ) : null}

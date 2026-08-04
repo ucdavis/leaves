@@ -217,8 +217,10 @@ public sealed class AdminRolesController : ApiControllerBase
             return validationResult.Error;
         }
 
-        var clusterExists = await _db.Clusters.AnyAsync(cluster => cluster.Id == request.ClusterId, cancellationToken);
-        if (!clusterExists)
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == request.ClusterId,
+            cancellationToken);
+        if (cluster == null || !cluster.IsActive)
         {
             return ValidationProblem("Selected cluster does not exist.");
         }
@@ -258,8 +260,10 @@ public sealed class AdminRolesController : ApiControllerBase
         }
 
         var departmentCode = request.DepartmentCode?.Trim().ToUpperInvariant();
-        var departmentExists = await _db.Departments.AnyAsync(department => department.DepartmentCode == departmentCode, cancellationToken);
-        if (string.IsNullOrWhiteSpace(departmentCode) || !departmentExists)
+        var department = await _db.Departments.FirstOrDefaultAsync(
+            item => item.DepartmentCode == departmentCode,
+            cancellationToken);
+        if (string.IsNullOrWhiteSpace(departmentCode) || department == null || !department.IsActive)
         {
             return ValidationProblem("Selected department does not exist.");
         }

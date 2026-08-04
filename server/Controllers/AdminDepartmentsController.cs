@@ -122,7 +122,6 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     {
         var cluster = await _db.Clusters
             .Include(item => item.Departments)
-            .Include(item => item.ClusterCaoAssignments)
             .FirstOrDefaultAsync(item => item.Id == clusterId, cancellationToken);
 
         if (cluster == null)
@@ -130,25 +129,21 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return NotFound();
         }
 
-        var now = DateTime.UtcNow;
         var caoUpdateResult = await UpdateClusterCaoAssignmentAsync(cluster.Id, null, cancellationToken);
         if (caoUpdateResult != null)
         {
             return caoUpdateResult;
         }
 
-        foreach (var department in cluster.Departments)
+        var now = DateTime.UtcNow;
+        foreach (var department in cluster.Departments.ToList())
         {
             department.ClusterId = null;
             department.UpdatedUtc = now;
         }
 
-        if (cluster.ClusterCaoAssignments.Count > 0)
-        {
-            _db.ClusterCaoAssignments.RemoveRange(cluster.ClusterCaoAssignments);
-        }
-
-        _db.Clusters.Remove(cluster);
+        cluster.IsActive = false;
+        cluster.UpdatedUtc = now;
 
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
@@ -186,10 +181,10 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (request.ClusterId.HasValue)
         {
-            var clusterExists = await _db.Clusters.AnyAsync(
-                cluster => cluster.Id == request.ClusterId.Value,
+            var cluster = await _db.Clusters.FirstOrDefaultAsync(
+                item => item.Id == request.ClusterId.Value,
                 cancellationToken);
-            if (!clusterExists)
+            if (cluster == null || !cluster.IsActive)
             {
                 return ValidationProblem("Selected cluster does not exist.");
             }
@@ -240,6 +235,17 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (request.ClusterIdSet)
         {
+            if (request.ClusterId.HasValue)
+            {
+                var cluster = await _db.Clusters.FirstOrDefaultAsync(
+                    item => item.Id == request.ClusterId.Value,
+                    cancellationToken);
+                if (cluster == null || !cluster.IsActive)
+                {
+                    return ValidationProblem("Selected cluster does not exist.");
+                }
+            }
+
             department.ClusterId = request.ClusterId;
         }
 
@@ -271,9 +277,6 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     public async Task<IActionResult> DeleteDepartment(string departmentCode, CancellationToken cancellationToken)
     {
         var department = await _db.Departments
-            .Include(item => item.DepartmentChairAssignments)
-            .Include(item => item.DepartmentEmailRoutings)
-            .Include(item => item.EmployeeReportingDepartmentOverrides)
             .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
 
         if (department == null)
@@ -290,23 +293,8 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return chairUpdateResult;
         }
 
-        if (department.DepartmentChairAssignments.Count > 0)
-        {
-            _db.DepartmentChairAssignments.RemoveRange(department.DepartmentChairAssignments);
-        }
-
-        if (department.DepartmentEmailRoutings.Count > 0)
-        {
-            _db.DepartmentEmailRoutings.RemoveRange(department.DepartmentEmailRoutings);
-        }
-
-        if (department.EmployeeReportingDepartmentOverrides.Count > 0)
-        {
-            _db.EmployeeReportingDepartmentOverrides.RemoveRange(
-                department.EmployeeReportingDepartmentOverrides);
-        }
-
-        _db.Departments.Remove(department);
+        department.IsActive = false;
+        department.UpdatedUtc = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();

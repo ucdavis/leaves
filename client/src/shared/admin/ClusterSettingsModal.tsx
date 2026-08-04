@@ -118,7 +118,7 @@ export function ClusterSettingsModal({
                 onClick={() => setIsDeleteConfirmOpen(true)}
                 type="button"
               >
-                Delete cluster
+                Deactivate cluster
               </button>
               <button className="btn btn-ghost" onClick={onClose} type="button">
                 Cancel
@@ -135,15 +135,19 @@ export function ClusterSettingsModal({
 
       {isDeleteConfirmOpen ? (
         <WarningModal
-          confirmLabel="Delete cluster"
+          confirmLabel="Deactivate cluster"
           isSaving={isDeleting}
           onCancel={() => setIsDeleteConfirmOpen(false)}
           onConfirm={() => {
             void handleDelete();
           }}
-          title="Delete cluster?"
+          title="Deactivate cluster?"
         >
-          <span>Any departments in the <strong>{cluster.name}</strong> cluster will be unassigned.</span>
+          <span>
+            This will unassign all departments from the{' '}
+            <strong>{cluster.name}</strong> cluster and hide the cluster from
+            active lists.
+          </span>
         </WarningModal>
       ) : null}
     </>
