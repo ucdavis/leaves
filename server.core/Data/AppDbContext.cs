@@ -9,6 +9,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AppAdminAssignment> AppAdminAssignments => Set<AppAdminAssignment>();
     public DbSet<Cluster> Clusters => Set<Cluster>();
     public DbSet<ClusterCaoAssignment> ClusterCaoAssignments => Set<ClusterCaoAssignment>();
+    public IQueryable<CurrentAccrualBalance> CurrentAccrualBalances => Set<CurrentAccrualBalance>();
+    public IQueryable<CurrentEmployee> CurrentEmployees => Set<CurrentEmployee>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<DepartmentChairAssignment> DepartmentChairAssignments => Set<DepartmentChairAssignment>();
     public DbSet<DepartmentEmailRouting> DepartmentEmailRoutings => Set<DepartmentEmailRouting>();
@@ -32,6 +34,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ClusterCaoAssignment.Configure(modelBuilder.Entity<ClusterCaoAssignment>());
         modelBuilder.Entity<ClusterCaoAssignment>().HasQueryFilter(assignment =>
             assignment.Cluster != null && assignment.Cluster.IsActive);
+        CurrentAccrualBalance.Configure(modelBuilder.Entity<CurrentAccrualBalance>());
+        CurrentEmployee.Configure(modelBuilder.Entity<CurrentEmployee>());
         Department.Configure(modelBuilder.Entity<Department>());
         modelBuilder.Entity<Department>().HasQueryFilter(department =>
             department.IsActive && (department.Cluster == null || department.Cluster.IsActive));

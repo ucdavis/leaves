@@ -1,5 +1,7 @@
 # Web App Template
 
+**LEAVES** stands for **Log Entries for Absence and Vacation Events System**.
+
 A full-stack web application template featuring a .NET 10 backend with React/Vite frontend, using OIDC authentication with Microsoft Entra ID.
 
 ## Architecture

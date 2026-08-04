@@ -87,6 +87,62 @@ body {
   margin: 0 auto;
 }
 
+.gold-leaf-float {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.gold-leaf-float-one {
+  animation: gold-leaf-float-one 5.5s ease-in-out infinite;
+}
+
+.gold-leaf-float-two {
+  animation: gold-leaf-float-two 6.5s ease-in-out -2s infinite;
+}
+
+@keyframes gold-leaf-float-one {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+
+  45% {
+    translate: 2px -3px;
+    rotate: 2deg;
+  }
+
+  72% {
+    translate: -1px -1px;
+    rotate: -1deg;
+  }
+}
+
+@keyframes gold-leaf-float-two {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+
+  38% {
+    translate: -2px -2px;
+    rotate: -2deg;
+  }
+
+  68% {
+    translate: 1px -3px;
+    rotate: 1deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-leaf-float {
+    animation: none;
+  }
+}
+
 @media (max-width: 640px) {
   .container {
     max-width: 100%;
