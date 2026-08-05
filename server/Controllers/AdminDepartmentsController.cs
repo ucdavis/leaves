@@ -16,19 +16,27 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private const int ClusterNameMaxLength = 100;
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
-    private readonly AdminDepartmentsService _adminDepartmentsService;
+    private readonly AdminDirectoryDataService _adminDirectoryDataService;
+    private readonly AdminDirectoryService _adminDirectoryService;
     private readonly AppDbContext _db;
+    private readonly IUserService _userService;
 
-    public AdminDepartmentsController(AppDbContext db, AdminDepartmentsService adminDepartmentsService)
+    public AdminDepartmentsController(
+        AppDbContext db,
+        AdminDirectoryDataService adminDirectoryDataService,
+        AdminDirectoryService adminDirectoryService,
+        IUserService userService)
     {
         _db = db;
-        _adminDepartmentsService = adminDepartmentsService;
+        _adminDirectoryDataService = adminDirectoryDataService;
+        _adminDirectoryService = adminDirectoryService;
+        _userService = userService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        return Ok(await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken));
+        return Ok(await _adminDirectoryService.GetDepartmentsAsync(cancellationToken));
     }
 
     [HttpPost("clusters")]
@@ -383,6 +391,22 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
+        var appUserId = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => user.EntraObjectId == entraObjectId)
+            .Select(user => (int?)user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (appUserId != null)
+        {
+            return appUserId;
+        }
+
+        await _userService.EnsureUserProfileAsync(
+            User,
+            recordSignIn: false,
+            cancellationToken: cancellationToken);
+
         return await _db.AppUsers
             .AsNoTracking()
             .Where(user => user.EntraObjectId == entraObjectId)
@@ -423,9 +447,9 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
-        var departmentData = await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken);
-        var userExists = departmentData.Users.Any(user =>
-            string.Equals(user.Id, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase));
+        var userExists = await _adminDirectoryDataService.DirectoryUserExistsAsync(
+            normalizedCaoUserId,
+            cancellationToken);
         if (!userExists)
         {
             return ValidationProblem("Selected CAO must be a valid directory user.");
@@ -498,10 +522,10 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
-        var departmentData = await _adminDepartmentsService.GetDepartmentsAsync(cancellationToken);
-        var userBelongsToDepartment = departmentData.Users.Any(user =>
-            string.Equals(user.Id, normalizedChairUserId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(user.DepartmentId, departmentCode, StringComparison.OrdinalIgnoreCase));
+        var userBelongsToDepartment = await _adminDirectoryDataService.UserBelongsToDepartmentAsync(
+            normalizedChairUserId,
+            departmentCode,
+            cancellationToken);
         if (!userBelongsToDepartment)
         {
             return ValidationProblem("Selected chair must currently belong to this department.");

@@ -15,6 +15,23 @@ type StatusSnapshot = {
   };
 };
 
+const dataSourceCopy: Record<
+  string,
+  {
+    detail: string;
+    label: string;
+  }
+> = {
+  'db-accruals': {
+    detail: 'Bi-weekly report.',
+    label: 'Employee accruals',
+  },
+  'db-people': {
+    detail: 'Monthly report.',
+    label: 'People',
+  },
+};
+
 export function AdminStatusContent({
   clusterCount,
   clustersMissingCaos,
@@ -54,9 +71,9 @@ export function AdminStatusContent({
           <div className="space-y-1">
             {dataSources.map((source) => (
               <FreshnessRow
-                detail={source.detail}
                 key={source.id}
-                label={source.label}
+                detail={dataSourceCopy[source.id]?.detail ?? ''}
+                label={dataSourceCopy[source.id]?.label ?? source.id}
                 status={source.status}
                 updatedAt={source.updatedAt}
               />
@@ -113,7 +130,7 @@ function FreshnessRow({
 }: {
   detail: string;
   label: string;
-  status: 'ready' | 'planned' | 'deferred';
+  status: AdminDataSource['status'];
   updatedAt: string | null;
 }) {
   const updatedLabel = updatedAt

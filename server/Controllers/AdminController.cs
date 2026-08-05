@@ -13,17 +13,20 @@ namespace Server.Controllers;
 public sealed class AdminController : ApiControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly AdminFacultyService _adminFacultyService;
+    private readonly AdminDirectoryService _adminDirectoryService;
     private readonly AdminStatusService _adminStatusService;
+    private readonly IUserService _userService;
 
     public AdminController(
         AppDbContext db,
-        AdminFacultyService adminFacultyService,
-        AdminStatusService adminStatusService)
+        AdminDirectoryService adminDirectoryService,
+        AdminStatusService adminStatusService,
+        IUserService userService)
     {
         _db = db;
-        _adminFacultyService = adminFacultyService;
+        _adminDirectoryService = adminDirectoryService;
         _adminStatusService = adminStatusService;
+        _userService = userService;
     }
 
     [HttpGet("status")]
@@ -35,7 +38,7 @@ public sealed class AdminController : ApiControllerBase
     [HttpGet("faculty")]
     public async Task<IActionResult> GetFaculty(CancellationToken cancellationToken)
     {
-        return Ok(await _adminFacultyService.GetFacultyAsync(cancellationToken));
+        return Ok(await _adminDirectoryService.GetFacultyAsync(cancellationToken));
     }
 
     [HttpPost("users")]
@@ -47,30 +50,19 @@ public sealed class AdminController : ApiControllerBase
             return ValidationProblem("IAM ID is required.");
         }
 
-        var user = new AppUser
+        var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == iamId, cancellationToken);
+        if (user == null)
         {
-            DisplayName = NullIfWhiteSpace(request.Name),
-            Email = NullIfWhiteSpace(request.Email),
-            EmployeeId = NullIfWhiteSpace(request.EmployeeId),
-            EntraObjectId = Guid.NewGuid(),
-            FirstLoginUtc = DateTime.UtcNow,
-            IamId = iamId,
-            IsActive = request.Active,
-            LastLoginUtc = null,
-            UpdatedUtc = DateTime.UtcNow,
-        };
-
-        _db.AppUsers.Add(user);
-
-        try
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
-        {
-            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
+            return NoContent();
         }
 
+        user.DisplayName = NullIfWhiteSpace(request.Name);
+        user.Email = NullIfWhiteSpace(request.Email);
+        user.EmployeeId = NullIfWhiteSpace(request.EmployeeId);
+        user.IsActive = request.Active;
+        user.UpdatedUtc = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -136,40 +128,49 @@ public sealed class AdminController : ApiControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
         var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
-        if (user == null)
-        {
-            user = new AppUser
-            {
-                DisplayName = NullIfWhiteSpace(request.Name) ?? NullIfWhiteSpace(person?.FullName),
-                Email = NullIfWhiteSpace(request.Email) ?? NullIfWhiteSpace(person?.Email),
-                EmployeeId = NullIfWhiteSpace(person?.EmployeeId),
-                EntraObjectId = Guid.NewGuid(),
-                FirstLoginUtc = DateTime.UtcNow,
-                IamId = normalizedIamId,
-                IsActive = request.Active ?? true,
-                LastLoginUtc = null,
-                UpdatedUtc = DateTime.UtcNow,
-            };
+        var shouldSave = false;
 
-            _db.AppUsers.Add(user);
+        if (user != null && request.NameSet)
+        {
+            user.DisplayName = NullIfWhiteSpace(request.Name) ?? NullIfWhiteSpace(person?.FullName);
+            shouldSave = true;
         }
 
-        if (request.NameSet)
+        if (user != null && request.EmailSet)
         {
-            user.DisplayName = NullIfWhiteSpace(request.Name);
+            user.Email = NullIfWhiteSpace(request.Email) ?? NullIfWhiteSpace(person?.Email);
+            shouldSave = true;
         }
 
-        if (request.EmailSet)
-        {
-            user.Email = NullIfWhiteSpace(request.Email);
-        }
-
-        if (request.Active.HasValue)
+        if (user != null && request.Active.HasValue)
         {
             user.IsActive = request.Active.Value;
+            shouldSave = true;
         }
 
-        user.UpdatedUtc = DateTime.UtcNow;
+        if (user != null && !request.NameSet && user.DisplayName == null)
+        {
+            user.DisplayName = NullIfWhiteSpace(person?.FullName);
+            shouldSave = true;
+        }
+
+        if (user != null && !request.EmailSet && user.Email == null)
+        {
+            user.Email = NullIfWhiteSpace(person?.Email);
+            shouldSave = true;
+        }
+
+        if (user != null && user.EmployeeId == null)
+        {
+            user.EmployeeId = NullIfWhiteSpace(person?.EmployeeId);
+            shouldSave = true;
+        }
+
+        if (user != null)
+        {
+            user.UpdatedUtc = DateTime.UtcNow;
+            shouldSave = true;
+        }
 
         if (request.DepartmentOverrideSet)
         {
@@ -180,15 +181,13 @@ public sealed class AdminController : ApiControllerBase
             {
                 return overrideResult;
             }
+
+            shouldSave = true;
         }
 
-        try
+        if (shouldSave)
         {
             await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
-        {
-            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
         }
 
         return NoContent();
@@ -264,14 +263,18 @@ public sealed class AdminController : ApiControllerBase
         string iamId,
         CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var currentOverride = await _db.EmployeeReportingDepartmentOverrides
-            .Where(item => item.IamId == iamId &&
-                           item.EffectiveStartDate <= today &&
-                           (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
-            .OrderByDescending(item => item.EffectiveStartDate)
-            .ThenByDescending(item => item.Id)
+        var currentOverrideId = await _db.CurrentEmployees
+            .Where(employee => employee.IamId == iamId)
+            .Select(employee => employee.ReportingDepartmentOverrideId)
             .FirstOrDefaultAsync(cancellationToken);
+        if (!currentOverrideId.HasValue)
+        {
+            return null;
+        }
+
+        var currentOverride = await _db.EmployeeReportingDepartmentOverrides
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == currentOverrideId.Value, cancellationToken);
 
         if (currentOverride == null)
         {
@@ -286,7 +289,7 @@ public sealed class AdminController : ApiControllerBase
 
         currentOverride.ClosedByAppUserId = closedByAppUserId.Value;
         currentOverride.ClosedUtc = DateTime.UtcNow;
-        currentOverride.EffectiveEndDateExclusive = today;
+        currentOverride.EffectiveEndDateExclusive = DateOnly.FromDateTime(DateTime.UtcNow);
         return null;
     }
 
@@ -296,6 +299,22 @@ public sealed class AdminController : ApiControllerBase
         {
             return null;
         }
+
+        var appUserId = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => user.EntraObjectId == entraObjectId)
+            .Select(user => (int?)user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (appUserId != null)
+        {
+            return appUserId;
+        }
+
+        await _userService.EnsureUserProfileAsync(
+            User,
+            recordSignIn: false,
+            cancellationToken: cancellationToken);
 
         return await _db.AppUsers
             .AsNoTracking()

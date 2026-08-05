@@ -2,26 +2,23 @@ namespace Server.Services;
 
 public sealed class AdminStatusService
 {
-    private readonly AdminDirectoryService _directoryService;
+    private readonly AdminDirectoryDataService _directoryDataService;
+    private readonly AdminStatusDataService _statusDataService;
 
-    public AdminStatusService(AdminDirectoryService directoryService)
+    public AdminStatusService(
+        AdminDirectoryDataService directoryDataService,
+        AdminStatusDataService statusDataService)
     {
-        _directoryService = directoryService;
+        _directoryDataService = directoryDataService;
+        _statusDataService = statusDataService;
     }
 
     public async Task<AdminStatusPageResponse> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var directoryData = await _directoryService.LoadDirectoryDataAsync(cancellationToken);
-        var statusData = await _directoryService.LoadStatusDataAsync(cancellationToken);
+        var directoryData = await _directoryDataService.LoadStatusDirectoryDataAsync(cancellationToken);
+        var statusData = await _statusDataService.LoadStatusDataAsync(cancellationToken);
 
-        var latestPeoplePromotionAt = directoryData.People
-            .Select(person => person.PromotedAt)
-            .OfType<DateTime>()
-            .DefaultIfEmpty()
-            .Max();
-
-        var pendingRequests = statusData.LeaveRequests.Count(request => request.Status == Server.Core.Domain.LeaveRequestStatus.PendingApproval);
-        var vacationRows = directoryData.LatestAccrualByEmployeeId.Values
+        var vacationRows = statusData.CurrentAccrualBalances
             .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -29,16 +26,12 @@ public sealed class AdminStatusService
         {
             new AdminDataSourceResponse(
                 "db-people",
-                "People",
-                "Monthly report.",
-                GetPeoplePromotionStatus(latestPeoplePromotionAt),
-                latestPeoplePromotionAt == default ? null : latestPeoplePromotionAt.ToString("O")),
+                GetPeoplePromotionStatus(statusData.LatestPeoplePromotionAt),
+                statusData.LatestPeoplePromotionAt?.ToString("O")),
             new AdminDataSourceResponse(
                 "db-accruals",
-                "Employee accruals",
-                "Bi-weekly report.",
-                directoryData.LatestAccrualByEmployeeId.Count > 0 ? "ready" : "planned",
-                GetLatestTimestamp(directoryData.LatestAccrualByEmployeeId.Values.Select(row => row.LastUpdated))),
+                statusData.CurrentAccrualBalances.Count > 0 ? "ready" : "planned",
+                statusData.LatestAccrualUpdatedAt?.ToString("O")),
         };
 
         return new AdminStatusPageResponse(
@@ -52,8 +45,8 @@ public sealed class AdminStatusService
             StatusSnapshot: new AdminStatusSnapshotResponse(
                 Issues: new AdminIssuesResponse(
                     ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
-                    FacultyAtVacationCap: vacationRows.Count(row => row.HoursOverUnderPolicyMax >= 0),
-                    PendingRequests: pendingRequests)));
+                    FacultyAtVacationCap: vacationRows.Count(row => row.CalculatedBal >= row.AccrualLimit),
+                    PendingRequests: statusData.PendingRequestCount)));
     }
 
     private static bool IsAffirmative(string? value)
@@ -63,27 +56,16 @@ public sealed class AdminStatusService
                string.Equals(value?.Trim(), "True", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetPeoplePromotionStatus(DateTime latestPeoplePromotionAt)
+    private static string GetPeoplePromotionStatus(DateTime? latestPeoplePromotionAt)
     {
-        if (latestPeoplePromotionAt == default)
+        if (!latestPeoplePromotionAt.HasValue)
         {
             return "planned";
         }
 
-        return latestPeoplePromotionAt < DateTime.UtcNow.AddDays(-30)
+        return latestPeoplePromotionAt.Value < DateTime.UtcNow.AddDays(-30)
             ? "deferred"
             : "ready";
-    }
-
-    private static string? GetLatestTimestamp(IEnumerable<DateTime> timestamps)
-    {
-        var latest = timestamps.DefaultIfEmpty().Max();
-        if (latest == default)
-        {
-            return null;
-        }
-
-        return latest.ToString("O");
     }
 }
 
@@ -95,7 +77,7 @@ public sealed record AdminStatusPageResponse(
     int DepartmentsMissingChairs,
     AdminStatusSnapshotResponse StatusSnapshot);
 
-public sealed record AdminDataSourceResponse(string Id, string Label, string Detail, string Status, string? UpdatedAt);
+public sealed record AdminDataSourceResponse(string Id, string Status, string? UpdatedAt);
 
 public sealed record AdminStatusSnapshotResponse(
     AdminIssuesResponse Issues);

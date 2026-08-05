@@ -26,14 +26,15 @@ public class UserController : ApiControllerBase
             GetClaimValue("preferred_username")
             ?? GetClaimValue(ClaimTypes.Email)
             ?? userName;
-        var entraObjectId = GetClaimValue("oid");
+        var entraObjectId = userId;
 
         var userRoles = User.FindAll(ClaimTypes.Role)
             .Select(c => c.Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return Ok(new UserResponse(userId, entraObjectId, userName, userEmail, userRoles));
+        var response = new UserResponse(userId, entraObjectId, userName, userEmail, userRoles);
+        return Ok(response);
     }
 
     private string? GetClaimValue(string claimType) => User.FindFirstValue(claimType);
