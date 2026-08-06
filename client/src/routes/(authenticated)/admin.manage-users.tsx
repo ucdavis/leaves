@@ -21,8 +21,7 @@ import { WarningModal } from '@/shared/WarningModal.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
   component: AdminUsersRoute,
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(adminRolesQueryOptions()),
+  loader: ({ context }) => context.queryClient.ensureQueryData(adminRolesQueryOptions()),
   pendingComponent: () => (
     <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
@@ -80,25 +79,25 @@ function AdminUsersRoute() {
     null
   );
 
-  const invalidateRoles = async () => {
+  const refreshRoles = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
   };
 
   const addAdminMutation = useMutation({
     mutationFn: addAdminAssignment,
-    onSuccess: invalidateRoles,
+    onSuccess: refreshRoles,
   });
   const addCaoMutation = useMutation({
     mutationFn: addCaoAssignment,
-    onSuccess: invalidateRoles,
+    onSuccess: refreshRoles,
   });
   const addChairMutation = useMutation({
     mutationFn: addChairAssignment,
-    onSuccess: invalidateRoles,
+    onSuccess: refreshRoles,
   });
   const removeMutation = useMutation({
     mutationFn: removeRoleAssignment,
-    onSuccess: invalidateRoles,
+    onSuccess: refreshRoles,
   });
 
   const isSaving =

@@ -14,18 +14,15 @@ namespace Server.Controllers;
 public sealed class AdminRolesController : ApiControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly AdminDirectoryDataService _directoryDataService;
     private readonly AdminRolesService _adminRolesService;
     private readonly IUserService _userService;
 
     public AdminRolesController(
         AppDbContext db,
-        AdminDirectoryDataService directoryDataService,
         AdminRolesService adminRolesService,
         IUserService userService)
     {
         _db = db;
-        _directoryDataService = directoryDataService;
         _adminRolesService = adminRolesService;
         _userService = userService;
     }
@@ -33,7 +30,6 @@ public sealed class AdminRolesController : ApiControllerBase
     [HttpGet]
     public async Task<IActionResult> GetRolesAsync(CancellationToken cancellationToken)
     {
-        await CloseInactiveRoleAssignmentsAsync(cancellationToken);
         return Ok(await _adminRolesService.GetRolesAsync(cancellationToken));
     }
 
@@ -333,63 +329,6 @@ public sealed class AdminRolesController : ApiControllerBase
             .Where(user => user.EntraObjectId == entraObjectId)
             .Select(user => (int?)user.Id)
             .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    private async Task CloseInactiveRoleAssignmentsAsync(CancellationToken cancellationToken)
-    {
-        var roleOptionsData = await _directoryDataService.LoadRoleOptionsDataAsync(cancellationToken);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var activeCaoAssignments = await _db.ClusterCaoAssignments
-            .Where(assignment => assignment.ClosedUtc == null &&
-                                 assignment.EffectiveStartDate <= today &&
-                                 (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today))
-            .ToListAsync(cancellationToken);
-        var activeChairAssignments = await _db.DepartmentChairAssignments
-            .Where(assignment => assignment.ClosedUtc == null &&
-                                 assignment.EffectiveStartDate <= today &&
-                                 (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today))
-            .ToListAsync(cancellationToken);
-        var activeAdminAssignments = await _db.AppAdminAssignments
-            .ToListAsync(cancellationToken);
-
-        var closedByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
-        var now = DateTime.UtcNow;
-        var changes = AdminRolesService.GetInactiveRoleAssignmentChanges(
-            activeAdminAssignments,
-            activeCaoAssignments,
-            activeChairAssignments,
-            roleOptionsData.CurrentEmployees,
-            roleOptionsData.Clusters,
-            roleOptionsData.Departments);
-
-        if (changes.AdminAssignmentsToDelete.Count == 0 &&
-            changes.CaoAssignmentsToClose.Count == 0 &&
-            changes.ChairAssignmentsToClose.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var assignment in changes.AdminAssignmentsToDelete)
-        {
-            _db.AppAdminAssignments.Remove(assignment);
-        }
-
-        foreach (var assignment in changes.CaoAssignmentsToClose)
-        {
-            AdminRolesService.CloseClusterCaoAssignment(assignment, closedByAppUserId, now, today);
-        }
-
-        foreach (var assignment in changes.ChairAssignmentsToClose)
-        {
-            AdminRolesService.CloseDepartmentChairAssignment(assignment, closedByAppUserId, now, today);
-        }
-
-        if (changes.AdminAssignmentsToDelete.Count > 0 ||
-            changes.CaoAssignmentsToClose.Count > 0 ||
-            changes.ChairAssignmentsToClose.Count > 0)
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
     }
 
     private static bool IsDuplicateKey(DbUpdateException exception)

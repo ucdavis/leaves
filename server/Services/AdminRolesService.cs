@@ -153,7 +153,8 @@ public sealed class AdminRolesService
             }))
             .Concat(roleAssignmentsData.ChairAssignments.Select(assignment =>
             {
-                departmentsByCode.TryGetValue(assignment.DepartmentCode, out var department);
+                var chairDepartmentCode = assignment.DepartmentCode.Trim();
+                departmentsByCode.TryGetValue(chairDepartmentCode, out var department);
                 return CreateAssignmentResponse(
                     active: IsRoleAssignmentActive(
                         currentEmployeesByIamId,
@@ -168,8 +169,8 @@ public sealed class AdminRolesService
                     effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
                     iamId: assignment.IamId,
-                    targetId: assignment.DepartmentCode,
-                    targetName: department?.DepartmentName ?? assignment.DepartmentCode,
+                    targetId: chairDepartmentCode,
+                    targetName: department?.DepartmentName ?? chairDepartmentCode,
                     type: "chair",
                     currentEmployeesByIamId: currentEmployeesByIamId);
             }))
