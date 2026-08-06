@@ -170,16 +170,14 @@ public sealed class AdminDirectoryService
                     Active: appUser?.IsActive ?? true,
                     DepartmentId: NullIfWhiteSpace(employee.ResolvedReportingDepartmentCode),
                     DepartmentOverrideEndDate: currentOverride?.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
-                    DepartmentOverrideId: employee.HasReportingDepartmentOverride
-                        ? NullIfWhiteSpace(employee.ResolvedReportingDepartmentCode)
-                        : null,
+                    DepartmentOverrideId: NullIfWhiteSpace(currentOverride?.DepartmentCode),
                     DepartmentOverrideStartDate: currentOverride?.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     Designation: GetDesignation(role, directoryData.NonFacultyIamIds.Contains(lookupIamId)),
-                    Email: NullIfWhiteSpace(appUser?.Email) ?? NullIfWhiteSpace(employee.Email) ?? string.Empty,
-                    EmployeeId: NullIfWhiteSpace(appUser?.EmployeeId) ?? NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
+                    Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                    EmployeeId: NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
                     HasAppUser: appUser != null,
                     IamId: iamId,
-                    Name: NullIfWhiteSpace(appUser?.DisplayName) ?? NullIfWhiteSpace(employee.DisplayName) ?? iamId,
+                    Name: NullIfWhiteSpace(employee.DisplayName) ?? NullIfWhiteSpace(appUser?.DisplayName) ?? iamId,
                     Position: NullIfWhiteSpace(employee.JobCodeDescription) ?? string.Empty,
                     Role: role);
             })

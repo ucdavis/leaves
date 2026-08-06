@@ -53,11 +53,6 @@ public sealed class AdminDirectoryDataService
     public async Task<AdminRoleOptionsData> LoadRoleOptionsDataAsync(CancellationToken cancellationToken)
     {
         return new AdminRoleOptionsData(
-            AppUsers: await _db.AppUsers
-                .AsNoTracking()
-                .OrderBy(user => user.DisplayName)
-                .ThenBy(user => user.IamId)
-                .ToListAsync(cancellationToken),
             Clusters: await _db.Clusters
                 .AsNoTracking()
                 .OrderBy(cluster => cluster.ClusterName)
@@ -237,7 +232,6 @@ public sealed record AdminStatusDirectoryData(
     IReadOnlyList<Department> Departments);
 
 public sealed record AdminRoleOptionsData(
-    IReadOnlyList<AppUser> AppUsers,
     IReadOnlyList<Cluster> Clusters,
     IReadOnlyList<CurrentEmployee> CurrentEmployees,
     IReadOnlyList<Department> Departments);

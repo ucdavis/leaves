@@ -84,7 +84,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             item => item.Id == clusterId,
             cancellationToken);
 
-        if (cluster == null)
+        if (cluster == null || !cluster.IsActive)
         {
             return NotFound();
         }
@@ -287,7 +287,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         var department = await _db.Departments
             .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
 
-        if (department == null)
+        if (department == null || !department.IsActive)
         {
             return NotFound();
         }
@@ -315,7 +315,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             item => item.DepartmentCode == departmentCode,
             cancellationToken);
 
-        if (department == null)
+        if (department == null || !department.IsActive)
         {
             return NotFound();
         }
@@ -441,7 +441,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         {
             if (currentAssignment != null)
             {
-                CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
+                AdminRolesService.CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
             }
 
             return null;
@@ -474,7 +474,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (currentAssignment != null)
         {
-            CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
+            AdminRolesService.CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
         }
 
         _db.ClusterCaoAssignments.Add(new ClusterCaoAssignment
@@ -516,7 +516,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         {
             if (currentAssignment != null)
             {
-                CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
+                AdminRolesService.CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
             }
 
             return null;
@@ -550,7 +550,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (currentAssignment != null)
         {
-            CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
+            AdminRolesService.CloseDepartmentChairAssignment(currentAssignment, adminUserId.Value, now, today);
         }
 
         _db.DepartmentChairAssignments.Add(new DepartmentChairAssignment
@@ -563,34 +563,6 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         });
 
         return null;
-    }
-
-    private static void CloseClusterCaoAssignment(
-        ClusterCaoAssignment assignment,
-        int closedByAppUserId,
-        DateTime closedUtc,
-        DateOnly today)
-    {
-        assignment.ClosedByAppUserId = closedByAppUserId;
-        assignment.ClosedUtc = closedUtc;
-        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
-        {
-            assignment.EffectiveEndDateExclusive = today;
-        }
-    }
-
-    private static void CloseDepartmentChairAssignment(
-        DepartmentChairAssignment assignment,
-        int closedByAppUserId,
-        DateTime closedUtc,
-        DateOnly today)
-    {
-        assignment.ClosedByAppUserId = closedByAppUserId;
-        assignment.ClosedUtc = closedUtc;
-        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
-        {
-            assignment.EffectiveEndDateExclusive = today;
-        }
     }
 
     private Task<bool> HasActiveClusterCaoAssignmentAsync(

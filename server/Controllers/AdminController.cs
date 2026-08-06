@@ -42,7 +42,7 @@ public sealed class AdminController : ApiControllerBase
     }
 
     [HttpPost("users")]
-    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
         var iamId = request.IamId.Trim();
         if (string.IsNullOrWhiteSpace(iamId))
@@ -53,12 +53,24 @@ public sealed class AdminController : ApiControllerBase
         var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == iamId, cancellationToken);
         if (user == null)
         {
-            return NoContent();
+            return NotFound();
         }
 
-        user.DisplayName = NullIfWhiteSpace(request.Name);
-        user.Email = NullIfWhiteSpace(request.Email);
-        user.EmployeeId = NullIfWhiteSpace(request.EmployeeId);
+        if (request.Name != null)
+        {
+            user.DisplayName = NullIfWhiteSpace(request.Name);
+        }
+
+        if (request.Email != null)
+        {
+            user.Email = NullIfWhiteSpace(request.Email);
+        }
+
+        if (request.EmployeeId != null)
+        {
+            user.EmployeeId = NullIfWhiteSpace(request.EmployeeId);
+        }
+
         user.IsActive = request.Active;
         user.UpdatedUtc = DateTime.UtcNow;
 
@@ -128,6 +140,11 @@ public sealed class AdminController : ApiControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
         var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
+        if (user == null && !request.DepartmentOverrideSet)
+        {
+            return NotFound();
+        }
+
         var shouldSave = false;
 
         if (user != null && request.NameSet)

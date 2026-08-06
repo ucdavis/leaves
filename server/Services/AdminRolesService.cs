@@ -20,13 +20,98 @@ public sealed class AdminRolesService
         return BuildRolesResponse(roleOptionsData, roleAssignmentsData, today);
     }
 
+    internal static InactiveRoleAssignmentChanges GetInactiveRoleAssignmentChanges(
+        IReadOnlyList<AppAdminAssignment> adminAssignments,
+        IReadOnlyList<ClusterCaoAssignment> caoAssignments,
+        IReadOnlyList<DepartmentChairAssignment> chairAssignments,
+        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<Cluster> clusters,
+        IReadOnlyList<Department> departments)
+    {
+        var currentEmployeesByIamId = currentEmployees
+            .Where(employee => !string.IsNullOrWhiteSpace(employee.IamId))
+            .GroupBy(employee => employee.IamId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var activeClusterIds = clusters
+            .Where(cluster => cluster.IsActive)
+            .Select(cluster => cluster.Id)
+            .ToHashSet();
+        var activeDepartmentCodes = departments
+            .Where(department => department.IsActive)
+            .Select(department => department.DepartmentCode.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var inactiveAdminAssignments = adminAssignments
+            .Where(assignment =>
+            {
+                var trimmedIamId = assignment.IamId.Trim();
+                return !currentEmployeesByIamId.TryGetValue(trimmedIamId, out var currentEmployee) ||
+                    !currentEmployee.HasCurrentAccrualRecord;
+            })
+            .ToList();
+
+        var inactiveCaoAssignments = caoAssignments
+            .Where(assignment =>
+                !currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee) ||
+                !currentEmployee.HasCurrentAccrualRecord ||
+                !activeClusterIds.Contains(assignment.ClusterId))
+            .ToList();
+
+        var inactiveChairAssignments = chairAssignments
+            .Where(assignment =>
+                !currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee) ||
+                !currentEmployee.HasCurrentAccrualRecord ||
+                !activeDepartmentCodes.Contains(assignment.DepartmentCode.Trim()))
+            .ToList();
+
+        return new InactiveRoleAssignmentChanges(
+            AdminAssignmentsToDelete: inactiveAdminAssignments,
+            CaoAssignmentsToClose: inactiveCaoAssignments,
+            ChairAssignmentsToClose: inactiveChairAssignments);
+    }
+
+    internal static void CloseClusterCaoAssignment(
+        ClusterCaoAssignment assignment,
+        int? closedByAppUserId,
+        DateTime closedUtc,
+        DateOnly today)
+    {
+        if (closedByAppUserId.HasValue)
+        {
+            assignment.ClosedByAppUserId = closedByAppUserId.Value;
+        }
+
+        assignment.ClosedUtc = closedUtc;
+        assignment.EffectiveEndDateExclusive = GetEffectiveEndDateExclusive(
+            assignment.EffectiveEndDateExclusive,
+            today);
+    }
+
+    internal static void CloseDepartmentChairAssignment(
+        DepartmentChairAssignment assignment,
+        int? closedByAppUserId,
+        DateTime closedUtc,
+        DateOnly today)
+    {
+        if (closedByAppUserId.HasValue)
+        {
+            assignment.ClosedByAppUserId = closedByAppUserId.Value;
+        }
+
+        assignment.ClosedUtc = closedUtc;
+        assignment.EffectiveEndDateExclusive = GetEffectiveEndDateExclusive(
+            assignment.EffectiveEndDateExclusive,
+            today);
+    }
+
     internal static AdminRolesResponse BuildRolesResponse(
         AdminRoleOptionsData roleOptionsData,
         AdminRoleAssignmentsData roleAssignmentsData,
         DateOnly today)
     {
-        var appUsersByIamId = roleOptionsData.AppUsers
-            .GroupBy(user => user.IamId.Trim(), StringComparer.OrdinalIgnoreCase)
+        var currentEmployeesByIamId = roleOptionsData.CurrentEmployees
+            .Where(employee => !string.IsNullOrWhiteSpace(employee.IamId))
+            .GroupBy(employee => employee.IamId.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var departments = roleOptionsData.Departments;
         var departmentsByCode = departments.ToDictionary(department => department.DepartmentCode, StringComparer.OrdinalIgnoreCase);
@@ -35,7 +120,7 @@ public sealed class AdminRolesService
 
         var assignments = roleAssignmentsData.AdminAssignments
             .Select(assignment => CreateAssignmentResponse(
-                active: true,
+                active: IsRoleAssignmentActive(currentEmployeesByIamId, assignment.IamId, true),
                 effectiveEndDate: null,
                 effectiveStartDate: null,
                 id: assignment.Id.ToString(),
@@ -43,12 +128,20 @@ public sealed class AdminRolesService
                 targetId: null,
                 targetName: null,
                 type: "admin",
-                appUsersByIamId: appUsersByIamId))
+                currentEmployeesByIamId: currentEmployeesByIamId))
             .Concat(roleAssignmentsData.CaoAssignments.Select(assignment =>
             {
                 clustersById.TryGetValue(assignment.ClusterId, out var cluster);
                 return CreateAssignmentResponse(
-                    active: IsActive(assignment.EffectiveStartDate, assignment.EffectiveEndDateExclusive, today, assignment.ClosedUtc),
+                    active: IsRoleAssignmentActive(
+                        currentEmployeesByIamId,
+                        assignment.IamId,
+                        true,
+                        cluster?.IsActive ?? false,
+                        assignment.EffectiveStartDate,
+                        assignment.EffectiveEndDateExclusive,
+                        today,
+                        assignment.ClosedUtc),
                     effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
@@ -56,13 +149,21 @@ public sealed class AdminRolesService
                     targetId: assignment.ClusterId.ToString(),
                     targetName: cluster?.ClusterName ?? $"Cluster {assignment.ClusterId}",
                     type: "cao",
-                    appUsersByIamId: appUsersByIamId);
+                    currentEmployeesByIamId: currentEmployeesByIamId);
             }))
             .Concat(roleAssignmentsData.ChairAssignments.Select(assignment =>
             {
                 departmentsByCode.TryGetValue(assignment.DepartmentCode, out var department);
                 return CreateAssignmentResponse(
-                    active: IsActive(assignment.EffectiveStartDate, assignment.EffectiveEndDateExclusive, today, assignment.ClosedUtc),
+                    active: IsRoleAssignmentActive(
+                        currentEmployeesByIamId,
+                        assignment.IamId,
+                        true,
+                        department?.IsActive ?? false,
+                        assignment.EffectiveStartDate,
+                        assignment.EffectiveEndDateExclusive,
+                        today,
+                        assignment.ClosedUtc),
                     effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
@@ -70,7 +171,7 @@ public sealed class AdminRolesService
                     targetId: assignment.DepartmentCode,
                     targetName: department?.DepartmentName ?? assignment.DepartmentCode,
                     type: "chair",
-                    appUsersByIamId: appUsersByIamId);
+                    currentEmployeesByIamId: currentEmployeesByIamId);
             }))
             .OrderByDescending(assignment => assignment.Active)
             .ThenBy(assignment => assignment.Type)
@@ -83,7 +184,6 @@ public sealed class AdminRolesService
             .Select(employee =>
             {
                 var iamId = employee.IamId.Trim();
-                appUsersByIamId.TryGetValue(iamId, out var appUser);
                 var departmentCode = NullIfWhiteSpace(employee.ResolvedReportingDepartmentCode);
                 var departmentName = NullIfWhiteSpace(employee.ResolvedReportingDepartmentName);
                 var departmentOptions = BuildDepartmentOptions(departmentCode, departmentName, departmentsByCode);
@@ -92,9 +192,9 @@ public sealed class AdminRolesService
                     DepartmentId: departmentCode,
                     DepartmentName: departmentName,
                     DepartmentOptions: departmentOptions,
-                    Email: NullIfWhiteSpace(appUser?.Email) ?? NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                    Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
                     IamId: iamId,
-                    Name: NullIfWhiteSpace(appUser?.DisplayName) ?? NullIfWhiteSpace(employee.DisplayName) ?? iamId);
+                    Name: NullIfWhiteSpace(employee.DisplayName) ?? iamId);
             })
             .OrderBy(user => user.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(user => user.IamId, StringComparer.OrdinalIgnoreCase)
@@ -102,8 +202,8 @@ public sealed class AdminRolesService
 
         return new AdminRolesResponse(
             Assignments: assignments,
-            Clusters: clusters.Select(cluster => new AdminRoleOption(cluster.Id.ToString(), cluster.ClusterName)).ToList(),
-            Departments: departments.Select(department => new AdminRoleOption(department.DepartmentCode, department.DepartmentName)).ToList(),
+            Clusters: clusters.Select(cluster => new AdminRoleOption(cluster.Id.ToString(), cluster.ClusterName, cluster.IsActive)).ToList(),
+            Departments: departments.Select(department => new AdminRoleOption(department.DepartmentCode, department.DepartmentName, department.IsActive)).ToList(),
             Users: users);
     }
 
@@ -116,27 +216,71 @@ public sealed class AdminRolesService
         string? targetId,
         string? targetName,
         string type,
-        IReadOnlyDictionary<string, AppUser> appUsersByIamId)
+        IReadOnlyDictionary<string, CurrentEmployee> currentEmployeesByIamId)
     {
         var trimmedIamId = iamId.Trim();
-        appUsersByIamId.TryGetValue(trimmedIamId, out var appUser);
+        currentEmployeesByIamId.TryGetValue(trimmedIamId, out var currentEmployee);
 
         return new AdminRoleAssignmentResponse(
             Active: active,
             EffectiveEndDate: effectiveEndDate,
             EffectiveStartDate: effectiveStartDate,
-            Email: appUser?.Email ?? string.Empty,
+            Email: NullIfWhiteSpace(currentEmployee?.Email) ?? string.Empty,
             Id: id,
             IamId: trimmedIamId,
-            Name: appUser?.DisplayName ?? trimmedIamId,
+            Name: NullIfWhiteSpace(currentEmployee?.DisplayName) ?? trimmedIamId,
             TargetId: targetId,
             TargetName: targetName,
             Type: type);
     }
 
-    private static bool IsActive(DateOnly startDate, DateOnly? endDate, DateOnly today, DateTime? closedUtc)
+    private static bool IsRoleAssignmentActive(
+        IReadOnlyDictionary<string, CurrentEmployee> currentEmployeesByIamId,
+        string iamId,
+        bool activeByAssignmentState,
+        bool targetIsActive = true,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        DateOnly? today = null,
+        DateTime? closedUtc = null)
     {
-        return closedUtc == null && startDate <= today && (!endDate.HasValue || endDate.Value > today);
+        if (!activeByAssignmentState)
+        {
+            return false;
+        }
+
+        var trimmedIamId = iamId.Trim();
+        if (!currentEmployeesByIamId.TryGetValue(trimmedIamId, out var currentEmployee))
+        {
+            return false;
+        }
+
+        if (!currentEmployee.HasCurrentAccrualRecord)
+        {
+            return false;
+        }
+
+        if (!targetIsActive)
+        {
+            return false;
+        }
+
+        if (!startDate.HasValue || !today.HasValue)
+        {
+            return true;
+        }
+
+        return closedUtc == null && startDate.Value <= today.Value && (!endDate.HasValue || endDate.Value > today.Value);
+    }
+
+    private static DateOnly? GetEffectiveEndDateExclusive(DateOnly? currentValue, DateOnly today)
+    {
+        if (!currentValue.HasValue || currentValue.Value > today)
+        {
+            return today;
+        }
+
+        return currentValue;
     }
 
     private static IReadOnlyList<AdminRoleOption> BuildDepartmentOptions(
@@ -158,7 +302,10 @@ public sealed class AdminRolesService
                 NullIfWhiteSpace(departmentName)
                     ?? (departmentsByCode.TryGetValue(normalizedDepartmentCode, out var department)
                         ? department.DepartmentName
-                        : normalizedDepartmentCode)),
+                        : normalizedDepartmentCode),
+                departmentsByCode.TryGetValue(normalizedDepartmentCode, out var activeDepartment)
+                    ? activeDepartment.IsActive
+                    : false),
         ];
     }
 
@@ -168,6 +315,11 @@ public sealed class AdminRolesService
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 }
+
+internal sealed record InactiveRoleAssignmentChanges(
+    IReadOnlyList<AppAdminAssignment> AdminAssignmentsToDelete,
+    IReadOnlyList<ClusterCaoAssignment> CaoAssignmentsToClose,
+    IReadOnlyList<DepartmentChairAssignment> ChairAssignmentsToClose);
 
 public sealed record AdminRolesResponse(
     IReadOnlyList<AdminRoleAssignmentResponse> Assignments,
@@ -187,7 +339,7 @@ public sealed record AdminRoleAssignmentResponse(
     string? TargetName,
     string Type);
 
-public sealed record AdminRoleOption(string Id, string Name);
+public sealed record AdminRoleOption(string Id, string Name, bool Active);
 
 public sealed record AdminRoleUserOption(
     string? DepartmentId,

@@ -14,12 +14,18 @@ namespace Server.Controllers;
 public sealed class AdminRolesController : ApiControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly AdminDirectoryDataService _directoryDataService;
     private readonly AdminRolesService _adminRolesService;
     private readonly IUserService _userService;
 
-    public AdminRolesController(AppDbContext db, AdminRolesService adminRolesService, IUserService userService)
+    public AdminRolesController(
+        AppDbContext db,
+        AdminDirectoryDataService directoryDataService,
+        AdminRolesService adminRolesService,
+        IUserService userService)
     {
         _db = db;
+        _directoryDataService = directoryDataService;
         _adminRolesService = adminRolesService;
         _userService = userService;
     }
@@ -27,6 +33,7 @@ public sealed class AdminRolesController : ApiControllerBase
     [HttpGet]
     public async Task<IActionResult> GetRolesAsync(CancellationToken cancellationToken)
     {
+        await CloseInactiveRoleAssignmentsAsync(cancellationToken);
         return Ok(await _adminRolesService.GetRolesAsync(cancellationToken));
     }
 
@@ -78,9 +85,14 @@ public sealed class AdminRolesController : ApiControllerBase
         var cluster = await _db.Clusters.FirstOrDefaultAsync(
             item => item.Id == request.ClusterId,
             cancellationToken);
-        if (cluster == null || !cluster.IsActive)
+        if (cluster == null)
         {
             return ValidationProblem("Selected cluster does not exist.");
+        }
+
+        if (!cluster.IsActive)
+        {
+            return ValidationProblem("Selected cluster is inactive.");
         }
 
         var hasActiveAssignment = await HasActiveClusterCaoAssignmentAsync(
@@ -121,9 +133,14 @@ public sealed class AdminRolesController : ApiControllerBase
         var department = await _db.Departments.FirstOrDefaultAsync(
             item => item.DepartmentCode == departmentCode,
             cancellationToken);
-        if (string.IsNullOrWhiteSpace(departmentCode) || department == null || !department.IsActive)
+        if (string.IsNullOrWhiteSpace(departmentCode) || department == null)
         {
             return ValidationProblem("Selected department does not exist.");
+        }
+
+        if (!department.IsActive)
+        {
+            return ValidationProblem("Selected department is inactive.");
         }
 
         var personDepartmentCodes = await GetCurrentDepartmentCodesAsync(validationResult.IamId!, cancellationToken);
@@ -178,7 +195,10 @@ public sealed class AdminRolesController : ApiControllerBase
             return NotFound();
         }
 
-        return await CloseDatedAssignmentAsync(assignment, cancellationToken);
+        return await CloseAssignmentAsync(
+            assignment,
+            AdminRolesService.CloseClusterCaoAssignment,
+            cancellationToken);
     }
 
     [HttpDelete("chairs/{id:int}")]
@@ -190,10 +210,16 @@ public sealed class AdminRolesController : ApiControllerBase
             return NotFound();
         }
 
-        return await CloseDatedAssignmentAsync(assignment, cancellationToken);
+        return await CloseAssignmentAsync(
+            assignment,
+            AdminRolesService.CloseDepartmentChairAssignment,
+            cancellationToken);
     }
 
-    private async Task<IActionResult> CloseDatedAssignmentAsync(ClusterCaoAssignment assignment, CancellationToken cancellationToken)
+    private async Task<IActionResult> CloseAssignmentAsync<TAssignment>(
+        TAssignment assignment,
+        Action<TAssignment, int?, DateTime, DateOnly> closeAssignment,
+        CancellationToken cancellationToken)
     {
         var closedByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
         if (closedByAppUserId == null)
@@ -201,33 +227,8 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("The authenticated admin must have an AppUser row before role assignments can be updated.");
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        assignment.ClosedByAppUserId = closedByAppUserId.Value;
-        assignment.ClosedUtc = DateTime.UtcNow;
-        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
-        {
-            assignment.EffectiveEndDateExclusive = today;
-        }
-
-        await _db.SaveChangesAsync(cancellationToken);
-        return NoContent();
-    }
-
-    private async Task<IActionResult> CloseDatedAssignmentAsync(DepartmentChairAssignment assignment, CancellationToken cancellationToken)
-    {
-        var closedByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
-        if (closedByAppUserId == null)
-        {
-            return ValidationProblem("The authenticated admin must have an AppUser row before role assignments can be updated.");
-        }
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        assignment.ClosedByAppUserId = closedByAppUserId.Value;
-        assignment.ClosedUtc = DateTime.UtcNow;
-        if (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)
-        {
-            assignment.EffectiveEndDateExclusive = today;
-        }
+        var now = DateTime.UtcNow;
+        closeAssignment(assignment, closedByAppUserId.Value, now, DateOnly.FromDateTime(now));
 
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
@@ -332,6 +333,63 @@ public sealed class AdminRolesController : ApiControllerBase
             .Where(user => user.EntraObjectId == entraObjectId)
             .Select(user => (int?)user.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task CloseInactiveRoleAssignmentsAsync(CancellationToken cancellationToken)
+    {
+        var roleOptionsData = await _directoryDataService.LoadRoleOptionsDataAsync(cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var activeCaoAssignments = await _db.ClusterCaoAssignments
+            .Where(assignment => assignment.ClosedUtc == null &&
+                                 assignment.EffectiveStartDate <= today &&
+                                 (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today))
+            .ToListAsync(cancellationToken);
+        var activeChairAssignments = await _db.DepartmentChairAssignments
+            .Where(assignment => assignment.ClosedUtc == null &&
+                                 assignment.EffectiveStartDate <= today &&
+                                 (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today))
+            .ToListAsync(cancellationToken);
+        var activeAdminAssignments = await _db.AppAdminAssignments
+            .ToListAsync(cancellationToken);
+
+        var closedByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        var now = DateTime.UtcNow;
+        var changes = AdminRolesService.GetInactiveRoleAssignmentChanges(
+            activeAdminAssignments,
+            activeCaoAssignments,
+            activeChairAssignments,
+            roleOptionsData.CurrentEmployees,
+            roleOptionsData.Clusters,
+            roleOptionsData.Departments);
+
+        if (changes.AdminAssignmentsToDelete.Count == 0 &&
+            changes.CaoAssignmentsToClose.Count == 0 &&
+            changes.ChairAssignmentsToClose.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var assignment in changes.AdminAssignmentsToDelete)
+        {
+            _db.AppAdminAssignments.Remove(assignment);
+        }
+
+        foreach (var assignment in changes.CaoAssignmentsToClose)
+        {
+            AdminRolesService.CloseClusterCaoAssignment(assignment, closedByAppUserId, now, today);
+        }
+
+        foreach (var assignment in changes.ChairAssignmentsToClose)
+        {
+            AdminRolesService.CloseDepartmentChairAssignment(assignment, closedByAppUserId, now, today);
+        }
+
+        if (changes.AdminAssignmentsToDelete.Count > 0 ||
+            changes.CaoAssignmentsToClose.Count > 0 ||
+            changes.ChairAssignmentsToClose.Count > 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static bool IsDuplicateKey(DbUpdateException exception)

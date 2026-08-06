@@ -16,6 +16,7 @@ export type AdminRoleAssignment = {
 };
 
 export type AdminRoleOption = {
+  active: boolean;
   id: string;
   name: string;
 };

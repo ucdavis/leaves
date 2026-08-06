@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Web;
 using Server.Helpers;
 using Server.Services;
 
@@ -26,7 +27,9 @@ public class UserController : ApiControllerBase
             GetClaimValue("preferred_username")
             ?? GetClaimValue(ClaimTypes.Email)
             ?? userName;
-        var entraObjectId = userId;
+        var entraObjectId =
+            GetClaimValue(ClaimConstants.ObjectId)
+            ?? GetClaimValue(ClaimConstants.Oid);
 
         var userRoles = User.FindAll(ClaimTypes.Role)
             .Select(c => c.Value)

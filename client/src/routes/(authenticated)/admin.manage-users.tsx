@@ -57,6 +57,7 @@ export type AdminRolePersonOption = {
   departmentId: string | null;
   departmentName: string | null;
   departmentOptions: Array<{
+    active: boolean;
     id: string;
     name: string;
   }>;
@@ -114,12 +115,18 @@ function AdminUsersRoute() {
         null)
       : null;
   const targetOptions = type === 'cao' ? data.clusters : data.departments;
+  const selectedTarget =
+    type === 'admin'
+      ? null
+      : type === 'chair'
+        ? selectedChairDepartment
+        : (targetOptions.find((option) => option.id === targetId) ?? null);
   const selectedTargetName =
     type === 'admin'
       ? null
       : type === 'chair'
         ? selectedChairDepartment?.name ?? null
-      : (targetOptions.find((option) => option.id === targetId)?.name ?? null);
+      : selectedTarget?.name ?? null;
   const selectedUserName = selectedUser?.name ?? iamId;
   const assignmentRows = data.assignments.filter((assignment) =>
     showInactiveAssignments ? true : assignment.active
@@ -155,6 +162,11 @@ function AdminUsersRoute() {
 
   const handleAdd = async () => {
     setError(null);
+
+    if (type !== 'admin' && selectedTarget && !selectedTarget.active) {
+      setError('Selected scope is inactive.');
+      return false;
+    }
 
     try {
       if (type === 'admin') {
@@ -323,6 +335,10 @@ function AdminUsersRoute() {
               onChangeOpen={setIsPersonSearchOpen}
               onChangeQuery={(value) => {
                 setPersonQuery(value);
+                setIamId('');
+                if (type === 'chair') {
+                  setTargetId('');
+                }
                 setIsPersonSearchOpen(true);
               }}
               onSelectUser={(user) => {
@@ -355,8 +371,13 @@ function AdminUsersRoute() {
                 >
                   <option value="">Select scope</option>
                   {targetOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
+                    <option
+                      disabled={!option.active}
+                      key={option.id}
+                      value={option.id}
+                    >
                       {option.name}
+                      {!option.active ? ' (inactive)' : ''}
                     </option>
                   ))}
                 </select>
@@ -378,8 +399,13 @@ function AdminUsersRoute() {
                         : 'Select department'}
                   </option>
                   {chairDepartmentOptions.map((department) => (
-                    <option key={department.id} value={department.id}>
+                    <option
+                      disabled={!department.active}
+                      key={department.id}
+                      value={department.id}
+                    >
                       {department.name}
+                      {!department.active ? ' (inactive)' : ''}
                     </option>
                   ))}
                 </select>
@@ -397,7 +423,8 @@ function AdminUsersRoute() {
               isSaving ||
               !iamId ||
               (type === 'cao' && !targetId) ||
-              (type === 'chair' && !targetId)
+              (type === 'chair' && !targetId) ||
+              (type !== 'admin' && selectedTarget !== null && !selectedTarget.active)
             }
             onClick={() =>
               setPendingAction({
