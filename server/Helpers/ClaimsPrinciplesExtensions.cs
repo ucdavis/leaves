@@ -25,8 +25,8 @@ public static class ClaimsPrincipalExtensions
         ArgumentNullException.ThrowIfNull(principal);
 
         var userIdValue =
-            principal.FindFirstValue(ClaimConstants.Oid)
-            ?? principal.FindFirstValue(ClaimConstants.ObjectId)
+            principal.FindFirstValue(ClaimConstants.ObjectId)
+            ?? principal.FindFirstValue(ClaimConstants.Oid)
             ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (string.IsNullOrWhiteSpace(userIdValue))

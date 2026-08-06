@@ -6,7 +6,7 @@ interface TextFieldProps {
   inputClassName?: string;
   label: string;
   placeholder?: string;
-  type?: 'email' | 'text';
+  type?: 'date' | 'email' | 'text';
 }
 
 export function TextField({

@@ -2,12 +2,14 @@ import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import {
   BuildingOffice2Icon,
   ChartBarSquareIcon,
+  ShieldCheckIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 
 const adminTabs = [
   { icon: ChartBarSquareIcon, label: 'Status', to: '/admin/status' },
-  { icon: UserGroupIcon, label: 'Users', to: '/admin/users' },
+  { icon: UserGroupIcon, label: 'Faculty', to: '/admin/faculty' },
+  { icon: ShieldCheckIcon, label: 'Manage users', to: '/admin/manage-users' },
   { icon: BuildingOffice2Icon, label: 'Departments', to: '/admin/departments' },
 ] as const;
 

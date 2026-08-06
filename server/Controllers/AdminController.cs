@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Helpers;
+using Server.Services;
 
 namespace Server.Controllers;
 
@@ -12,293 +13,36 @@ namespace Server.Controllers;
 public sealed class AdminController : ApiControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly AdminDirectoryService _adminDirectoryService;
+    private readonly AdminStatusService _adminStatusService;
+    private readonly IUserService _userService;
 
-    public AdminController(AppDbContext db)
+    public AdminController(
+        AppDbContext db,
+        AdminDirectoryService adminDirectoryService,
+        AdminStatusService adminStatusService,
+        IUserService userService)
     {
         _db = db;
+        _adminDirectoryService = adminDirectoryService;
+        _adminStatusService = adminStatusService;
+        _userService = userService;
     }
 
-    [HttpGet("dashboard")]
-    public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus(CancellationToken cancellationToken)
     {
-        var clusters = await _db.Clusters
-            .AsNoTracking()
-            .OrderBy(cluster => cluster.ClusterName)
-            .ToListAsync(cancellationToken);
-
-        var departments = await _db.Departments
-            .AsNoTracking()
-            .Include(department => department.DepartmentEmailRoutings)
-            .OrderBy(department => department.DepartmentName)
-            .ToListAsync(cancellationToken);
-
-        var users = await _db.AppUsers
-            .AsNoTracking()
-            .OrderBy(user => user.DisplayName)
-            .ToListAsync(cancellationToken);
-
-        var adminIamIds = await _db.AppAdminAssignments
-            .AsNoTracking()
-            .Select(assignment => assignment.IamId.Trim())
-            .ToHashSetAsync(cancellationToken);
-
-        var leaveTypes = await _db.LeaveTypes
-            .AsNoTracking()
-            .ToDictionaryAsync(type => type.Id, cancellationToken);
-
-        var leaveRequests = await _db.LeaveRequests
-            .AsNoTracking()
-            .OrderByDescending(request => request.SubmittedAt)
-            .ThenByDescending(request => request.Id)
-            .ToListAsync(cancellationToken);
-
-        var latestDepartmentByUserId = leaveRequests
-            .GroupBy(request => request.AppUserId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().ReportingDepartmentCodeSnapshot);
-
-        var activeUsers = users.Where(user => user.IsActive).ToList();
-        var activeUsersWithDepartments = activeUsers
-            .Where(user => latestDepartmentByUserId.ContainsKey(user.Id))
-            .ToList();
-
-        var userResponses = users
-            .Select(user =>
-            {
-                var trimmedIamId = user.IamId.Trim();
-                var isAdmin = adminIamIds.Contains(trimmedIamId);
-                var departmentCode = latestDepartmentByUserId.GetValueOrDefault(user.Id);
-
-                return new AdminUserResponse(
-                    Id: user.Id.ToString(),
-                    Active: user.IsActive,
-                    DepartmentId: departmentCode,
-                    Designation: isAdmin ? "admin" : "fy",
-                    Email: user.Email ?? string.Empty,
-                    EmployeeId: user.EmployeeId?.Trim() ?? string.Empty,
-                    IamId: trimmedIamId,
-                    Name: user.DisplayName ?? trimmedIamId,
-                    Position: string.Empty,
-                    Role: isAdmin ? "admin" : "faculty");
-            })
-            .ToList();
-
-        var departmentResponses = departments
-            .Select(department => new AdminDepartmentResponse(
-                ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "notification",
-                ChairUserId: null,
-                ClusterId: department.ClusterId?.ToString(),
-                Code: department.DepartmentCode,
-                DispositionRequired: false,
-                Id: department.DepartmentCode,
-                Name: department.DepartmentName,
-                RoutingEmails: department.DepartmentEmailRoutings
-                    .Where(routing => routing.IsActive)
-                    .OrderBy(routing => routing.ToEmail)
-                    .Select(routing => new DepartmentRoutingEmailResponse(
-                        Address: routing.ToEmail,
-                        Id: routing.Id.ToString(),
-                        Kind: "to"))
-                    .ToList()))
-            .ToList();
-
-        var clusterResponses = clusters
-            .Select(cluster => new AdminClusterResponse(
-                CaoUserId: null,
-                Id: cluster.Id.ToString(),
-                Name: cluster.ClusterName))
-            .ToList();
-
-        var requestsByType = leaveRequests
-            .GroupBy(request =>
-            {
-                if (leaveTypes.TryGetValue(request.LeaveTypeId, out var leaveType))
-                {
-                    return leaveType.DisplayName;
-                }
-
-                return "Unknown";
-            })
-            .OrderBy(group => group.Key)
-            .ToDictionary(group => group.Key, group => group.Count());
-
-        var pendingRequests = leaveRequests.Count(request => request.Status == LeaveRequestStatus.PendingApproval);
-
-        var response = new AdminDashboardResponse(
-            Clusters: clusterResponses,
-            DataSources: new[]
-            {
-                new AdminDataSourceResponse("db-users", "App users", "Sourced from AppUser records.", "ready", GetLatestTimestamp(users.Select(user => user.UpdatedUtc))),
-                new AdminDataSourceResponse("db-departments", "Departments", "Sourced from Department and DepartmentEmailRouting.", "ready", GetLatestTimestamp(departments.Select(department => department.UpdatedUtc))),
-                new AdminDataSourceResponse("db-requests", "Leave requests", "Sourced from LeaveRequest history snapshots.", leaveRequests.Count > 0 ? "ready" : "planned", GetLatestTimestamp(leaveRequests.Select(request => request.UpdatedUtc))),
-            },
-            Departments: departmentResponses,
-            ReadonlyReason: "Chair, CAO, designation, and disposition fields are not modeled in the current database yet, so this admin UI now reads from the database and only enables persisted fields.",
-            StatusSnapshot: new AdminStatusSnapshotResponse(
-                Departments: new DepartmentStatusResponse(
-                    Clustered: departments.Count(department => department.ClusterId.HasValue),
-                    Total: departments.Count,
-                    WithFaculty: activeUsersWithDepartments
-                        .Select(user => latestDepartmentByUserId[user.Id])
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count()),
-                Issues: new AdminIssuesResponse(
-                    ApproachingVacationCap: 0,
-                    ExcludedUsers: users.Count(user => !user.IsActive),
-                    FacultyAtVacationCap: 0,
-                    MissingEmails: activeUsers.Count(user => string.IsNullOrWhiteSpace(user.Email)),
-                    PendingRequests: pendingRequests),
-                Requests: new AdminRequestStatusResponse(
-                    BySource: new RequestSourceStatusResponse(
-                        Cognos: 0,
-                        Manual: leaveRequests.Count),
-                    ByType: requestsByType,
-                    Pending: pendingRequests,
-                    Total: leaveRequests.Count),
-                Users: new AdminUserStatusResponse(
-                    Admins: activeUsers.Count(user => adminIamIds.Contains(user.IamId.Trim())),
-                    AyFaculty: 0,
-                    Caos: 0,
-                    Chairs: 0,
-                    FyFaculty: activeUsers.Count(user => !adminIamIds.Contains(user.IamId.Trim())),
-                    Total: activeUsers.Count)),
-            Users: userResponses);
-
-        return Ok(response);
+        return Ok(await _adminStatusService.GetStatusAsync(cancellationToken));
     }
 
-    [HttpPatch("clusters/{id:int}")]
-    public async Task<IActionResult> UpdateCluster(int id, [FromBody] UpdateClusterRequest request, CancellationToken cancellationToken)
+    [HttpGet("faculty")]
+    public async Task<IActionResult> GetFaculty(CancellationToken cancellationToken)
     {
-        var cluster = await _db.Clusters.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (cluster == null)
-        {
-            return NotFound();
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Name))
-        {
-            cluster.ClusterName = request.Name.Trim();
-        }
-
-        cluster.UpdatedUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
-        return NoContent();
-    }
-
-    [HttpPatch("departments/{departmentCode}")]
-    public async Task<IActionResult> UpdateDepartment(string departmentCode, [FromBody] UpdateDepartmentRequest request, CancellationToken cancellationToken)
-    {
-        var department = await _db.Departments.FirstOrDefaultAsync(
-            item => item.DepartmentCode == departmentCode,
-            cancellationToken);
-
-        if (department == null)
-        {
-            return NotFound();
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Name))
-        {
-            department.DepartmentName = request.Name.Trim();
-        }
-
-        if (request.ClusterIdSet)
-        {
-            department.ClusterId = request.ClusterId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.ApprovalMode))
-        {
-            department.WorkflowMode = request.ApprovalMode == "approval"
-                ? WorkflowMode.ApprovalRequired
-                : WorkflowMode.DirectSubmission;
-        }
-
-        department.UpdatedUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
-        return NoContent();
-    }
-
-    [HttpPost("departments/{departmentCode}/routing-emails")]
-    public async Task<IActionResult> AddRoutingEmail(string departmentCode, [FromBody] UpsertRoutingEmailRequest request, CancellationToken cancellationToken)
-    {
-        var department = await _db.Departments.FirstOrDefaultAsync(
-            item => item.DepartmentCode == departmentCode,
-            cancellationToken);
-
-        if (department == null)
-        {
-            return NotFound();
-        }
-
-        var email = request.Address?.Trim();
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return ValidationProblem("Email address is required.");
-        }
-
-        var existing = await _db.DepartmentEmailRoutings.FirstOrDefaultAsync(
-            item => item.DepartmentCode == departmentCode && item.ToEmail == email,
-            cancellationToken);
-
-        if (existing == null)
-        {
-            var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
-            if (adminUserId == null)
-            {
-                return ValidationProblem("The authenticated admin must have an AppUser row before routing emails can be updated.");
-            }
-
-            existing = new DepartmentEmailRouting
-            {
-                DepartmentCode = departmentCode,
-                IsActive = true,
-                ToEmail = email,
-                UpdatedByAppUserId = adminUserId.Value,
-                UpdatedUtc = DateTime.UtcNow,
-            };
-
-            _db.DepartmentEmailRoutings.Add(existing);
-        }
-        else
-        {
-            existing.IsActive = true;
-            existing.UpdatedUtc = DateTime.UtcNow;
-        }
-
-        try
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateDepartmentRoutingEmail(ex))
-        {
-            return Conflict("That routing email already exists for this department.");
-        }
-
-        return NoContent();
-    }
-
-    [HttpDelete("departments/{departmentCode}/routing-emails/{id:int}")]
-    public async Task<IActionResult> RemoveRoutingEmail(string departmentCode, int id, CancellationToken cancellationToken)
-    {
-        var routing = await _db.DepartmentEmailRoutings.FirstOrDefaultAsync(
-            item => item.Id == id && item.DepartmentCode == departmentCode,
-            cancellationToken);
-
-        if (routing == null)
-        {
-            return NotFound();
-        }
-
-        _db.DepartmentEmailRoutings.Remove(routing);
-        await _db.SaveChangesAsync(cancellationToken);
-        return NoContent();
+        return Ok(await _adminDirectoryService.GetFacultyAsync(cancellationToken));
     }
 
     [HttpPost("users")]
-    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
         var iamId = request.IamId.Trim();
         if (string.IsNullOrWhiteSpace(iamId))
@@ -306,30 +50,31 @@ public sealed class AdminController : ApiControllerBase
             return ValidationProblem("IAM ID is required.");
         }
 
-        var user = new AppUser
+        var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == iamId, cancellationToken);
+        if (user == null)
         {
-            DisplayName = NullIfWhiteSpace(request.Name),
-            Email = NullIfWhiteSpace(request.Email),
-            EmployeeId = NullIfWhiteSpace(request.EmployeeId),
-            EntraObjectId = Guid.NewGuid(),
-            FirstLoginUtc = DateTime.UtcNow,
-            IamId = iamId,
-            IsActive = request.Active,
-            LastLoginUtc = null,
-            UpdatedUtc = DateTime.UtcNow,
-        };
-
-        _db.AppUsers.Add(user);
-
-        try
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
-        {
-            return Conflict("A user with that IAM ID, employee ID, or identity already exists.");
+            return NotFound();
         }
 
+        if (request.Name != null)
+        {
+            user.DisplayName = NullIfWhiteSpace(request.Name);
+        }
+
+        if (request.Email != null)
+        {
+            user.Email = NullIfWhiteSpace(request.Email);
+        }
+
+        if (request.EmployeeId != null)
+        {
+            user.EmployeeId = NullIfWhiteSpace(request.EmployeeId);
+        }
+
+        user.IsActive = request.Active;
+        user.UpdatedUtc = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -357,23 +102,18 @@ public sealed class AdminController : ApiControllerBase
             user.Email = NullIfWhiteSpace(request.Email);
         }
 
-        if (request.EmployeeIdSet)
-        {
-            user.EmployeeId = NullIfWhiteSpace(request.EmployeeId);
-        }
-
-        if (request.IamIdSet)
-        {
-            var iamId = request.IamId?.Trim();
-            if (string.IsNullOrWhiteSpace(iamId))
-            {
-                return ValidationProblem("IAM ID cannot be empty.");
-            }
-
-            user.IamId = iamId;
-        }
-
         user.UpdatedUtc = DateTime.UtcNow;
+
+        if (request.DepartmentOverrideSet)
+        {
+            var overrideResult = string.IsNullOrWhiteSpace(request.DepartmentOverrideId)
+                ? await CloseCurrentDepartmentOverrideAsync(user.IamId.Trim(), cancellationToken)
+                : await CreateDepartmentOverrideAsync(user.IamId.Trim(), request, cancellationToken);
+            if (overrideResult != null)
+            {
+                return overrideResult;
+            }
+        }
 
         try
         {
@@ -387,10 +127,187 @@ public sealed class AdminController : ApiControllerBase
         return NoContent();
     }
 
-    [HttpGet("status")]
-    public IActionResult Status()
+    [HttpPatch("users/by-iam/{iamId}")]
+    public async Task<IActionResult> UpsertUserByIamId(string iamId, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
-        return Ok(new AdminStatusResponse("Admin access granted."));
+        var normalizedIamId = iamId.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedIamId))
+        {
+            return ValidationProblem("IAM ID is required.");
+        }
+
+        var person = await _db.Set<Person>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
+        var user = await _db.AppUsers.FirstOrDefaultAsync(item => item.IamId == normalizedIamId, cancellationToken);
+        if (user == null && !request.DepartmentOverrideSet)
+        {
+            return NotFound();
+        }
+
+        var shouldSave = false;
+
+        if (user != null && request.NameSet)
+        {
+            user.DisplayName = NullIfWhiteSpace(request.Name) ?? NullIfWhiteSpace(person?.FullName);
+            shouldSave = true;
+        }
+
+        if (user != null && request.EmailSet)
+        {
+            user.Email = NullIfWhiteSpace(request.Email) ?? NullIfWhiteSpace(person?.Email);
+            shouldSave = true;
+        }
+
+        if (user != null && request.Active.HasValue)
+        {
+            user.IsActive = request.Active.Value;
+            shouldSave = true;
+        }
+
+        if (user != null && !request.NameSet && user.DisplayName == null)
+        {
+            user.DisplayName = NullIfWhiteSpace(person?.FullName);
+            shouldSave = true;
+        }
+
+        if (user != null && !request.EmailSet && user.Email == null)
+        {
+            user.Email = NullIfWhiteSpace(person?.Email);
+            shouldSave = true;
+        }
+
+        if (user != null && user.EmployeeId == null)
+        {
+            user.EmployeeId = NullIfWhiteSpace(person?.EmployeeId);
+            shouldSave = true;
+        }
+
+        if (user != null)
+        {
+            user.UpdatedUtc = DateTime.UtcNow;
+            shouldSave = true;
+        }
+
+        if (request.DepartmentOverrideSet)
+        {
+            var overrideResult = string.IsNullOrWhiteSpace(request.DepartmentOverrideId)
+                ? await CloseCurrentDepartmentOverrideAsync(normalizedIamId, cancellationToken)
+                : await CreateDepartmentOverrideAsync(normalizedIamId, request, cancellationToken);
+            if (overrideResult != null)
+            {
+                return overrideResult;
+            }
+
+            shouldSave = true;
+        }
+
+        if (shouldSave)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return NoContent();
+    }
+
+    private static bool IsDuplicateAppUser(DbUpdateException exception)
+    {
+        return exception.InnerException is SqlException sqlException &&
+               (sqlException.Number == 2601 || sqlException.Number == 2627);
+    }
+
+    private async Task<IActionResult?> CreateDepartmentOverrideAsync(
+        string iamId,
+        UpdateUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var departmentCode = request.DepartmentOverrideId?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(departmentCode))
+        {
+            return null;
+        }
+
+        var department = await _db.Departments.FirstOrDefaultAsync(
+            item => item.DepartmentCode == departmentCode,
+            cancellationToken);
+        if (department == null || !department.IsActive)
+        {
+            return ValidationProblem("Selected department does not exist.");
+        }
+
+        if (!DateOnly.TryParse(request.DepartmentOverrideStartDate, out var startDate))
+        {
+            return ValidationProblem("Department override start date is required.");
+        }
+
+        DateOnly? endDate = null;
+        if (!string.IsNullOrWhiteSpace(request.DepartmentOverrideEndDate))
+        {
+            if (!DateOnly.TryParse(request.DepartmentOverrideEndDate, out var parsedEndDate))
+            {
+                return ValidationProblem("Department override end date is invalid.");
+            }
+
+            if (parsedEndDate <= startDate)
+            {
+                return ValidationProblem("Department override end date must be after the start date.");
+            }
+
+            endDate = parsedEndDate;
+        }
+
+        var createdByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (createdByAppUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before department overrides can be updated.");
+        }
+
+        _db.EmployeeReportingDepartmentOverrides.Add(new EmployeeReportingDepartmentOverride
+        {
+            CreatedByAppUserId = createdByAppUserId.Value,
+            CreatedUtc = DateTime.UtcNow,
+            DepartmentCode = departmentCode,
+            EffectiveEndDateExclusive = endDate,
+            EffectiveStartDate = startDate,
+            IamId = iamId,
+            Reason = "Admin people edit",
+        });
+
+        return null;
+    }
+
+    private async Task<IActionResult?> CloseCurrentDepartmentOverrideAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var currentOverrideId = await _db.CurrentEmployees
+            .Where(employee => employee.IamId == iamId)
+            .Select(employee => employee.ReportingDepartmentOverrideId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!currentOverrideId.HasValue)
+        {
+            return null;
+        }
+
+        var currentOverride = await _db.EmployeeReportingDepartmentOverrides
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == currentOverrideId.Value, cancellationToken);
+
+        if (currentOverride == null)
+        {
+            return null;
+        }
+
+        var closedByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (closedByAppUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before department overrides can be updated.");
+        }
+
+        currentOverride.ClosedByAppUserId = closedByAppUserId.Value;
+        currentOverride.ClosedUtc = DateTime.UtcNow;
+        currentOverride.EffectiveEndDateExclusive = DateOnly.FromDateTime(DateTime.UtcNow);
+        return null;
     }
 
     private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)
@@ -400,34 +317,27 @@ public sealed class AdminController : ApiControllerBase
             return null;
         }
 
+        var appUserId = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => user.EntraObjectId == entraObjectId)
+            .Select(user => (int?)user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (appUserId != null)
+        {
+            return appUserId;
+        }
+
+        await _userService.EnsureUserProfileAsync(
+            User,
+            recordSignIn: false,
+            cancellationToken: cancellationToken);
+
         return await _db.AppUsers
             .AsNoTracking()
             .Where(user => user.EntraObjectId == entraObjectId)
             .Select(user => (int?)user.Id)
             .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    private static bool IsDuplicateDepartmentRoutingEmail(DbUpdateException exception)
-    {
-        return exception.InnerException is SqlException sqlException &&
-               (sqlException.Number == 2601 || sqlException.Number == 2627);
-    }
-
-    private static bool IsDuplicateAppUser(DbUpdateException exception)
-    {
-        return exception.InnerException is SqlException sqlException &&
-               (sqlException.Number == 2601 || sqlException.Number == 2627);
-    }
-
-    private static string? GetLatestTimestamp(IEnumerable<DateTime> timestamps)
-    {
-        var latest = timestamps.DefaultIfEmpty().Max();
-        if (latest == default)
-        {
-            return null;
-        }
-
-        return latest.ToString("O");
     }
 
     private static string? NullIfWhiteSpace(string? value)
@@ -440,68 +350,15 @@ public sealed class AdminController : ApiControllerBase
         return value.Trim();
     }
 
-    private sealed record AdminStatusResponse(string Message);
-    private sealed record AdminDashboardResponse(
-        IReadOnlyList<AdminClusterResponse> Clusters,
-        IReadOnlyList<AdminDataSourceResponse> DataSources,
-        IReadOnlyList<AdminDepartmentResponse> Departments,
-        string ReadonlyReason,
-        AdminStatusSnapshotResponse StatusSnapshot,
-        IReadOnlyList<AdminUserResponse> Users);
-    private sealed record AdminClusterResponse(string? CaoUserId, string Id, string Name);
-    private sealed record AdminDataSourceResponse(string Id, string Label, string Detail, string Status, string? UpdatedAt);
-    private sealed record AdminDepartmentResponse(
-        string ApprovalMode,
-        string? ChairUserId,
-        string? ClusterId,
-        string Code,
-        bool DispositionRequired,
-        string Id,
-        string Name,
-        IReadOnlyList<DepartmentRoutingEmailResponse> RoutingEmails);
-    private sealed record DepartmentRoutingEmailResponse(string Address, string Id, string Kind);
-    private sealed record AdminUserResponse(
-        string Id,
-        bool Active,
-        string? DepartmentId,
-        string Designation,
-        string Email,
-        string EmployeeId,
-        string IamId,
-        string Name,
-        string Position,
-        string Role);
-    private sealed record AdminStatusSnapshotResponse(
-        DepartmentStatusResponse Departments,
-        AdminIssuesResponse Issues,
-        AdminRequestStatusResponse Requests,
-        AdminUserStatusResponse Users);
-    private sealed record DepartmentStatusResponse(int Clustered, int Total, int WithFaculty);
-    private sealed record AdminIssuesResponse(
-        int ApproachingVacationCap,
-        int ExcludedUsers,
-        int FacultyAtVacationCap,
-        int MissingEmails,
-        int PendingRequests);
-    private sealed record AdminRequestStatusResponse(
-        RequestSourceStatusResponse BySource,
-        IReadOnlyDictionary<string, int> ByType,
-        int Pending,
-        int Total);
-    private sealed record RequestSourceStatusResponse(int Cognos, int Manual);
-    private sealed record AdminUserStatusResponse(int Admins, int AyFaculty, int Caos, int Chairs, int FyFaculty, int Total);
-    public sealed record UpdateClusterRequest(string? Name);
-    public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode);
-    public sealed record UpsertRoutingEmailRequest(string? Address);
     public sealed record CreateUserRequest(bool Active, string? Email, string? EmployeeId, string IamId, string? Name);
     public sealed record UpdateUserRequest(
         bool? Active,
         string? Email,
         bool EmailSet,
-        string? EmployeeId,
-        bool EmployeeIdSet,
-        string? IamId,
-        bool IamIdSet,
+        string? DepartmentOverrideEndDate,
+        string? DepartmentOverrideId,
+        bool DepartmentOverrideSet,
+        string? DepartmentOverrideStartDate,
         string? Name,
         bool NameSet);
 }

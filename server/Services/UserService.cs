@@ -63,12 +63,17 @@ public class UserService : IUserService
 
         var existingUser = await _dbContext.AppUsers
             .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
+        var matchedPerson = await FindPersonByEmailAsync(email, cancellationToken);
 
-        var resolvedAuthorizationKey = existingUser?.IamId;
+        var resolvedAuthorizationKey = NormalizeAuthorizationKey(matchedPerson?.IamId) ?? existingUser?.IamId;
         if (string.IsNullOrWhiteSpace(resolvedAuthorizationKey))
         {
-            resolvedAuthorizationKey = ResolveAuthorizationKey(principal, email, entraObjectId);
+            resolvedAuthorizationKey = ResolveAuthorizationKey(principal, entraObjectId);
         }
+        var resolvedEmployeeId = NormalizeEmployeeId(matchedPerson?.EmployeeId) ?? existingUser?.EmployeeId;
+        var resolvedDisplayName = !string.IsNullOrWhiteSpace(matchedPerson?.FullName)
+            ? matchedPerson.FullName
+            : displayName;
 
         var now = DateTime.UtcNow;
         var isNewUser = existingUser == null;
@@ -77,9 +82,9 @@ public class UserService : IUserService
         {
             existingUser = new AppUser
             {
-                DisplayName = displayName,
-                Email = email,
-                EmployeeId = null,
+                DisplayName = resolvedDisplayName,
+                Email = email ?? matchedPerson?.Email,
+                EmployeeId = resolvedEmployeeId,
                 EntraObjectId = entraObjectId,
                 FirstLoginUtc = now,
                 IamId = resolvedAuthorizationKey,
@@ -93,10 +98,11 @@ public class UserService : IUserService
         else
         {
             shouldSaveUser = ApplyExistingUserUpdates(
-                existingUser,
-                displayName,
-                email,
+                existingUser!,
+                resolvedDisplayName,
+                email ?? matchedPerson?.Email,
                 resolvedAuthorizationKey,
+                resolvedEmployeeId,
                 recordSignIn,
                 now);
         }
@@ -120,9 +126,10 @@ public class UserService : IUserService
 
                 if (ApplyExistingUserUpdates(
                     concurrentUser,
-                    displayName,
-                    email,
+                    resolvedDisplayName,
+                    email ?? matchedPerson?.Email,
                     resolvedAuthorizationKey,
+                    resolvedEmployeeId,
                     recordSignIn,
                     now))
                 {
@@ -230,6 +237,7 @@ public class UserService : IUserService
         string? displayName,
         string? email,
         string? resolvedAuthorizationKey,
+        string? resolvedEmployeeId,
         bool recordSignIn,
         DateTime now)
     {
@@ -250,9 +258,16 @@ public class UserService : IUserService
         }
 
         if (!string.IsNullOrWhiteSpace(resolvedAuthorizationKey) &&
-            string.IsNullOrWhiteSpace(user.IamId))
+            !string.Equals(user.IamId, resolvedAuthorizationKey, StringComparison.OrdinalIgnoreCase))
         {
             user.IamId = resolvedAuthorizationKey;
+            shouldSaveUser = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(resolvedEmployeeId) &&
+            !string.Equals(user.EmployeeId, resolvedEmployeeId, StringComparison.OrdinalIgnoreCase))
+        {
+            user.EmployeeId = resolvedEmployeeId;
             shouldSaveUser = true;
         }
 
@@ -278,7 +293,7 @@ public class UserService : IUserService
                (sqlException.Number == 2601 || sqlException.Number == 2627);
     }
 
-    private string ResolveAuthorizationKey(ClaimsPrincipal principal, string? email, Guid entraObjectId)
+    private string ResolveAuthorizationKey(ClaimsPrincipal principal, Guid entraObjectId)
     {
         var directClaim =
             NormalizeAuthorizationKey(principal.FindFirst("iam_id")?.Value)
@@ -288,18 +303,6 @@ public class UserService : IUserService
             return directClaim;
         }
 
-        if (!string.IsNullOrWhiteSpace(email))
-        {
-            var localPart = email.Split('@', 2)[0];
-            var normalizedLocalPart = NormalizeAuthorizationKey(localPart);
-            if (!string.IsNullOrWhiteSpace(normalizedLocalPart))
-            {
-                return normalizedLocalPart;
-            }
-        }
-
-        // Temporary fallback until we can resolve a real IAM key for every Entra account.
-        // Keep it deterministic so AppUser/AppAdminAssignment lookups stay stable.
         return BuildSyntheticAuthorizationKey(entraObjectId);
     }
 
@@ -320,7 +323,36 @@ public class UserService : IUserService
         return normalized.Length <= 10 ? normalized : null;
     }
 
-    private static string BuildSyntheticAuthorizationKey(Guid entraObjectId)
+    private async Task<Person?> FindPersonByEmailAsync(string? email, CancellationToken cancellationToken)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        if (normalizedEmail == null)
+        {
+            return null;
+        }
+
+        var matches = await _dbContext.People
+            .Where(person => person.Email != null && person.Email.ToLower() == normalizedEmail)
+            .OrderByDescending(person => person.PromotedAt)
+            .ThenByDescending(person => person.ModifyDate)
+            .ToListAsync(cancellationToken);
+
+        return matches.FirstOrDefault();
+    }
+
+    private static string? NormalizeEmail(string? email)
+    {
+        var normalized = email?.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static string? NormalizeEmployeeId(string? employeeId)
+    {
+        var normalized = employeeId?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    public static string BuildSyntheticAuthorizationKey(Guid entraObjectId)
     {
         var hash = SHA256.HashData(entraObjectId.ToByteArray());
         return Convert.ToHexString(hash.AsSpan(0, 5)).ToLowerInvariant();

@@ -48,7 +48,14 @@ try
 
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
+    builder.Services.AddScoped<AdminDirectoryDataService>();
+    builder.Services.AddScoped<AdminDirectoryService>();
+    builder.Services.AddScoped<AdminRolesService>();
+    builder.Services.AddScoped<AdminStatusDataService>();
+    builder.Services.AddScoped<AdminStatusService>();
     builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddSingleton<AdminRoleCleanupBackgroundService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
     // add auth policies here
 
     // add db context (check secrets first, then config, then default)

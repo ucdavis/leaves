@@ -2,6 +2,7 @@ import { useFieldContext } from './formContext.tsx';
 import { FieldWrapper } from './fieldWrapper.tsx';
 
 interface SelectFieldProps {
+  allowEmptyOption?: boolean;
   helperText?: string;
   label: string;
   options: Array<{ label: string; value: string }>;
@@ -10,6 +11,7 @@ interface SelectFieldProps {
 }
 
 export function SelectField({
+  allowEmptyOption,
   helperText,
   label,
   options,
@@ -29,7 +31,7 @@ export function SelectField({
         onChange={(e) => field.handleChange(e.target.value)}
         value={field.state.value || ''}
       >
-        <option disabled value="">
+        <option disabled={!allowEmptyOption} value="">
           {placeholder ?? `Pick a ${label.toLowerCase()}`}
         </option>
         {options.map((option) => (

@@ -1,31 +1,121 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { useAdminData } from '@/shared/admin/adminData.tsx';
-import { HttpError } from '@/lib/api.ts';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import {
+  adminDepartmentsQueryOptions,
+  createAdminCluster,
+  createAdminDepartment,
+  deleteAdminCluster,
+  deleteAdminDepartment,
+  removeAdminDepartmentRoutingEmail,
+  updateAdminCluster,
+  updateAdminDepartment,
+  upsertAdminDepartmentRoutingEmail,
+} from '@/queries/adminDepartments.ts';
+import { ClusterSettingsModal } from '@/shared/admin/ClusterSettingsModal.tsx';
+import { AdminDepartmentCreationPanel } from '@/shared/admin/AdminDepartmentCreationPanel.tsx';
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
 import { DepartmentSettingsModal } from '@/shared/admin/DepartmentSettingsModal.tsx';
+import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
+import { WarningModal } from '@/shared/WarningModal.tsx';
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  Cog6ToothIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline';
 import { statusTextColors } from '@/shared/statusColors.ts';
 
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
   component: AdminDepartmentsRoute,
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
+  pendingComponent: () => (
+    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+        Loading department data
+      </h2>
+      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
+        Pulling the current department and cluster records from the database.
+      </p>
+    </section>
+  ),
 });
 
 function AdminDepartmentsRoute() {
-  const {
-    clusters,
-    departments,
-    readonlyReason,
-    removeRoutingEmail,
-    renameDepartment,
-    updateDepartment,
-    upsertRoutingEmail,
-    users,
-  } = useAdminData();
+  const queryClient = useQueryClient();
+  const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
+  const { clusters, departments, users } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
+  const [editingClusterCaoId, setEditingClusterCaoId] = useState<string | null>(
+    null
+  );
+  const [clusterCaoQuery, setClusterCaoQuery] = useState('');
+  const [isClusterCaoSearchOpen, setIsClusterCaoSearchOpen] = useState(false);
+  const [selectedClusterCaoUserId, setSelectedClusterCaoUserId] = useState('');
+  const [pendingCaoChange, setPendingCaoChange] = useState<{
+    clusterId: string;
+    clusterName: string;
+    currentCaoName: string | null;
+    nextCaoName: string;
+    nextCaoUserId: string;
+  } | null>(null);
+  const [pendingCaoChangeError, setPendingCaoChangeError] = useState<
+    string | null
+  >(null);
+  const [pendingChairChange, setPendingChairChange] = useState<{
+    currentChairName: string | null;
+    departmentId: string;
+    departmentName: string;
+    nextChairName: string;
+    nextChairUserId: string;
+  } | null>(null);
+  const [pendingChairChangeError, setPendingChairChangeError] = useState<
+    string | null
+  >(null);
   const [viewDepartmentId, setViewDepartmentId] = useState<string | null>(null);
+  const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
+    string | null
+  >(null);
+
+  const invalidateDepartments = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['admin', 'departments'] });
+  };
+
+  const createClusterMutation = useMutation({
+    mutationFn: createAdminCluster,
+    onSuccess: invalidateDepartments,
+  });
+  const createDepartmentMutation = useMutation({
+    mutationFn: createAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const updateDepartmentMutation = useMutation({
+    mutationFn: updateAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const deleteDepartmentMutation = useMutation({
+    mutationFn: deleteAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const updateClusterMutation = useMutation({
+    mutationFn: updateAdminCluster,
+    onSuccess: invalidateDepartments,
+  });
+  const deleteClusterMutation = useMutation({
+    mutationFn: deleteAdminCluster,
+    onSuccess: invalidateDepartments,
+  });
+  const upsertRoutingEmailMutation = useMutation({
+    mutationFn: upsertAdminDepartmentRoutingEmail,
+    onSuccess: invalidateDepartments,
+  });
+  const removeRoutingEmailMutation = useMutation({
+    mutationFn: removeAdminDepartmentRoutingEmail,
+    onSuccess: invalidateDepartments,
+  });
 
   const clusterGroups = clusters.map((cluster) => ({
     ...cluster,
@@ -65,10 +155,6 @@ function AdminDepartmentsRoute() {
                   <h2 className="text-2xl font-semibold text-primary">
                     {selectedDepartment.name}
                   </h2>
-                  <p className="mt-2 text-sm text-base-content/70">
-                    This roster is derived from each user&apos;s latest leave
-                    request snapshot in the database.
-                  </p>
                 </div>
                 <div className="text-sm text-base-content/70">
                   {departmentUsers.length} people linked by request history
@@ -83,6 +169,7 @@ function AdminDepartmentsRoute() {
                       <th>Email</th>
                       <th>Role</th>
                       <th>IAM ID</th>
+                      <th>Department chair</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -102,16 +189,49 @@ function AdminDepartmentsRoute() {
                         </td>
                         <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
                         <td className="font-mono text-xs">{user.iamId}</td>
+                        <td>
+                          {selectedDepartment.chairUserId === user.id ? (
+                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
+                              <CheckCircleIcon
+                                aria-hidden="true"
+                                className="h-4 w-4 shrink-0"
+                              />
+                              Chair
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              disabled={updateDepartmentMutation.isPending}
+                              onClick={() => {
+                                setPendingChairChangeError(null);
+                                setPendingChairChange({
+                                  currentChairName:
+                                    departmentUsers.find(
+                                      (departmentUser) =>
+                                        departmentUser.id ===
+                                        selectedDepartment.chairUserId
+                                    )?.name ?? null,
+                                  departmentId: selectedDepartment.id,
+                                  departmentName: selectedDepartment.name,
+                                  nextChairName: user.name,
+                                  nextChairUserId: user.id,
+                                });
+                              }}
+                              type="button"
+                            >
+                              Set chair
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {departmentUsers.length === 0 ? (
                       <tr>
                         <td
                           className="py-6 text-sm text-base-content/70"
-                          colSpan={4}
+                          colSpan={5}
                         >
-                          No users currently map to this department from stored
-                          leave request snapshots.
+                          There are currently no faculty members assigned to this department.
                         </td>
                       </tr>
                     ) : null}
@@ -120,6 +240,34 @@ function AdminDepartmentsRoute() {
               </div>
             </div>
           </section>
+
+          {pendingChairChange &&
+          pendingChairChange.departmentId === selectedDepartment.id ? (
+            <DepartmentChairWarningModal
+              action={pendingChairChange}
+              errorMessage={pendingChairChangeError}
+              isSaving={updateDepartmentMutation.isPending}
+              onCancel={() => {
+                setPendingChairChange(null);
+                setPendingChairChangeError(null);
+              }}
+              onConfirm={() => {
+                void (async () => {
+                  setPendingChairChangeError(null);
+
+                  try {
+                    await updateDepartmentMutation.mutateAsync({
+                      departmentId: pendingChairChange.departmentId,
+                      updates: { chairUserId: pendingChairChange.nextChairUserId },
+                    });
+                    setPendingChairChange(null);
+                  } catch (error) {
+                    setPendingChairChangeError(getAdminMutationErrorMessage(error));
+                  }
+                })();
+              }}
+            />
+          ) : null}
         </div>
       );
     }
@@ -131,44 +279,127 @@ function AdminDepartmentsRoute() {
       : (departments.find(
           (department) => department.id === editingDepartmentId
         ) ?? null);
+  const editingClusterSettings =
+    editingClusterSettingsId === null
+      ? null
+      : (clusters.find((cluster) => cluster.id === editingClusterSettingsId) ?? null);
 
   return (
-    <div className="space-y-2">
-      <div className="max-w-3xl space-y-2">
-        <h2 className="text-lg font-semibold text-primary">
-          Department and cluster management
-        </h2>
-        <p>
-          These cards are now backed by the database. Cluster names, department
-          names, approval mode, and routing emails persist to SQL Server.
-        </p>
-        <p>{readonlyReason}</p>
-        <p>
-          Cluster names and department assignments are live. Chair and CAO
-          assignments are still pending schema support.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <AdminDepartmentCreationPanel
+        clusters={clusters}
+        formatError={getAdminMutationErrorMessage}
+        onCreateCluster={(name) => createClusterMutation.mutateAsync({ name })}
+        onCreateDepartment={(input) =>
+          createDepartmentMutation.mutateAsync({ input })
+        }
+      />
+
+      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
+        <div className="max-w-3xl space-y-2">
+          <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+            Department and cluster management
+          </h2>
+        </div>
+      </section>
 
       {clusterGroups.map((cluster) => (
-        <section className="my-8" key={cluster.id}>
-          <div className="flex flex-col lg:items-start lg:justify-between">
-            <h3 className="h2">{cluster.name}</h3>
+        <section
+          className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm"
+          key={cluster.id}
+        >
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
+                Cluster
+              </label>
+              <div className="mt-2 w-full max-w-md rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-sand)] px-4 py-3 text-[var(--admin-blue)]">
+                {cluster.name}
+              </div>
+            </div>
+
+            <div className="flex w-full max-w-md items-stretch gap-3">
+              <ClusterCaoEditor
+                currentCaoName={
+                  users.find((user) => user.id === cluster.caoUserId)?.name ?? null
+                }
+                isEditing={editingClusterCaoId === cluster.id}
+                isSaving={updateClusterMutation.isPending}
+                isSearchOpen={isClusterCaoSearchOpen}
+                onCancel={() => {
+                  setEditingClusterCaoId(null);
+                  setClusterCaoQuery('');
+                  setIsClusterCaoSearchOpen(false);
+                  setSelectedClusterCaoUserId('');
+                }}
+                onChangeQuery={(value) => {
+                  setClusterCaoQuery(value);
+                  setIsClusterCaoSearchOpen(true);
+                }}
+                onConfirm={() => {
+                  const selectedUser = users.find(
+                    (user) => user.id === selectedClusterCaoUserId
+                  );
+                  if (!selectedUser) {
+                    return;
+                  }
+
+                  setPendingCaoChangeError(null);
+                  setPendingCaoChange({
+                    clusterId: cluster.id,
+                    clusterName: cluster.name,
+                    currentCaoName:
+                      users.find((user) => user.id === cluster.caoUserId)?.name ??
+                      null,
+                    nextCaoName: selectedUser.name,
+                    nextCaoUserId: selectedUser.id,
+                  });
+                }}
+                onEdit={() => {
+                  setEditingClusterCaoId(cluster.id);
+                  setClusterCaoQuery('');
+                  setIsClusterCaoSearchOpen(false);
+                  setSelectedClusterCaoUserId('');
+                }}
+                onSelectUser={(user) => {
+                  setSelectedClusterCaoUserId(user.id);
+                  setClusterCaoQuery(user.name);
+                  setIsClusterCaoSearchOpen(false);
+                }}
+                query={clusterCaoQuery}
+                selectedUserId={selectedClusterCaoUserId}
+                users={getAccrualAssignableUsers(users)}
+              />
+
+              <button
+                aria-label={`Open settings for ${cluster.name}`}
+                className="btn btn-outline h-12 self-stretch shrink-0 px-4"
+                onClick={() => setEditingClusterSettingsId(cluster.id)}
+                type="button"
+              >
+                <Cog6ToothIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                Settings
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3 ps-5 border-l-5 border-primary/20 mt-5">
+          <div className="space-y-3 border-l-4 border-[var(--admin-border-strong)] pl-5">
             {cluster.departments.map((department) => {
               const linkedUserCount = users.filter(
-                (user) => user.departmentId === department.id && user.active
+                (user) => user.departmentId === department.id
               ).length;
 
               return (
                 <DepartmentRow
+                  chairName={
+                    users.find((user) => user.id === department.chairUserId)?.name ??
+                    null
+                  }
                   department={department}
                   key={department.id}
                   linkedUserCount={linkedUserCount}
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  onRename={(name) => renameDepartment(department.id, name)}
                 />
               );
             })}
@@ -185,6 +416,10 @@ function AdminDepartmentsRoute() {
             <div className="mt-4 space-y-3">
               {unassignedDepartments.map((department) => (
                 <DepartmentRow
+                  chairName={
+                    users.find((user) => user.id === department.chairUserId)?.name ??
+                    null
+                  }
                   department={department}
                   key={department.id}
                   linkedUserCount={
@@ -195,7 +430,6 @@ function AdminDepartmentsRoute() {
                   }
                   onOpenRoster={() => setViewDepartmentId(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  onRename={(name) => renameDepartment(department.id, name)}
                 />
               ))}
             </div>
@@ -208,51 +442,354 @@ function AdminDepartmentsRoute() {
           clusters={clusters}
           department={editingDepartment}
           formatError={getAdminMutationErrorMessage}
+          isDeleting={deleteDepartmentMutation.isPending}
           onClose={() => setEditingDepartmentId(null)}
-          onRemoveRoutingEmail={(emailId) =>
-            removeRoutingEmail(editingDepartment.id, emailId)
+          onDelete={() =>
+            deleteDepartmentMutation
+              .mutateAsync({
+                departmentId: editingDepartment.id,
+              })
+              .then(() => {
+                setEditingDepartmentId(null);
+                if (viewDepartmentId === editingDepartment.id) {
+                  setViewDepartmentId(null);
+                }
+              })
           }
-          onSave={(updates) =>
-            updateDepartment(editingDepartment.id, updates).then(() => {
-              setEditingDepartmentId(null);
+          onRemoveRoutingEmail={(emailId) =>
+            removeRoutingEmailMutation.mutateAsync({
+              departmentId: editingDepartment.id,
+              emailId,
             })
           }
-          onUpsertRoutingEmail={(email) =>
-            upsertRoutingEmail(editingDepartment.id, email)
+          onSave={(updates) =>
+            updateDepartmentMutation
+              .mutateAsync({
+                departmentId: editingDepartment.id,
+                updates,
+              })
+              .then(() => {
+                setEditingDepartmentId(null);
+              })
           }
+          onUpsertRoutingEmail={(email) =>
+            upsertRoutingEmailMutation.mutateAsync({
+              departmentId: editingDepartment.id,
+              email,
+            })
+          }
+        />
+      ) : null}
+
+      {editingClusterSettings ? (
+        <ClusterSettingsModal
+          cluster={editingClusterSettings}
+          departmentCount={
+            departments.filter(
+              (department) => department.clusterId === editingClusterSettings.id
+            ).length
+          }
+          formatError={getAdminMutationErrorMessage}
+          isDeleting={deleteClusterMutation.isPending}
+          onClose={() => setEditingClusterSettingsId(null)}
+          onDelete={() =>
+            deleteClusterMutation
+              .mutateAsync({
+                clusterId: editingClusterSettings.id,
+              })
+              .then(() => {
+                setEditingClusterSettingsId(null);
+                if (editingClusterCaoId === editingClusterSettings.id) {
+                  setEditingClusterCaoId(null);
+                  setClusterCaoQuery('');
+                  setIsClusterCaoSearchOpen(false);
+                  setSelectedClusterCaoUserId('');
+                }
+              })
+          }
+          onSave={(updates) =>
+            updateClusterMutation
+              .mutateAsync({
+                clusterId: editingClusterSettings.id,
+                updates,
+              })
+              .then(() => {
+                setEditingClusterSettingsId(null);
+              })
+          }
+        />
+      ) : null}
+
+      {pendingCaoChange ? (
+        <ClusterCaoWarningModal
+          action={pendingCaoChange}
+          errorMessage={pendingCaoChangeError}
+          isSaving={updateClusterMutation.isPending}
+          onCancel={() => {
+            setPendingCaoChange(null);
+            setPendingCaoChangeError(null);
+          }}
+          onConfirm={() => {
+            void (async () => {
+              setPendingCaoChangeError(null);
+
+              try {
+                await updateClusterMutation.mutateAsync({
+                  clusterId: pendingCaoChange.clusterId,
+                  updates: { caoUserId: pendingCaoChange.nextCaoUserId },
+                });
+                setPendingCaoChange(null);
+                setEditingClusterCaoId(null);
+                setClusterCaoQuery('');
+                setIsClusterCaoSearchOpen(false);
+                setSelectedClusterCaoUserId('');
+              } catch (error) {
+                setPendingCaoChangeError(getAdminMutationErrorMessage(error));
+              }
+            })();
+          }}
         />
       ) : null}
     </div>
   );
 }
 
-function getAdminMutationErrorMessage(error: unknown) {
-  if (error instanceof HttpError) {
-    if (typeof error.body === 'string' && error.body.trim()) {
-      return error.body;
+function getAccrualAssignableUsers(
+  users: Array<{
+    active: boolean;
+    departmentId: string;
+    email: string;
+    id: string;
+    name: string;
+  }>
+) {
+  return users
+    .filter((user) => user.active)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function ClusterCaoEditor({
+  currentCaoName,
+  isEditing,
+  isSaving,
+  isSearchOpen,
+  onCancel,
+  onChangeQuery,
+  onConfirm,
+  onEdit,
+  onSelectUser,
+  query,
+  selectedUserId,
+  users,
+}: {
+  currentCaoName: string | null;
+  isEditing: boolean;
+  isSaving: boolean;
+  isSearchOpen: boolean;
+  onCancel: () => void;
+  onChangeQuery: (value: string) => void;
+  onConfirm: () => void;
+  onEdit: () => void;
+  onSelectUser: (user: {
+    email: string;
+    id: string;
+    name: string;
+  }) => void;
+  query: string;
+  selectedUserId: string;
+  users: Array<{
+    email: string;
+    id: string;
+    name: string;
+  }>;
+}) {
+  const filteredUsers = users.filter((user) => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return true;
     }
 
-    if (error.body && typeof error.body === 'object') {
-      const body = error.body as {
-        detail?: string;
-        title?: string;
-      };
+    return [user.name, user.email, user.id]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedQuery);
+  });
+  const showResults = isSearchOpen && query.trim().length > 0;
 
-      if (body.detail) {
-        return body.detail;
-      }
+  return (
+    <div
+      className={`w-full max-w-md self-stretch rounded-xl border border-[var(--admin-border)] bg-white px-4 shadow-sm ${
+        isEditing ? 'py-2.5' : 'h-12 py-0'
+      }`}
+    >
+      <div className={`flex h-full items-center justify-between gap-3`}>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink)]">
+            CAO: {currentCaoName ?? 'Add CAO'}
+          </div>
+        </div>
+        <button
+          className="btn btn-ghost btn-sm h-8"
+          onClick={onEdit}
+          type="button"
+        >
+          <PencilSquareIcon aria-hidden="true" aria-label="Edit CAO" className="h-4 w-4 shrink-0" />
+        </button>
+      </div>
 
-      if (body.title) {
-        return body.title;
-      }
-    }
+      {isEditing ? (
+        <div className="mt-4 space-y-3">
+          <div className="relative">
+            <input
+              className="input input-bordered w-full"
+              onChange={(event) => onChangeQuery(event.target.value)}
+              onFocus={() => {
+                if (query.trim().length > 0) {
+                  onChangeQuery(query);
+                }
+              }}
+              placeholder="Search people"
+              type="text"
+              value={query}
+            />
+            {showResults ? (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-white shadow-lg">
+                {filteredUsers.slice(0, 8).map((user) => (
+                  <button
+                    className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-[var(--admin-sand)] ${
+                      user.id === selectedUserId ? 'bg-[var(--admin-sand)]' : ''
+                    }`}
+                    key={user.id}
+                    onClick={() => onSelectUser(user)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    type="button"
+                  >
+                    <span>
+                      <span className="block font-semibold text-[var(--admin-ink)]">
+                        {user.name}
+                      </span>
+                      <span className="block text-xs text-[var(--admin-ink-muted)]">
+                        {user.email || user.id}
+                      </span>
+                    </span>
+                    <span className="text-right text-xs text-[var(--admin-ink-muted)]">
+                      {user.id}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
-    return 'Unable to save the change. Please try again.';
-  }
+          <div className="flex justify-end gap-3">
+            <button className="btn btn-ghost btn-sm" onClick={onCancel} type="button">
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={isSaving || !selectedUserId}
+              onClick={onConfirm}
+              type="button"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
+function DepartmentChairWarningModal({
+  action,
+  errorMessage,
+  isSaving,
+  onCancel,
+  onConfirm,
+}: {
+  action: {
+    currentChairName: string | null;
+    departmentId: string;
+    departmentName: string;
+    nextChairName: string;
+    nextChairUserId: string;
+  };
+  errorMessage: string | null;
+  isSaving: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const title = action.currentChairName
+    ? 'Change department chair?'
+    : 'Add department chair?';
 
-  return 'Unable to save the change. Please try again.';
+  return (
+    <WarningModal
+      confirmLabel={action.currentChairName ? 'Change chair' : 'Add chair'}
+      errorMessage={errorMessage}
+      isSaving={isSaving}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title={title}
+    >
+      {action.currentChairName ? (
+        <span>
+          This action will replace <strong>{action.currentChairName}</strong> with{' '}
+          <strong>{action.nextChairName}</strong>{' '}
+          as chair for the <strong>{action.departmentName}</strong> department effective
+          immediately.
+        </span>
+      ) : (
+        <span>
+          This action will assign <strong>{action.nextChairName}</strong> as chair for the{' '}
+          <strong>{action.departmentName}</strong> department effective
+          immediately.
+        </span>
+      )}
+    </WarningModal>
+  );
+}
+
+function ClusterCaoWarningModal({
+  action,
+  errorMessage,
+  isSaving,
+  onCancel,
+  onConfirm,
+}: {
+  action: {
+    clusterId: string;
+    clusterName: string;
+    currentCaoName: string | null;
+    nextCaoName: string;
+    nextCaoUserId: string;
+  };
+  errorMessage: string | null;
+  isSaving: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <WarningModal
+      confirmLabel={action.currentCaoName ? 'Change CAO' : 'Add CAO'}
+      errorMessage={errorMessage}
+      isSaving={isSaving}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title={action.currentCaoName ? 'Change cluster CAO?' : 'Add cluster CAO?'}
+    >
+      {action.currentCaoName ? (
+        <span>
+          This will replace <strong>{action.currentCaoName}</strong> with{' '}
+          <strong>{action.nextCaoName}</strong>{' '}
+          as CAO for the <strong>{action.clusterName}</strong> cluster effective immediately.
+        </span>
+      ) : (
+        <span>
+          This will assign <strong>{action.nextCaoName}</strong> as CAO for the <strong>{action.clusterName}</strong>{' '}
+          cluster effective immediately.
+        </span>
+      )}
+    </WarningModal>
+  );
 }
