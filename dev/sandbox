@@ -1,0 +1,355 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+readonly BASE_COMPOSE="${REPO_ROOT}/.devcontainer/docker-compose.yml"
+readonly SANDBOX_COMPOSE="${REPO_ROOT}/.devcontainer/docker-compose.sandbox.yml"
+readonly START_TIMEOUT_SECONDS=600
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./dev/sandbox up [--name <id>] [--json]
+  ./dev/sandbox status [--name <id>] [--json]
+  ./dev/sandbox down [--name <id>]
+
+Names may contain letters, numbers, dots, underscores, and hyphens (maximum 64 characters).
+When omitted, the name is derived from the current worktree path.
+EOF
+}
+
+fail() {
+  echo "Error: $*" >&2
+  exit 2
+}
+
+short_hash() {
+  local value="$1"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s' "${value}" | sha256sum | cut -c1-8
+  elif command -v shasum >/dev/null 2>&1; then
+    printf '%s' "${value}" | shasum -a 256 | cut -c1-8
+  else
+    fail "sha256sum or shasum is required"
+  fi
+}
+
+default_name() {
+  local worktree_name
+  worktree_name="$(basename "${REPO_ROOT}")"
+  printf '%s-%s\n' "${worktree_name}" "$(short_hash "${REPO_ROOT}")"
+}
+
+sanitize_project_name() {
+  local input="$1"
+  local sanitized
+  local shortened
+
+  sanitized="$(printf '%s' "${input}" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//; s/[-_]+$//')"
+  shortened="${sanitized:0:32}"
+
+  if [[ -z "${shortened}" ]]; then
+    shortened="sandbox"
+  fi
+
+  if [[ "${shortened}" != "${input}" ]]; then
+    shortened="${shortened}-$(short_hash "${input}")"
+  fi
+
+  printf 'leaves-sandbox-%s\n' "${shortened}"
+}
+
+command_name="${1:-}"
+if [[ -z "${command_name}" ]]; then
+  usage >&2
+  exit 2
+fi
+shift
+
+case "${command_name}" in
+  up | status | down) ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    fail "unknown command '${command_name}'"
+    ;;
+esac
+
+sandbox_name=""
+json_output=false
+name_seen=false
+json_seen=false
+
+while (($# > 0)); do
+  case "$1" in
+    --name)
+      ${name_seen} && fail "--name may only be specified once"
+      (($# >= 2)) || fail "--name requires a value"
+      sandbox_name="$2"
+      name_seen=true
+      shift 2
+      ;;
+    --json)
+      ${json_seen} && fail "--json may only be specified once"
+      json_output=true
+      json_seen=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "unknown option '$1'"
+      ;;
+  esac
+done
+
+if [[ "${command_name}" == "down" && "${json_output}" == true ]]; then
+  fail "down does not support --json"
+fi
+
+if [[ -z "${sandbox_name}" ]]; then
+  sandbox_name="$(default_name)"
+fi
+
+if [[ ! "${sandbox_name}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
+  fail "invalid sandbox name '${sandbox_name}'"
+fi
+
+readonly SANDBOX_NAME="${sandbox_name}"
+readonly PROJECT_NAME="$(sanitize_project_name "${SANDBOX_NAME}")"
+readonly -a COMPOSE=(
+  docker compose
+  --project-name "${PROJECT_NAME}"
+  --file "${BASE_COMPOSE}"
+  --file "${SANDBOX_COMPOSE}"
+)
+
+command -v docker >/dev/null 2>&1 || fail "docker is required"
+docker info >/dev/null 2>&1 || fail "Docker is not running"
+
+app_container_id=""
+sql_container_id=""
+app_container_state="absent"
+sql_container_state="absent"
+app_health_state="none"
+sandbox_state="absent"
+app_port=""
+api_port=""
+sql_port=""
+app_url=""
+api_url=""
+health_url=""
+
+container_id() {
+  local service="$1"
+  "${COMPOSE[@]}" ps --all --quiet "${service}" 2>/dev/null | head -n 1
+}
+
+container_state() {
+  local id="$1"
+
+  if [[ -z "${id}" ]]; then
+    printf 'absent\n'
+    return
+  fi
+
+  docker inspect --format '{{.State.Status}}' "${id}" 2>/dev/null || printf 'absent\n'
+}
+
+container_health() {
+  local id="$1"
+
+  if [[ -z "${id}" ]]; then
+    printf 'none\n'
+    return
+  fi
+
+  docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${id}" 2>/dev/null \
+    || printf 'none\n'
+}
+
+published_port() {
+  local service="$1"
+  local target_port="$2"
+  local mapping
+
+  mapping="$("${COMPOSE[@]}" port "${service}" "${target_port}" 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${mapping}" ]]; then
+    printf '%s\n' "${mapping##*:}"
+  fi
+}
+
+refresh_status() {
+  app_container_id="$(container_id devcontainer)"
+  sql_container_id="$(container_id sql)"
+  app_container_state="$(container_state "${app_container_id}")"
+  sql_container_state="$(container_state "${sql_container_id}")"
+  app_health_state="$(container_health "${app_container_id}")"
+
+  app_port="$(published_port devcontainer 5173)"
+  api_port="$(published_port devcontainer 5165)"
+  sql_port="$(published_port sql 1433)"
+
+  app_url=""
+  api_url=""
+  health_url=""
+  if [[ -n "${app_port}" ]]; then
+    app_url="http://127.0.0.1:${app_port}"
+    health_url="${app_url}/health"
+  fi
+  if [[ -n "${api_port}" ]]; then
+    api_url="http://127.0.0.1:${api_port}"
+  fi
+
+  if [[ "${app_container_state}" == "absent" && "${sql_container_state}" == "absent" ]]; then
+    sandbox_state="absent"
+  elif [[ "${app_container_state}" =~ ^(exited|dead)$ || "${sql_container_state}" =~ ^(exited|dead)$ ]]; then
+    sandbox_state="failed"
+  elif [[ "${app_container_state}" == "running" && "${sql_container_state}" == "running" ]]; then
+    case "${app_health_state}" in
+      healthy) sandbox_state="healthy" ;;
+      unhealthy) sandbox_state="unhealthy" ;;
+      *) sandbox_state="starting" ;;
+    esac
+  else
+    sandbox_state="starting"
+  fi
+}
+
+json_value() {
+  local value="$1"
+
+  if [[ -n "${value}" ]]; then
+    printf '"%s"' "${value}"
+  else
+    printf 'null'
+  fi
+}
+
+emit_json_status() {
+  local database_json="null"
+  local auth_json="null"
+
+  if [[ -n "${sql_port}" ]]; then
+    database_json="{\"host\":\"127.0.0.1\",\"port\":${sql_port}}"
+  fi
+
+  if [[ -n "${app_url}" ]]; then
+    auth_json="{\"admin\":\"${app_url}/login?as=admin&returnUrl=/\",\"requester\":\"${app_url}/login?as=requester&returnUrl=/\",\"unauthorized\":\"${app_url}/login?as=unauthorized&returnUrl=/\"}"
+  fi
+
+  printf '{\n'
+  printf '  "name": "%s",\n' "${SANDBOX_NAME}"
+  printf '  "project": "%s",\n' "${PROJECT_NAME}"
+  printf '  "state": "%s",\n' "${sandbox_state}"
+  printf '  "appUrl": %s,\n' "$(json_value "${app_url}")"
+  printf '  "apiUrl": %s,\n' "$(json_value "${api_url}")"
+  printf '  "healthUrl": %s,\n' "$(json_value "${health_url}")"
+  printf '  "database": %s,\n' "${database_json}"
+  printf '  "auth": %s,\n' "${auth_json}"
+  printf '  "containers": {"app":"%s","database":"%s","health":"%s"}\n' \
+    "${app_container_state}" "${sql_container_state}" "${app_health_state}"
+  printf '}\n'
+}
+
+emit_human_status() {
+  echo "Sandbox: ${SANDBOX_NAME}"
+  echo "State: ${sandbox_state}"
+
+  if [[ -n "${app_url}" ]]; then
+    echo "App: ${app_url}"
+    echo "Health: ${health_url}"
+    echo "API: ${api_url}"
+    echo "Admin login: ${app_url}/login?as=admin&returnUrl=/"
+  fi
+
+  if [[ -n "${sql_port}" ]]; then
+    echo "Database: 127.0.0.1:${sql_port}"
+  fi
+
+  if [[ -n "${app_container_id}" ]]; then
+    echo "Logs: docker logs -f ${app_container_id}"
+  fi
+
+  if [[ "${sandbox_state}" == "absent" ]]; then
+    echo "Start: ./dev/sandbox up --name ${SANDBOX_NAME}"
+  else
+    echo "Stop: ./dev/sandbox down --name ${SANDBOX_NAME}"
+  fi
+}
+
+emit_status() {
+  if [[ "${json_output}" == true ]]; then
+    emit_json_status
+  else
+    emit_human_status
+  fi
+}
+
+wait_for_healthy_app() {
+  local deadline=$((SECONDS + START_TIMEOUT_SECONDS))
+
+  while ((SECONDS < deadline)); do
+    refresh_status
+
+    if [[ "${sandbox_state}" == "healthy" ]] \
+      && curl --fail --silent --show-error --max-time 5 "${health_url}" >/dev/null 2>&1; then
+      return 0
+    fi
+
+    if [[ "${sandbox_state}" == "failed" ]]; then
+      return 1
+    fi
+
+    sleep 2
+  done
+
+  refresh_status
+  return 1
+}
+
+case "${command_name}" in
+  up)
+    command -v curl >/dev/null 2>&1 || fail "curl is required"
+
+    if ! "${COMPOSE[@]}" up --detach --build --remove-orphans >&2; then
+      refresh_status
+      sandbox_state="failed"
+      emit_status
+      exit 1
+    fi
+
+    if ! wait_for_healthy_app; then
+      emit_status
+      echo "Sandbox did not become healthy within ${START_TIMEOUT_SECONDS} seconds." >&2
+      if [[ -n "${app_container_id}" ]]; then
+        echo "Inspect startup with: docker logs ${app_container_id}" >&2
+      fi
+      exit 1
+    fi
+
+    emit_status
+    ;;
+  status)
+    refresh_status
+    emit_status
+    ;;
+  down)
+    container_count="$(docker ps --all --quiet --filter "label=com.docker.compose.project=${PROJECT_NAME}" | wc -l | tr -d ' ')"
+    volume_count="$(docker volume ls --quiet --filter "label=com.docker.compose.project=${PROJECT_NAME}" | wc -l | tr -d ' ')"
+    network_count="$(docker network ls --quiet --filter "label=com.docker.compose.project=${PROJECT_NAME}" | wc -l | tr -d ' ')"
+
+    "${COMPOSE[@]}" down --volumes --remove-orphans >&2
+
+    echo "Sandbox ${SANDBOX_NAME} removed: ${container_count} container(s), ${volume_count} volume(s), ${network_count} network(s)."
+    ;;
+esac
