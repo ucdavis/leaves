@@ -42,6 +42,13 @@ default_name() {
   local max_worktree_name_length
 
   worktree_name="$(basename "${REPO_ROOT}")"
+  worktree_name="$(printf '%s' "${worktree_name}" \
+    | LC_ALL=C tr -c 'A-Za-z0-9_.-' '-' \
+    | sed -E 's/^[^A-Za-z0-9]+//')"
+  if [[ -z "${worktree_name}" ]]; then
+    worktree_name="sandbox"
+  fi
+
   path_hash="$(short_hash "${REPO_ROOT}")"
   max_worktree_name_length=$((64 - 1 - ${#path_hash}))
   worktree_name="${worktree_name:0:${max_worktree_name_length}}"
