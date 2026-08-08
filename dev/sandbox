@@ -38,8 +38,15 @@ short_hash() {
 
 default_name() {
   local worktree_name
+  local path_hash
+  local max_worktree_name_length
+
   worktree_name="$(basename "${REPO_ROOT}")"
-  printf '%s-%s\n' "${worktree_name}" "$(short_hash "${REPO_ROOT}")"
+  path_hash="$(short_hash "${REPO_ROOT}")"
+  max_worktree_name_length=$((64 - 1 - ${#path_hash}))
+  worktree_name="${worktree_name:0:${max_worktree_name_length}}"
+
+  printf '%s-%s\n' "${worktree_name}" "${path_hash}"
 }
 
 sanitize_project_name() {
