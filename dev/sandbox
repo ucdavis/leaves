@@ -60,21 +60,19 @@ sanitize_project_name() {
   local input="$1"
   local sanitized
   local shortened
+  local name_hash
 
   sanitized="$(printf '%s' "${input}" \
     | tr '[:upper:]' '[:lower:]' \
     | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//; s/[-_]+$//')"
   shortened="${sanitized:0:32}"
+  name_hash="$(short_hash "${input}")"
 
   if [[ -z "${shortened}" ]]; then
     shortened="sandbox"
   fi
 
-  if [[ "${shortened}" != "${input}" ]]; then
-    shortened="${shortened}-$(short_hash "${input}")"
-  fi
-
-  printf 'leaves-sandbox-%s\n' "${shortened}"
+  printf 'leaves-sandbox-%s-%s\n' "${shortened}" "${name_hash}"
 }
 
 command_name="${1:-}"
