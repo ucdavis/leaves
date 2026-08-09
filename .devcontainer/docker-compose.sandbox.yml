@@ -12,6 +12,9 @@ services:
       Smtp__Username: ""
       Smtp__Password: ""
       Notification__BaseUrl: ""
+    depends_on:
+      sql:
+        condition: service_healthy
     command:
       - /bin/bash
       - -lc
