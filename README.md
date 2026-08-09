@@ -97,7 +97,7 @@ In development, the frontend runs from **http://localhost:5173** and proxies bac
 The backend requires a SQL Server connection string.
 
 - Outside DevContainer, the default development connection points to the SQL Server container published on `localhost:14333`.
-- Inside DevContainer, `devcontainer.json` overrides `DB_CONNECTION` to use the internal Docker hostname `sql:1433`.
+- Inside Docker, use the internal hostname `sql:1433`; `./dev/sandbox` supplies this setting through its sandbox Compose override.
 
 When you want to specify your own DB connection, provide it by setting the `DB_CONNECTION` environment variable (for example in a `.env` file) or by updating `ConnectionStrings:DefaultConnection` in `appsettings.*.json` (`.env` is recommended)
 

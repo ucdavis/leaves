@@ -217,9 +217,10 @@ Controllers    Static Files + SPA fallback (wwwroot)
 ### Sandboxed App Validation
 
 - For browser/Playwright, API, or integration validation, run `./dev/sandbox up [--name <id>] [--json]`. It creates an isolated app and database, loads seed data, waits until the app is healthy, and prints the app/API/database details; use `--json` when consuming them programmatically.
-- The app starts at a user picker. Choose the needed role to log in automatically.
+- Inspect an existing sandbox with `./dev/sandbox status [--name <id>] [--json]`, using the same name passed to `up`. If no name is provided, each command derives the same stable name from the current worktree.
+- The app starts at a user picker. Choose the needed role there, or use the role-specific login URLs included in JSON output.
 - The sandbox database is disposable and isolated, so tests may freely create, update, or delete data.
-- Always clean up when finished with `./dev/sandbox down [--name <id>]`, using the same name passed to `up`. If no name is provided, both commands derive one from the current worktree.
+- Always clean up when finished with `./dev/sandbox down [--name <id>]`. Teardown removes that sandbox's containers, volumes, and network.
 
 ## Code Generation Preferences
 
