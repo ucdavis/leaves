@@ -1,6 +1,5 @@
 services:
   devcontainer:
-    image: leaves-sandbox-devcontainer:local
     user: root
     environment:
       HOME: /home/vscode
