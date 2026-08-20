@@ -340,7 +340,9 @@ function LeaveRequestForm({
       setPendingDraft(null);
       form.reset();
     } catch {
-      form.setErrorMap({ onSubmit: { form: draftSendErrorMessage } });
+      form.setErrorMap({
+        onSubmit: { fields: {}, form: draftSendErrorMessage },
+      });
     }
   };
 
