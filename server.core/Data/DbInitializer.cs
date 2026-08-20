@@ -90,7 +90,8 @@ public class DbInitializer : IDbInitializer
     [
         new("Vacation", 10, "Vacation", true, true),
         new("Sick", 20, "Sick Leave", true, true),
-        new("FamilyCare", 30, "Family Care Leave", false, true),
+        new("ProfessionalDevelopment", null, "Professional Development", false, true),
+        new("FamilyCare", 30, "FMLA", false, true),
         new("Sabbatical", 40, "Sabbatical", false, true),
         new("CompTime", 50, "Compensatory Time", true, true),
     ];

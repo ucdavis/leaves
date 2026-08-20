@@ -16,7 +16,7 @@ import type {
   AdminDepartment,
   AdminUser,
   UpdateUserInput,
-} from '@/shared/admin/adminData.tsx';
+} from '@/shared/admin/adminData.ts';
 
 type AdminFacultyDataContextValue = {
   departments: AdminDepartment[];

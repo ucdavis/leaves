@@ -5,6 +5,7 @@ interface FieldWrapperProps {
   children: ReactNode;
   helperText?: string;
   label: string;
+  required?: boolean;
   wrapperClassName?: string;
 }
 
@@ -15,6 +16,7 @@ export function FieldWrapper({
   children,
   helperText,
   label,
+  required,
   wrapperClassName,
 }: FieldWrapperProps) {
   const field = useFieldContext<string>();
@@ -23,7 +25,10 @@ export function FieldWrapper({
   return (
     <div className={wrapperClassName ?? 'form-control w-full'}>
       <label className="label">
-        <span className="label-text font-medium">{label}</span>
+        <span className="label-text font-medium">
+          {label}
+          {required ? <span className="text-error"> *</span> : null}
+        </span>
       </label>
       {children}
       {hasError && (

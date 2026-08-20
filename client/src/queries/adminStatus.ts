@@ -1,5 +1,5 @@
 import { fetchJson } from '@/lib/api.ts';
-import type { AdminDataSource } from '@/shared/admin/adminData.tsx';
+import type { AdminDataSource } from '@/shared/admin/adminData.ts';
 
 export type AdminStatusSnapshot = {
   issues: {

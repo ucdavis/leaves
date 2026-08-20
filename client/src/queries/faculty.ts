@@ -45,6 +45,7 @@ export interface FacultyLeaveRequest {
   endDate: string;
   id: number;
   leaveType: string;
+  note?: string | null;
   payLeaveType?: string | null;
   startDate: string;
   status: 'Approved' | 'Denied' | 'PendingApproval' | string;

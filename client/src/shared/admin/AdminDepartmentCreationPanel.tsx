@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type {
   AdminCluster,
   ApprovalMode,
-} from '@/shared/admin/adminData.tsx';
+} from '@/shared/admin/adminData.ts';
 import type { CreateDepartmentInput } from '@/queries/adminDepartments.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 

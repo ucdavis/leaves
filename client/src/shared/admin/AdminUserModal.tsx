@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import type { AdminDepartment } from '@/shared/admin/adminData.tsx';
+import type { AdminDepartment } from '@/shared/admin/adminData.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import { statusSurfaceColors } from '@/shared/statusColors.ts';
 import { AdminModalFrame } from './AdminModalFrame.tsx';

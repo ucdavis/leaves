@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
 import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)/index'
+import { Route as authenticatedHistoryRouteImport } from './routes/(authenticated)/history'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
 import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
 import { Route as authenticatedAdminManageUsersRouteImport } from './routes/(authenticated)/admin.manage-users'
@@ -24,6 +25,11 @@ const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
 const authenticatedIndexRoute = authenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => authenticatedRouteRoute,
+} as any)
+const authenticatedHistoryRoute = authenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
 const authenticatedAdminRoute = authenticatedAdminRouteImport.update({
@@ -58,6 +64,7 @@ const authenticatedAdminDepartmentsRoute =
 
 export interface FileRoutesByFullPath {
   '/admin': typeof authenticatedAdminRouteWithChildren
+  '/history': typeof authenticatedHistoryRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/faculty': typeof authenticatedAdminFacultyRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/admin': typeof authenticatedAdminRouteWithChildren
+  '/history': typeof authenticatedHistoryRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/faculty': typeof authenticatedAdminFacultyRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(authenticated)': typeof authenticatedRouteRouteWithChildren
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
+  '/(authenticated)/history': typeof authenticatedHistoryRoute
   '/(authenticated)/': typeof authenticatedIndexRoute
   '/(authenticated)/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/(authenticated)/admin/faculty': typeof authenticatedAdminFacultyRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/admin'
+    | '/history'
     | '/'
     | '/admin/departments'
     | '/admin/faculty'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/admin'
+    | '/history'
     | '/'
     | '/admin/departments'
     | '/admin/faculty'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/(authenticated)'
     | '/(authenticated)/admin'
+    | '/(authenticated)/history'
     | '/(authenticated)/'
     | '/(authenticated)/admin/departments'
     | '/(authenticated)/admin/faculty'
@@ -128,6 +140,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof authenticatedIndexRouteImport
+      parentRoute: typeof authenticatedRouteRoute
+    }
+    '/(authenticated)/history': {
+      id: '/(authenticated)/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof authenticatedHistoryRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/admin': {
@@ -187,11 +206,13 @@ const authenticatedAdminRouteWithChildren =
 
 interface authenticatedRouteRouteChildren {
   authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
+  authenticatedHistoryRoute: typeof authenticatedHistoryRoute
   authenticatedIndexRoute: typeof authenticatedIndexRoute
 }
 
 const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
   authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
+  authenticatedHistoryRoute: authenticatedHistoryRoute,
   authenticatedIndexRoute: authenticatedIndexRoute,
 }
 

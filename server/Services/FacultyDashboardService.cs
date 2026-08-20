@@ -18,6 +18,15 @@ public interface IFacultyDashboardService
 
 public sealed class FacultyDashboardService : IFacultyDashboardService
 {
+    private static readonly string[] DesiredLeaveTypeLabels =
+    [
+        "Vacation",
+        "Sick Leave",
+        "Professional Development",
+        "Sabbatical",
+        "FMLA",
+    ];
+
     private readonly AppDbContext _db;
     private readonly ILogger<FacultyDashboardService> _logger;
 
@@ -76,12 +85,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                     HasDivergentPositionBalances: balance.HasDivergentPositionBalances))
                 .ToList(),
             RecentRequests: recentRequests,
-            LeaveTypes: leaveTypes
-                .Select(type => new FacultyLeaveTypeResponse(
-                    Id: type.Id,
-                    DisplayName: type.DisplayName,
-                    HasAccrualBalance: type.HasAccrualBalance))
-                .ToList());
+            LeaveTypes: BuildLeaveTypeResponses(leaveTypes));
     }
 
     public async Task<CreateLeaveRequestResult> CreateLeaveRequestAsync(
@@ -293,7 +297,8 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                     TotalHours: request.TotalHours,
                     SubmittedAt: request.SubmittedAt,
                     WorkflowMode: request.WorkflowModeSnapshot.ToString(),
-                    DepartmentName: request.ReportingDepartmentNameSnapshot);
+                    DepartmentName: request.ReportingDepartmentNameSnapshot,
+                    Note: request.Note);
             })
             .ToList();
     }
@@ -305,6 +310,27 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .Where(type => type.IsActive)
             .OrderBy(type => type.DisplayName)
             .ToListAsync(cancellationToken);
+    }
+
+    private static List<FacultyLeaveTypeResponse> BuildLeaveTypeResponses(List<LeaveType> leaveTypes)
+    {
+        var responses = new List<FacultyLeaveTypeResponse>();
+
+        foreach (var label in DesiredLeaveTypeLabels)
+        {
+            var matchingType = leaveTypes.FirstOrDefault(type =>
+                string.Equals(type.DisplayName, label, StringComparison.Ordinal));
+
+            if (matchingType != null)
+            {
+                responses.Add(new FacultyLeaveTypeResponse(
+                    Id: matchingType.Id,
+                    DisplayName: label,
+                    HasAccrualBalance: matchingType.HasAccrualBalance));
+            }
+        }
+
+        return responses;
     }
 
     private async Task<Department?> ResolveReportingDepartmentAsync(
@@ -410,7 +436,8 @@ public sealed record FacultyLeaveRequestResponse(
     decimal TotalHours,
     DateTime SubmittedAt,
     string WorkflowMode,
-    string DepartmentName);
+    string DepartmentName,
+    string? Note);
 
 public sealed record FacultyLeaveTypeResponse(
     int Id,

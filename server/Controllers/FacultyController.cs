@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Server.Services;
 
@@ -15,6 +16,11 @@ public sealed class FacultyController : ApiControllerBase
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
+        if (!CanAccessFacultyWorkspace(User))
+        {
+            return Forbid();
+        }
+
         var dashboard = await _facultyDashboardService.GetDashboardAsync(User, cancellationToken);
         if (dashboard == null)
         {
@@ -29,6 +35,11 @@ public sealed class FacultyController : ApiControllerBase
         [FromBody] CreateFacultyLeaveRequest request,
         CancellationToken cancellationToken)
     {
+        if (!CanAccessFacultyWorkspace(User))
+        {
+            return Forbid();
+        }
+
         var result = await _facultyDashboardService.CreateLeaveRequestAsync(User, request, cancellationToken);
         if (result.MissingUser)
         {
@@ -44,5 +55,12 @@ public sealed class FacultyController : ApiControllerBase
         {
             id = result.LeaveRequestId,
         });
+    }
+
+    private static bool CanAccessFacultyWorkspace(ClaimsPrincipal principal)
+    {
+        return principal.FindAll(ClaimTypes.Role).Any(roleClaim =>
+            roleClaim.Value.Equals("faculty", StringComparison.OrdinalIgnoreCase) ||
+            roleClaim.Value.Equals("chair", StringComparison.OrdinalIgnoreCase));
     }
 }

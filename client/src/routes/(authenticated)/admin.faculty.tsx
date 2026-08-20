@@ -4,7 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { HttpError } from '@/lib/api.ts';
 import { adminFacultyQueryOptions } from '@/queries/adminFaculty.ts';
 import { AdminUserModal } from '@/shared/admin/AdminUserModal.tsx';
-import type { AdminUser } from '@/shared/admin/adminData.tsx';
+import type { AdminUser } from '@/shared/admin/adminData.ts';
 import {
   AdminFacultyDataProvider,
   useAdminFacultyData,

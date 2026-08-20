@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import type { AdminCluster } from '@/shared/admin/adminData.tsx';
+import type { AdminCluster } from '@/shared/admin/adminData.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import {
   statusSurfaceColors,

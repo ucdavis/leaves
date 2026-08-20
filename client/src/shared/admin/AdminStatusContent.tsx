@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { AdminDataSource } from '@/shared/admin/adminData.tsx';
+import type { AdminDataSource } from '@/shared/admin/adminData.ts';
 import {
   freshnessStatusBadgeColors,
   issueToneDotColors,

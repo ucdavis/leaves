@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import { meQueryOptions, type User } from '@/queries/user.ts';
 import { AdminLayout } from '@/shared/admin/adminLayout.tsx';
+import { hasAdminRole as userHasAdminRole } from '@/shared/auth/roleAccess.ts';
 import { type RouterContext } from '@/main.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin')({
@@ -29,5 +30,5 @@ function AdminRoute() {
 }
 
 function hasAdminRole(user: User) {
-  return user.roles.some((role) => role.toLowerCase() === 'admin');
+  return userHasAdminRole(user.roles);
 }

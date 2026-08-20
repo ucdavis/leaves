@@ -3,7 +3,7 @@ import {
   PencilSquareIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
-import type { AdminDepartment } from '@/shared/admin/adminData.tsx';
+import type { AdminDepartment } from '@/shared/admin/adminData.ts';
 
 export function DepartmentRow({
   chairName,
