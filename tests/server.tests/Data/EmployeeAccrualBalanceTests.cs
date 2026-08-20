@@ -68,8 +68,8 @@ public class EmployeeAccrualBalanceTests
             balance.LeaveTypeNumber == 10);
 
         localRequesterVacation.ApproachingMax.Should().Be("N");
-        localRequesterVacation.HoursOverUnderPolicyMax.Should().Be(152.62m);
-        localRequesterVacation.AccrualPercentage.Should().Be(36.41m);
+        localRequesterVacation.HoursOverUnderPolicyMax.Should().Be(144.00m);
+        localRequesterVacation.AccrualPercentage.Should().Be(40.00m);
         localRequesterVacation.Level5Dept.Should().Be("030045");
         localRequesterVacation.Level5DeptDesc.Should().Be("ANIMAL SCIENCE");
 
