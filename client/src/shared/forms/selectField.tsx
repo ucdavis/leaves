@@ -26,6 +26,7 @@ export function SelectField({
   return (
     <FieldWrapper helperText={helperText} label={label} required={required}>
       <select
+        aria-required={required}
         className={`${selectClassName ?? 'select select-bordered w-full'} ${
           hasError ? 'select-error' : ''
         }`}

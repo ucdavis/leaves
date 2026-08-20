@@ -7,7 +7,6 @@ import {
   type FacultyDashboardResponse,
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
-import { statusSurfaceColors } from '@/shared/statusColors.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import { facultyLeaveTypeLabels } from './leaveTypes.ts';
 import { Modal } from './FacultyDashboardModal.tsx';
@@ -110,6 +109,22 @@ type LeaveRequestDraft = {
   startDate: string;
   totalHours: number;
 };
+
+const draftSendErrorMessage =
+  'The simulated send could not be completed. Please review the draft and try again.';
+
+function getDraftSubmitErrorMessage(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+
+  const formError = (error as { form?: unknown }).form;
+  if (typeof formError !== 'string') {
+    return null;
+  }
+
+  return formError;
+}
 
 export function RequestDetailModal({
   faculty,
@@ -290,6 +305,7 @@ function LeaveRequestForm({
         leaveTypeOptions.find((option) => option.value === value.leaveTypeId)
           ?.label ?? 'Leave';
 
+      form.setErrorMap({ onSubmit: undefined });
       setPendingDraft({
         endDate,
         leaveTypeId: Number(value.leaveTypeId),
@@ -309,17 +325,28 @@ function LeaveRequestForm({
       return;
     }
 
-    await requestMutation.mutateAsync({
-      coveragePlan: null,
-      endDate: pendingDraft.endDate,
-      leaveTypeId: pendingDraft.leaveTypeId,
-      note: pendingDraft.note,
-      payLeaveTypeId: null,
-      startDate: pendingDraft.startDate,
-      totalHours: pendingDraft.totalHours,
-    });
+    form.setErrorMap({ onSubmit: undefined });
+
+    try {
+      await requestMutation.mutateAsync({
+        coveragePlan: null,
+        endDate: pendingDraft.endDate,
+        leaveTypeId: pendingDraft.leaveTypeId,
+        note: pendingDraft.note,
+        payLeaveTypeId: null,
+        startDate: pendingDraft.startDate,
+        totalHours: pendingDraft.totalHours,
+      });
+      setPendingDraft(null);
+      form.reset();
+    } catch {
+      form.setErrorMap({ onSubmit: { form: draftSendErrorMessage } });
+    }
+  };
+
+  const handleCloseDraftPreview = () => {
+    form.setErrorMap({ onSubmit: undefined });
     setPendingDraft(null);
-    form.reset();
   };
 
   return (
@@ -443,15 +470,6 @@ function LeaveRequestForm({
             </form.AppField>
           </div>
 
-          {requestMutation.isError ? (
-            <div
-              className={`mt-4 rounded-lg px-4 py-3 text-sm ${statusSurfaceColors.danger}`}
-            >
-              The request could not be submitted. Check the fields and try
-              again.
-            </div>
-          ) : null}
-
           <div className="flex justify-end gap-3 pt-2">
             <button
               className="btn btn-outline btn-primary min-w-24"
@@ -469,18 +487,25 @@ function LeaveRequestForm({
         </form.AppForm>
       </form>
 
-      {pendingDraft ? (
-        <DraftEmailPreviewModal
-          draft={pendingDraft}
-          faculty={data.faculty}
-          onClose={() => setPendingDraft(null)}
-          onPrimaryAction={() => void handleSimulateSend()}
-          onSecondaryAction={() => setPendingDraft(null)}
-          primaryLabel="Simulate Send"
-          primaryLoading={requestMutation.isPending}
-          secondaryLabel="Cancel"
-        />
-      ) : null}
+      <form.Subscribe
+        selector={(state) => getDraftSubmitErrorMessage(state.errorMap.onSubmit)}
+      >
+        {(draftErrorMessage) =>
+          pendingDraft ? (
+            <DraftEmailPreviewModal
+              draft={pendingDraft}
+              faculty={data.faculty}
+              onClose={handleCloseDraftPreview}
+              onPrimaryAction={() => void handleSimulateSend()}
+              onSecondaryAction={handleCloseDraftPreview}
+              primaryLabel="Simulate Send"
+              primaryLoading={requestMutation.isPending}
+              secondaryLabel="Cancel"
+              statusMessage={draftErrorMessage}
+            />
+          ) : null
+        }
+      </form.Subscribe>
     </>
   );
 }

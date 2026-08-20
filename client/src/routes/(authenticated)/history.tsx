@@ -7,13 +7,12 @@ import type {
   FacultyDashboardResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
-import { facultyDashboardQueryOptions } from '@/queries/faculty.ts';
+import { facultyHistoryQueryOptions } from '@/queries/faculty.ts';
 import { meQueryOptions } from '@/queries/user.ts';
 import { canAccessFacultyWorkspace } from '@/shared/auth/roleAccess.ts';
 import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
 import {
   FacultyToast,
-  RequestHistoryTable,
   reportLeaveButtonClass,
 } from '@/shared/faculty/FacultyDashboardPanels.tsx';
 import {
@@ -22,6 +21,7 @@ import {
   getReportLeaveTypeOptions,
 } from '@/shared/faculty/FacultyDashboardModals.tsx';
 import { ExistingRequestEmailPreviewModal } from '@/shared/faculty/FacultyDashboardEmailPreviews.tsx';
+import { RequestHistoryTable } from '@/shared/faculty/RequestHistoryTable.tsx';
 
 export const Route = createFileRoute('/(authenticated)/history')({
   beforeLoad: async ({ context }: { context: RouterContext }) => {
@@ -35,7 +35,7 @@ export const Route = createFileRoute('/(authenticated)/history')({
 });
 
 function RouteComponent() {
-  const dashboardQuery = useQuery(facultyDashboardQueryOptions());
+  const dashboardQuery = useQuery(facultyHistoryQueryOptions());
   const [selectedType, setSelectedType] = useState('');
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
@@ -148,6 +148,7 @@ function HistoryContent({
         </div>
 
         <RequestHistoryTable
+          key={selectedType}
           onSelectRequest={onRequestSelected}
           onViewEmail={onEmailPreviewRequest}
           requests={requests}

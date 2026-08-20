@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -10,7 +10,10 @@ import {
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 import { meQueryOptions } from '@/queries/user.ts';
-import { canAccessFacultyWorkspace } from '@/shared/auth/roleAccess.ts';
+import {
+  canAccessFacultyWorkspace,
+  hasAdminRole,
+} from '@/shared/auth/roleAccess.ts';
 import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
 import { LeaveCalendar } from '@/shared/faculty/FacultyDashboardCalendar.tsx';
 import {
@@ -27,6 +30,10 @@ import {
 export const Route = createFileRoute('/(authenticated)/')({
   beforeLoad: async ({ context }: { context: RouterContext }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions());
+
+    if (hasAdminRole(user.roles)) {
+      throw redirect({ replace: true, to: '/admin' });
+    }
 
     if (!canAccessFacultyWorkspace(user.roles)) {
       throw new HttpError(403, '/api/faculty/dashboard');

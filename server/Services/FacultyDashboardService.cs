@@ -9,6 +9,11 @@ namespace Server.Services;
 public interface IFacultyDashboardService
 {
     Task<FacultyDashboardResponse?> GetDashboardAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
+    Task<FacultyDashboardResponse?> GetHistoryAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
+    Task<FacultyLeaveRequestResponse?> GetRequestAsync(
+        ClaimsPrincipal principal,
+        int leaveRequestId,
+        CancellationToken cancellationToken);
 
     Task<CreateLeaveRequestResult> CreateLeaveRequestAsync(
         ClaimsPrincipal principal,
@@ -18,6 +23,8 @@ public interface IFacultyDashboardService
 
 public sealed class FacultyDashboardService : IFacultyDashboardService
 {
+    private const int RecentRequestsLimit = 24;
+
     private static readonly string[] DesiredLeaveTypeLabels =
     [
         "Vacation",
@@ -49,43 +56,74 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var iamId = NormalizeIamId(appUser.IamId);
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
         var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
-        var recentRequests = await GetRecentLeaveRequestsAsync(appUser.Id, cancellationToken);
+        var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
+        var recentRequests = await GetLeaveRequestsAsync(
+            appUser.Id,
+            RecentRequestsLimit,
+            cancellationToken);
         var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
 
-        var balanceSummary = BuildBalanceSummary(accrualBalances);
-        var pendingStatus = LeaveRequestStatus.PendingApproval.ToString();
-        var approvedStatus = LeaveRequestStatus.Approved.ToString();
-        var pendingCount = recentRequests.Count(request => request.Status == pendingStatus);
-        var approvedCount = recentRequests.Count(request => request.Status == approvedStatus);
+        return BuildDashboardResponse(
+            appUser,
+            iamId,
+            employee,
+            accrualBalances,
+            recentRequests,
+            leaveTypes,
+            pendingCount,
+            approvedCount);
+    }
 
-        return new FacultyDashboardResponse(
-            Faculty: new FacultyProfileResponse(
-                IamId: iamId,
-                EmployeeId: employee?.EmployeeId?.Trim() ?? appUser.EmployeeId?.Trim(),
-                Name: employee?.DisplayName ?? appUser.DisplayName ?? iamId,
-                Email: employee?.Email ?? appUser.Email,
-                DepartmentCode: employee?.ResolvedReportingDepartmentCode,
-                DepartmentName: employee?.ResolvedReportingDepartmentName,
-                EmployeeClass: employee?.EmployeeClassDescription,
-                JobTitle: employee?.JobCodeDescription,
-                LatestSnapshotDate: employee?.LatestAsOfDate),
-            Snapshot: new FacultyDashboardSnapshotResponse(
-                PendingRequests: pendingCount,
-                ApprovedRequests: approvedCount,
-                AvailableBalanceHours: balanceSummary.AvailableBalanceHours,
-                AccrualsApproachingCap: balanceSummary.AccrualsApproachingCap),
-            AccrualBalances: accrualBalances
-                .Select(balance => new FacultyAccrualBalanceResponse(
-                    TypeLabel: balance.TypeLabel,
-                    CalculatedBalance: balance.CalculatedBal,
-                    AccrualLimit: balance.AccrualLimit,
-                    AccrualPercentage: balance.AccrualPercentage,
-                    ApproachingMax: balance.ApproachingMax,
-                    LatestAsOfDate: balance.LatestAsOfDate,
-                    HasDivergentPositionBalances: balance.HasDivergentPositionBalances))
-                .ToList(),
-            RecentRequests: recentRequests,
-            LeaveTypes: BuildLeaveTypeResponses(leaveTypes));
+    public async Task<FacultyDashboardResponse?> GetHistoryAsync(
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken)
+    {
+        var appUser = await ResolveAppUserAsync(principal, cancellationToken);
+        if (appUser == null)
+        {
+            return null;
+        }
+
+        var iamId = NormalizeIamId(appUser.IamId);
+        var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
+        var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
+        var allRequests = await GetLeaveRequestsAsync(appUser.Id, null, cancellationToken);
+        var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
+
+        return BuildDashboardResponse(
+            appUser,
+            iamId,
+            employee,
+            accrualBalances,
+            allRequests,
+            leaveTypes,
+            pendingCount,
+            approvedCount);
+    }
+
+    public async Task<FacultyLeaveRequestResponse?> GetRequestAsync(
+        ClaimsPrincipal principal,
+        int leaveRequestId,
+        CancellationToken cancellationToken)
+    {
+        var appUser = await ResolveAppUserAsync(principal, cancellationToken);
+        if (appUser == null)
+        {
+            return null;
+        }
+
+        var request = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(leaveRequest => leaveRequest.AppUserId == appUser.Id && leaveRequest.Id == leaveRequestId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (request == null)
+        {
+            return null;
+        }
+
+        return await BuildFacultyLeaveRequestResponseAsync(request, cancellationToken);
     }
 
     public async Task<CreateLeaveRequestResult> CreateLeaveRequestAsync(
@@ -130,6 +168,19 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         }
 
         var iamId = NormalizeIamId(appUser.IamId);
+        var hasActiveOverlap = await HasActiveOverlappingLeaveRequestAsync(
+            iamId,
+            request.StartDate,
+            request.EndDate,
+            cancellationToken);
+
+        if (hasActiveOverlap)
+        {
+            return CreateLeaveRequestResult.Invalid(
+                "startDate",
+                "A leave request already exists for these dates.");
+        }
+
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         if (department == null)
@@ -173,6 +224,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             iamId);
 
         return CreateLeaveRequestResult.Created(leaveRequest.Id);
+    }
+
+    internal async Task<bool> HasActiveOverlappingLeaveRequestAsync(
+        string iamId,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken)
+    {
+        return await _db.LeaveRequests
+            .AsNoTracking()
+            .AnyAsync(
+                existing =>
+                    existing.IamId == iamId &&
+                    (existing.Status == LeaveRequestStatus.PendingApproval ||
+                        existing.Status == LeaveRequestStatus.Approved) &&
+                    existing.StartDate <= endDate &&
+                    existing.EndDate >= startDate,
+                cancellationToken);
     }
 
     private async Task<AppUser?> ResolveAppUserAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -253,17 +322,65 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<List<FacultyLeaveRequestResponse>> GetRecentLeaveRequestsAsync(
+    private static FacultyDashboardResponse BuildDashboardResponse(
+        AppUser appUser,
+        string iamId,
+        CurrentEmployee? employee,
+        IReadOnlyCollection<CurrentAccrualBalance> accrualBalances,
+        IReadOnlyCollection<FacultyLeaveRequestResponse> requests,
+        IReadOnlyCollection<LeaveType> leaveTypes,
+        int pendingCount,
+        int approvedCount)
+    {
+        var balanceSummary = BuildBalanceSummary(accrualBalances);
+
+        return new FacultyDashboardResponse(
+            Faculty: new FacultyProfileResponse(
+                IamId: iamId,
+                EmployeeId: employee?.EmployeeId?.Trim() ?? appUser.EmployeeId?.Trim(),
+                Name: employee?.DisplayName ?? appUser.DisplayName ?? iamId,
+                Email: employee?.Email ?? appUser.Email,
+                DepartmentCode: employee?.ResolvedReportingDepartmentCode,
+                DepartmentName: employee?.ResolvedReportingDepartmentName,
+                EmployeeClass: employee?.EmployeeClassDescription,
+                JobTitle: employee?.JobCodeDescription,
+                LatestSnapshotDate: employee?.LatestAsOfDate),
+            Snapshot: new FacultyDashboardSnapshotResponse(
+                PendingRequests: pendingCount,
+                ApprovedRequests: approvedCount,
+                AvailableBalanceHours: balanceSummary.AvailableBalanceHours,
+                AccrualsApproachingCap: balanceSummary.AccrualsApproachingCap),
+            AccrualBalances: accrualBalances
+                .Select(balance => new FacultyAccrualBalanceResponse(
+                    TypeLabel: balance.TypeLabel,
+                    CalculatedBalance: balance.CalculatedBal,
+                    AccrualLimit: balance.AccrualLimit,
+                    AccrualPercentage: balance.AccrualPercentage,
+                    ApproachingMax: balance.ApproachingMax,
+                    LatestAsOfDate: balance.LatestAsOfDate,
+                    HasDivergentPositionBalances: balance.HasDivergentPositionBalances))
+                .ToList(),
+            RecentRequests: requests,
+            LeaveTypes: BuildLeaveTypeResponses(leaveTypes));
+    }
+
+    private async Task<List<FacultyLeaveRequestResponse>> GetLeaveRequestsAsync(
         int appUserId,
+        int? limit,
         CancellationToken cancellationToken)
     {
-        var requests = await _db.LeaveRequests
+        IQueryable<LeaveRequest> query = _db.LeaveRequests
             .AsNoTracking()
             .Where(request => request.AppUserId == appUserId)
             .OrderByDescending(request => request.SubmittedAt)
-            .ThenByDescending(request => request.Id)
-            .Take(24)
-            .ToListAsync(cancellationToken);
+            .ThenByDescending(request => request.Id);
+
+        if (limit.HasValue)
+        {
+            query = query.Take(limit.Value);
+        }
+
+        var requests = await query.ToListAsync(cancellationToken);
 
         var leaveTypeIds = requests
             .SelectMany(request => new[] { request.LeaveTypeId, request.PayLeaveTypeId ?? 0 })
@@ -277,30 +394,51 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .ToDictionaryAsync(type => type.Id, cancellationToken);
 
         return requests
-            .Select(request =>
-            {
-                var leaveTypeName = leaveTypesById.TryGetValue(request.LeaveTypeId, out var leaveType)
-                    ? leaveType.DisplayName
-                    : "Unknown";
-                var payLeaveTypeName = request.PayLeaveTypeId.HasValue &&
-                    leaveTypesById.TryGetValue(request.PayLeaveTypeId.Value, out var payLeaveType)
-                        ? payLeaveType.DisplayName
-                        : null;
-
-                return new FacultyLeaveRequestResponse(
-                    Id: request.Id,
-                    LeaveType: leaveTypeName,
-                    PayLeaveType: payLeaveTypeName,
-                    Status: request.Status.ToString(),
-                    StartDate: request.StartDate,
-                    EndDate: request.EndDate,
-                    TotalHours: request.TotalHours,
-                    SubmittedAt: request.SubmittedAt,
-                    WorkflowMode: request.WorkflowModeSnapshot.ToString(),
-                    DepartmentName: request.ReportingDepartmentNameSnapshot,
-                    Note: request.Note);
-            })
+            .Select(request => CreateFacultyLeaveRequestResponse(request, leaveTypesById))
             .ToList();
+    }
+
+    private async Task<FacultyLeaveRequestResponse> BuildFacultyLeaveRequestResponseAsync(
+        LeaveRequest request,
+        CancellationToken cancellationToken)
+    {
+        var leaveTypeIds = new[] { request.LeaveTypeId, request.PayLeaveTypeId ?? 0 }
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        var leaveTypesById = await _db.LeaveTypes
+            .AsNoTracking()
+            .Where(type => leaveTypeIds.Contains(type.Id))
+            .ToDictionaryAsync(type => type.Id, cancellationToken);
+
+        return CreateFacultyLeaveRequestResponse(request, leaveTypesById);
+    }
+
+    private static FacultyLeaveRequestResponse CreateFacultyLeaveRequestResponse(
+        LeaveRequest request,
+        IReadOnlyDictionary<int, LeaveType> leaveTypesById)
+    {
+        var leaveTypeName = leaveTypesById.TryGetValue(request.LeaveTypeId, out var leaveType)
+            ? leaveType.DisplayName
+            : "Unknown";
+        var payLeaveTypeName = request.PayLeaveTypeId.HasValue &&
+            leaveTypesById.TryGetValue(request.PayLeaveTypeId.Value, out var payLeaveType)
+                ? payLeaveType.DisplayName
+                : null;
+
+        return new FacultyLeaveRequestResponse(
+            Id: request.Id,
+            LeaveType: leaveTypeName,
+            PayLeaveType: payLeaveTypeName,
+            Status: request.Status.ToString(),
+            StartDate: request.StartDate,
+            EndDate: request.EndDate,
+            TotalHours: request.TotalHours,
+            SubmittedAt: request.SubmittedAt,
+            WorkflowMode: request.WorkflowModeSnapshot.ToString(),
+            DepartmentName: request.ReportingDepartmentNameSnapshot,
+            Note: request.Note);
     }
 
     private async Task<List<LeaveType>> GetLeaveTypesAsync(CancellationToken cancellationToken)
@@ -312,7 +450,32 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .ToListAsync(cancellationToken);
     }
 
-    private static List<FacultyLeaveTypeResponse> BuildLeaveTypeResponses(List<LeaveType> leaveTypes)
+    private async Task<(int PendingCount, int ApprovedCount)> GetRequestSnapshotCountsAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var statusCounts = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(request =>
+                request.IamId == iamId &&
+                (request.Status == LeaveRequestStatus.PendingApproval ||
+                    request.Status == LeaveRequestStatus.Approved))
+            .GroupBy(request => request.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        var pendingCount = statusCounts
+            .Where(entry => entry.Status == LeaveRequestStatus.PendingApproval)
+            .Sum(entry => entry.Count);
+        var approvedCount = statusCounts
+            .Where(entry => entry.Status == LeaveRequestStatus.Approved)
+            .Sum(entry => entry.Count);
+
+        return (pendingCount, approvedCount);
+    }
+
+    private static List<FacultyLeaveTypeResponse> BuildLeaveTypeResponses(
+        IReadOnlyCollection<LeaveType> leaveTypes)
     {
         var responses = new List<FacultyLeaveTypeResponse>();
 

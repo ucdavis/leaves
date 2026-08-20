@@ -30,6 +30,40 @@ public sealed class FacultyController : ApiControllerBase
         return Ok(dashboard);
     }
 
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory(CancellationToken cancellationToken)
+    {
+        if (!CanAccessFacultyWorkspace(User))
+        {
+            return Forbid();
+        }
+
+        var history = await _facultyDashboardService.GetHistoryAsync(User, cancellationToken);
+        if (history == null)
+        {
+            return NotFound("The authenticated user does not have a faculty profile in Leaves.");
+        }
+
+        return Ok(history);
+    }
+
+    [HttpGet("requests/{id:int}")]
+    public async Task<IActionResult> GetRequest(int id, CancellationToken cancellationToken)
+    {
+        if (!CanAccessFacultyWorkspace(User))
+        {
+            return Forbid();
+        }
+
+        var request = await _facultyDashboardService.GetRequestAsync(User, id, cancellationToken);
+        if (request == null)
+        {
+            return NotFound("The requested leave request was not found.");
+        }
+
+        return Ok(request);
+    }
+
     [HttpPost("requests")]
     public async Task<IActionResult> CreateRequest(
         [FromBody] CreateFacultyLeaveRequest request,
@@ -51,7 +85,7 @@ public sealed class FacultyController : ApiControllerBase
             return ValidationProblem(new ValidationProblemDetails(result.Errors));
         }
 
-        return Created($"/api/faculty/requests/{result.LeaveRequestId}", new
+        return CreatedAtAction(nameof(GetRequest), new { id = result.LeaveRequestId }, new
         {
             id = result.LeaveRequestId,
         });

@@ -82,6 +82,18 @@ export const facultyDashboardQueryOptions = () =>
     retry: false,
   });
 
+export const facultyHistoryQueryOptions = () =>
+  queryOptions({
+    queryFn: ({ signal }) =>
+      fetchJsonWithTimeout<FacultyDashboardResponse>(
+        '/api/faculty/history',
+        dashboardRequestTimeoutMs,
+        signal
+      ),
+    queryKey: ['faculty', 'history'] as const,
+    retry: false,
+  });
+
 export async function createFacultyLeaveRequest(
   request: CreateFacultyLeaveRequest
 ) {
@@ -109,7 +121,7 @@ async function fetchJsonWithTimeout<T>(
   try {
     return await fetchJson<T>(
       url,
-      { skipRedirectOn401: true },
+      {},
       controller.signal
     );
   } finally {

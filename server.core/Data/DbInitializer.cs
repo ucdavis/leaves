@@ -52,7 +52,7 @@ public class DbInitializer : IDbInitializer
     private static readonly PersonSeed[] DevPeople =
     [
         new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "030045", "2026-07-08T08:00:00"),
-        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Faculty", DevelopmentSeedData.LocalRequesterEmail, true, false, false, true, "030045", "2026-07-08T08:05:00"),
+        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Faculty", DevelopmentSeedData.LocalRequesterEmail, true, true, false, true, "030045", "2026-07-08T08:05:00"),
         new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "030000", "2026-07-08T08:10:00"),
         new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "030000", "2026-07-08T08:15:00"),
         new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:20:00"),

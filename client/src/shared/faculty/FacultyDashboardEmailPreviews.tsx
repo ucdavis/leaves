@@ -121,6 +121,7 @@ function EmailPreviewModal({
   primaryLabel,
   primaryLoading,
   secondaryLabel,
+  statusMessage,
   title,
 }: {
   onClose: () => void;
@@ -130,6 +131,7 @@ function EmailPreviewModal({
   primaryLabel: string;
   primaryLoading?: boolean;
   secondaryLabel: string | null;
+  statusMessage?: string | null;
   title: string;
 }) {
   return (
@@ -159,6 +161,15 @@ function EmailPreviewModal({
         <div className="text-sm text-base-content/70">
           Mock mode - email will be simulated
         </div>
+
+        {statusMessage ? (
+          <div
+            className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error"
+            role="alert"
+          >
+            {statusMessage}
+          </div>
+        ) : null}
 
         <div className="flex justify-end gap-3">
           {secondaryLabel ? (
@@ -193,6 +204,7 @@ export function DraftEmailPreviewModal({
   primaryLabel,
   primaryLoading,
   secondaryLabel,
+  statusMessage,
 }: {
   draft: {
     endDate: string;
@@ -208,6 +220,7 @@ export function DraftEmailPreviewModal({
   primaryLabel: string;
   primaryLoading?: boolean;
   secondaryLabel: string | null;
+  statusMessage?: string | null;
 }) {
   return (
     <EmailPreviewModal
@@ -218,6 +231,7 @@ export function DraftEmailPreviewModal({
       primaryLabel={primaryLabel}
       primaryLoading={primaryLoading}
       secondaryLabel={secondaryLabel}
+      statusMessage={statusMessage}
       title="Email Preview: AggieService Submission"
     />
   );

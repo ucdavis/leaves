@@ -22,6 +22,7 @@ export function TextAreaField({
   return (
     <FieldWrapper label={label} required={required}>
       <textarea
+        aria-required={required}
         className={`${textareaClassName ?? 'textarea textarea-bordered w-full'} ${
           hasError ? 'textarea-error' : ''
         }`}

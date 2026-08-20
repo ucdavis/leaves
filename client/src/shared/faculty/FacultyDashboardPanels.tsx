@@ -162,79 +162,6 @@ function RecentRequestRow({
   );
 }
 
-export function RequestHistoryTable({
-  onSelectRequest,
-  onViewEmail,
-  requests,
-}: {
-  onSelectRequest: (request: FacultyLeaveRequest) => void;
-  onViewEmail: (request: FacultyLeaveRequest) => void;
-  requests: FacultyLeaveRequest[];
-}) {
-  if (requests.length === 0) {
-    return <EmptyPanelMessage message="No leave history is on file." />;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="table">
-        <thead>
-          <tr className="border-base-300 text-xs uppercase tracking-[0.12em]">
-            <th>Submitted</th>
-            <th>Leave Type</th>
-            <th>Date(s)</th>
-            <th>Hours</th>
-            <th>Status</th>
-            <th>
-              <span className="sr-only">Email</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((request) => {
-            const tone = getLeaveTone(request.leaveType);
-
-            return (
-              <tr
-                className="cursor-pointer border-base-300 transition hover:bg-base-200"
-                key={request.id}
-                onClick={() => onSelectRequest(request)}
-              >
-                <td>{formatDate(request.submittedAt)}</td>
-                <td>
-                  <span className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                    {request.leaveType}
-                  </span>
-                </td>
-                <td>{formatDateRange(request.startDate, request.endDate)}</td>
-                <td className="font-bold">
-                  {formatCompactHours(request.totalHours)}
-                </td>
-                <td>
-                  <RequestStatusBadge status={request.status} />
-                </td>
-                <td>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onViewEmail(request);
-                    }}
-                    type="button"
-                  >
-                    View Email
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function FacultyToast({
   message,
   onDismiss,
@@ -247,7 +174,11 @@ export function FacultyToast({
   }
 
   return (
-    <div className="fixed right-6 top-6 z-50 max-w-xl">
+    <div
+      aria-live="polite"
+      className="fixed right-6 top-6 z-50 max-w-xl"
+      role="status"
+    >
       <div className="flex items-start gap-3 rounded-lg bg-success px-5 py-4 text-sm font-semibold text-success-content shadow-lg">
         <EnvelopeIcon className="mt-0.5 h-5 w-5 shrink-0" />
         <span>{message}</span>
@@ -420,5 +351,7 @@ export function isIsoDate(value: string) {
 }
 
 function parseIsoDate(value: string) {
-  return new Date(`${value.slice(0, 10)}T00:00:00`);
+  return isIsoDate(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value);
 }

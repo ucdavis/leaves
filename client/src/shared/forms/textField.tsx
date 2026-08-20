@@ -24,6 +24,7 @@ export function TextField({
   return (
     <FieldWrapper helperText={helperText} label={label} required={required}>
       <input
+        aria-required={required}
         className={`${inputClassName ?? 'input input-bordered w-full'} ${
           hasError ? 'input-error' : ''
         }`}
