@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useFormContext } from './formContext.tsx';
 
 export function SubscribeButton({
@@ -8,7 +9,7 @@ export function SubscribeButton({
   type,
 }: {
   className?: string;
-  label: string;
+  label: ReactNode;
   loadingLabel?: string;
   onClick?: () => void;
   type?: 'button' | 'submit';

@@ -7,6 +7,7 @@ interface SelectFieldProps {
   label: string;
   options: Array<{ label: string; value: string }>;
   placeholder?: string;
+  required?: boolean;
   selectClassName?: string;
 }
 
@@ -16,14 +17,16 @@ export function SelectField({
   label,
   options,
   placeholder,
+  required,
   selectClassName,
 }: SelectFieldProps) {
   const field = useFieldContext<string>();
   const hasError = field.state.meta.isTouched && !field.state.meta.isValid;
 
   return (
-    <FieldWrapper helperText={helperText} label={label}>
+    <FieldWrapper helperText={helperText} label={label} required={required}>
       <select
+        aria-required={required}
         className={`${selectClassName ?? 'select select-bordered w-full'} ${
           hasError ? 'select-error' : ''
         }`}

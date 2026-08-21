@@ -6,7 +6,7 @@ import type {
   AdminUser,
   ApprovalMode,
   DepartmentRoutingEmail,
-} from '@/shared/admin/adminData.tsx';
+} from '@/shared/admin/adminData.ts';
 
 export type CreateDepartmentInput = {
   approvalMode: ApprovalMode;
@@ -20,7 +20,7 @@ type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
   departmentOverrideEndDate?: string | null;
   departmentOverrideId?: string | null;
   departmentOverrideStartDate?: string | null;
-  role: string;
+  role: AdminRole;
 };
 
 type AdminDepartmentsResponse = {
@@ -41,14 +41,6 @@ function normalizeApprovalMode(mode: string): ApprovalMode {
   }
 
   return 'notification';
-}
-
-function normalizeRole(role: string): AdminRole {
-  if (role === 'admin' || role === 'chair' || role === 'cao') {
-    return role;
-  }
-
-  return 'faculty';
 }
 
 function normalizeDepartmentData(
@@ -72,7 +64,7 @@ function normalizeDepartmentData(
       departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
       departmentOverrideId: user.departmentOverrideId ?? '',
       departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      role: normalizeRole(user.role),
+      role: user.role,
     })),
   };
 }

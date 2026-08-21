@@ -1,14 +1,15 @@
 'use no memo';
 
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import {
-  ColumnDef,
+  type ColumnDef,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  InitialTableState,
+  type InitialTableState,
+  type Row,
   type Table,
   useReactTable,
 } from '@tanstack/react-table';
@@ -21,29 +22,32 @@ interface DataTableProps<TData extends object> {
   columns: ColumnDef<TData>[];
   data: TData[];
   filterPlaceholder?: string;
+  getRowProps?: (row: Row<TData>) => HTMLAttributes<HTMLTableRowElement>;
   globalFilter?: 'left' | 'right' | 'none'; // Controls the position of the search box
   initialState?: InitialTableState; // Optional initial state for the table, use for stuff like setting page size or sorting
   tableActions?: TableActionsRenderer<TData>;
+  tableClassName?: string;
 }
 
 export const DataTable = <TData extends object>({
   columns,
   data,
   filterPlaceholder = 'Search all columns...',
+  getRowProps,
   globalFilter = 'right',
   initialState,
   tableActions,
+  tableClassName,
 }: DataTableProps<TData>) => {
-  // see note in https://tanstack.com/table/latest/docs/installation#react-table.  Added "use no memo" just to be safe but it's unnecessary.
-  // once tanstack updates their docs and makes sure it works w/ react compiler (even though we aren't using it yet), we can remove this comment
+  // see note in https://tanstack.com/table/latest/docs/installation#react-table.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     columns,
     data,
-    getCoreRowModel: getCoreRowModel(), // basic rendering
-    getFilteredRowModel: getFilteredRowModel(), // enable filtering feature
-    getPaginationRowModel: getPaginationRowModel(), // enable pagination calculations
-    getSortedRowModel: getSortedRowModel(), // enable sorting feature
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     initialState: {
       ...initialState,
     },
@@ -51,7 +55,7 @@ export const DataTable = <TData extends object>({
 
   const filterControl =
     globalFilter === 'none' ? null : (
-      <label className="input input-bordered flex items-center gap-2 w-full max-w-sm">
+      <label className="input input-bordered flex w-full max-w-sm items-center gap-2">
         <svg
           className="h-[1em] opacity-50"
           viewBox="0 0 24 24"
@@ -75,7 +79,7 @@ export const DataTable = <TData extends object>({
           type="text"
           value={table.getState().globalFilter ?? ''}
         />
-        {table.getState().globalFilter && (
+        {table.getState().globalFilter ? (
           <button
             className="btn btn-ghost btn-sm btn-circle"
             onClick={() => table.setGlobalFilter('')}
@@ -87,10 +91,10 @@ export const DataTable = <TData extends object>({
               viewBox="0 0 16 16"
               xmlns="http://www.w3.org/2000/svg"
             >
-              <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
+              <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 0 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
             </svg>
           </button>
-        )}
+        ) : null}
       </label>
     );
 
@@ -111,7 +115,7 @@ export const DataTable = <TData extends object>({
 
   return (
     <div className="space-y-4">
-      {hasToolbar && (
+      {hasToolbar ? (
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {toolbarItems.map((item, index) =>
             item.content ? (
@@ -128,12 +132,14 @@ export const DataTable = <TData extends object>({
             ) : null
           )}
         </div>
-      )}
+      ) : null}
 
       <div className="overflow-x-auto">
-        {' '}
-        {/* enables horizontal scroll on small screens */}
-        <table className="table table-zebra w-full">
+        <table
+          className={['table table-zebra w-full', tableClassName]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -149,7 +155,6 @@ export const DataTable = <TData extends object>({
                           header.column.columnDef.header,
                           header.getContext()
                         )}
-                    {/* Add sort indicator if column is sorted */}
                     {header.column.getIsSorted() === 'asc'
                       ? ' 🔼'
                       : header.column.getIsSorted() === 'desc'
@@ -161,23 +166,32 @@ export const DataTable = <TData extends object>({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map((row) => {
+              const rowProps = getRowProps?.(row);
+
+              return (
+                <tr
+                  {...rowProps}
+                  className={['', rowProps?.className].filter(Boolean).join(' ')}
+                  key={row.id}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {/* (Optional) Pagination controls */}
+
         <div className="flex justify-end space-x-2 py-2">
           <button
             className="btn btn-xs"
             disabled={!table.getCanPreviousPage()}
             onClick={() => table.previousPage()}
+            type="button"
           >
             Previous
           </button>
@@ -185,6 +199,7 @@ export const DataTable = <TData extends object>({
             className="btn btn-xs"
             disabled={!table.getCanNextPage()}
             onClick={() => table.nextPage()}
+            type="button"
           >
             Next
           </button>

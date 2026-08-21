@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type {
   AdminCluster,
   AdminDepartment,
-} from '@/shared/admin/adminData.tsx';
+} from '@/shared/admin/adminData.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import {
   statusSurfaceColors,

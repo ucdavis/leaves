@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { AdminDataSource } from '@/shared/admin/adminData.tsx';
+import type { AdminDataSource } from '@/shared/admin/adminData.ts';
 import {
   freshnessStatusBadgeColors,
   issueToneDotColors,
@@ -71,8 +71,8 @@ export function AdminStatusContent({
           <div className="space-y-1">
             {dataSources.map((source) => (
               <FreshnessRow
-                key={source.id}
                 detail={dataSourceCopy[source.id]?.detail ?? ''}
+                key={source.id}
                 label={dataSourceCopy[source.id]?.label ?? source.id}
                 status={source.status}
                 updatedAt={source.updatedAt}

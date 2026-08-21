@@ -56,6 +56,7 @@ try
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddSingleton<AdminRoleCleanupBackgroundService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
+    builder.Services.AddScoped<IFacultyDashboardService, FacultyDashboardService>();
     // add auth policies here
 
     // add db context (check secrets first, then config, then default)

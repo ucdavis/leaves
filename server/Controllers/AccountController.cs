@@ -65,12 +65,12 @@ public class AccountController : Controller
                 iamIdFallback: DevelopmentSeedData.LocalAdminIamId,
                 safeReturnUrl: safeReturnUrl,
                 roles: ["Admin"]),
-            "requester" => await SignInAsSeededDevPersonaAsync(
+            "faculty" or "requester" => await SignInAsSeededDevPersonaAsync(
                 displayNameFallback: DevelopmentSeedData.LocalRequesterDisplayName,
                 email: DevelopmentSeedData.LocalRequesterEmail,
                 iamIdFallback: DevelopmentSeedData.LocalRequesterIamId,
                 safeReturnUrl: safeReturnUrl,
-                roles: ["User"]),
+                roles: ["Faculty"]),
             "unauthorized" => await SignInAsSeededDevPersonaAsync(
                 displayNameFallback: DevelopmentSeedData.LocalUnauthorizedDisplayName,
                 email: DevelopmentSeedData.LocalUnauthorizedEmail,
@@ -190,9 +190,9 @@ public class AccountController : Controller
                   <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Admin</div>
                   <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Grants the local Admin role for testing admin-only UI.</div>
                 </a>
-                <a href="/login?as=requester&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
-                  <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Requester</div>
-                  <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Simulates a standard signed-in requester with no admin role.</div>
+                <a href="/login?as=faculty&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
+                  <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Faculty</div>
+                  <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Simulates a standard signed-in faculty member with no admin authority.</div>
                 </a>
                 <a href="/login?as=unauthorized&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
                   <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Unauthorized User</div>
@@ -242,12 +242,8 @@ public class AccountController : Controller
                 $"User '{email}' not found in the local database.");
         }
 
-        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
-            ? displayNameFallback
-            : user.DisplayName;
-        var resolvedEmail = string.IsNullOrWhiteSpace(user.Email)
-            ? email
-            : user.Email;
+        var displayName = displayNameFallback;
+        var resolvedEmail = email;
 
         var claims = new List<Claim>
         {

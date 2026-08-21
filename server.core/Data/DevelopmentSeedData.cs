@@ -11,8 +11,8 @@ public static class DevelopmentSeedData
     public const string LocalAdminIamId = "devadmin";
     public const string LocalAdminEmployeeId = "10000001";
 
-    public const string LocalRequesterDisplayName = "Local Requester";
-    public const string LocalRequesterEmail = "requester@local.test";
+    public const string LocalRequesterDisplayName = "Local Faculty";
+    public const string LocalRequesterEmail = "faculty@local.test";
     public const string LocalRequesterIamId = "devreq";
     public const string LocalRequesterEmployeeId = "10000002";
 

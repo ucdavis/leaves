@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { useRouterState } from '@tanstack/react-router';
 import { AppFooter } from '@/shared/AppFooter.tsx';
+import { hasAdminRole } from './roleAccess.ts';
 import { useUser } from './UserContext.tsx';
 
 const navigationItems = [{ label: 'Home', to: '/' }] as const;
@@ -14,7 +15,7 @@ export const AuthenticatedShell = ({
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  const isAdmin = user.roles.some((role) => role.toLowerCase() === 'admin');
+  const isAdmin = hasAdminRole(user.roles);
   const items = isAdmin
     ? [...navigationItems, { label: 'Admin', to: '/admin' as const }]
     : navigationItems;

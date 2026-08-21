@@ -52,7 +52,7 @@ public class DbInitializer : IDbInitializer
     private static readonly PersonSeed[] DevPeople =
     [
         new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "030045", "2026-07-08T08:00:00"),
-        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Requester", DevelopmentSeedData.LocalRequesterEmail, true, false, false, true, "030045", "2026-07-08T08:05:00"),
+        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Faculty", DevelopmentSeedData.LocalRequesterEmail, true, true, false, true, "030045", "2026-07-08T08:05:00"),
         new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "030000", "2026-07-08T08:10:00"),
         new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "030000", "2026-07-08T08:15:00"),
         new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:20:00"),
@@ -90,17 +90,18 @@ public class DbInitializer : IDbInitializer
     [
         new("Vacation", 10, "Vacation", true, true),
         new("Sick", 20, "Sick Leave", true, true),
-        new("FamilyCare", 30, "Family Care Leave", false, true),
+        new("ProfessionalDevelopment", null, "Professional Development", false, true),
+        new("FamilyCare", 30, "FMLA", false, true),
         new("Sabbatical", 40, "Sabbatical", false, true),
         new("CompTime", 50, "Compensatory Time", true, true),
     ];
 
     private static readonly EmployeeAccrualBalanceSeed[] DevEmployeeAccrualBalances =
     [
-        // The local requester has two biweekly snapshots so balance-history development has useful data.
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-06-28", "40001234", 10, "Vacation", 88.00m, 0.00m, 3.69m, 0.00m, 91.69m, 240.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 10, "Vacation", 91.69m, 8.00m, 3.69m, 0.00m, 87.38m, 240.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 20, "Sick Leave", 72.00m, 0.00m, 3.69m, 0.00m, 75.69m, 0.00m, "PSS", "Professional and Support Staff", "004822", "Applications Programmer", "030045", "ANIMAL SCIENCE"),
+        // The local faculty persona has two biweekly snapshots so balance-history development has useful data.
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-06-28", "40001234", 10, "Vacation", 88.00m, 0.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 10, "Vacation", 96.00m, 8.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 20, "Sick Leave", 280.00m, 0.00m, 8.00m, 0.00m, 288.00m, 0.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
 
         // Monthly and biweekly employees intentionally have different latest dates.
         new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 10, "Vacation", 160.00m, 0.00m, 8.00m, 0.00m, 168.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
@@ -762,8 +763,17 @@ public class DbInitializer : IDbInitializer
 
     private async Task<Dictionary<string, Cluster>> LoadClustersByNameAsync(CancellationToken ct)
     {
-        return await _db.Clusters
-            .ToDictionaryAsync(cluster => cluster.ClusterName, StringComparer.OrdinalIgnoreCase, ct);
+        var clusters = await _db.Clusters
+            .OrderByDescending(cluster => cluster.IsActive)
+            .ThenBy(cluster => cluster.Id)
+            .ToListAsync(ct);
+
+        return clusters
+            .GroupBy(cluster => NormalizeKey(cluster.ClusterName), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First(),
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task<Dictionary<string, LeaveType>> LoadLeaveTypesByKeyAsync(CancellationToken ct)
@@ -774,11 +784,19 @@ public class DbInitializer : IDbInitializer
 
     private async Task<Dictionary<string, LeaveRequest>> LoadLeaveRequestsByKeyAsync(CancellationToken ct)
     {
-        var requests = await _db.LeaveRequests.ToListAsync(ct);
+        var requests = await _db.LeaveRequests
+            .OrderByDescending(request => request.SubmittedAt)
+            .ThenByDescending(request => request.Id)
+            .ToListAsync(ct);
 
-        return requests.ToDictionary(
-            request => CreateLeaveRequestKey(request.IamId, request.StartDate, request.EndDate),
-            StringComparer.OrdinalIgnoreCase);
+        return requests
+            .GroupBy(
+                request => CreateLeaveRequestKey(request.IamId, request.StartDate, request.EndDate),
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First(),
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private static string NormalizeKey(string value) => value.Trim();

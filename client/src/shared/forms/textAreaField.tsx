@@ -1,37 +1,35 @@
 import { useFieldContext } from './formContext.tsx';
 import { FieldWrapper } from './fieldWrapper.tsx';
 
-interface TextFieldProps {
-  helperText?: string;
-  inputClassName?: string;
+interface TextAreaFieldProps {
   label: string;
   placeholder?: string;
   required?: boolean;
-  type?: 'date' | 'email' | 'text';
+  rows?: number;
+  textareaClassName?: string;
 }
 
-export function TextField({
-  helperText,
-  inputClassName,
+export function TextAreaField({
   label,
   placeholder,
   required,
-  type,
-}: TextFieldProps) {
+  rows = 3,
+  textareaClassName,
+}: TextAreaFieldProps) {
   const field = useFieldContext<string>();
   const hasError = field.state.meta.isTouched && !field.state.meta.isValid;
 
   return (
-    <FieldWrapper helperText={helperText} label={label} required={required}>
-      <input
+    <FieldWrapper label={label} required={required}>
+      <textarea
         aria-required={required}
-        className={`${inputClassName ?? 'input input-bordered w-full'} ${
-          hasError ? 'input-error' : ''
+        className={`${textareaClassName ?? 'textarea textarea-bordered w-full'} ${
+          hasError ? 'textarea-error' : ''
         }`}
         onBlur={field.handleBlur}
         onChange={(e) => field.handleChange(e.target.value)}
         placeholder={placeholder ?? `Enter ${label.toLowerCase()}`}
-        type={type ?? 'text'}
+        rows={rows}
         value={field.state.value}
       />
     </FieldWrapper>

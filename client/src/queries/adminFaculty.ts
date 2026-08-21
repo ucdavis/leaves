@@ -5,14 +5,14 @@ import type {
   AdminUser,
   ApprovalMode,
   UpdateUserInput,
-} from '@/shared/admin/adminData.tsx';
+} from '@/shared/admin/adminData.ts';
 
 type AdminFacultyUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
   departmentId: string | null;
   departmentOverrideEndDate?: string | null;
   departmentOverrideId?: string | null;
   departmentOverrideStartDate?: string | null;
-  role: string;
+  role: AdminRole;
 };
 
 type AdminFacultyResponse = {
@@ -31,14 +31,6 @@ function normalizeApprovalMode(mode: string): ApprovalMode {
   }
 
   return 'notification';
-}
-
-function normalizeRole(role: string): AdminRole {
-  if (role === 'admin' || role === 'chair' || role === 'cao') {
-    return role;
-  }
-
-  return 'faculty';
 }
 
 function normalizeDesignation(designation: string): AdminUser['designation'] {
@@ -76,7 +68,7 @@ function normalizeFacultyData(
       departmentOverrideId: user.departmentOverrideId ?? '',
       departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
       designation: normalizeDesignation(user.designation),
-      role: normalizeRole(user.role),
+      role: user.role,
     })),
   };
 }
