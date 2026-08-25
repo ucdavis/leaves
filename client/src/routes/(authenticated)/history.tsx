@@ -120,8 +120,8 @@ function HistoryContent({
     : data.recentRequests;
 
   return (
-    <div className="container py-8 lg:py-10">
-      <section className="mx-auto max-w-6xl rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <div className="container">
+      <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm mt-10">
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-lg font-bold text-primary">Request History</h1>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -142,7 +142,7 @@ function HistoryContent({
               onClick={() => onReportModalOpen(true)}
               type="button"
             >
-              + Report Leave
+              Report Leave
             </button>
           </div>
         </div>

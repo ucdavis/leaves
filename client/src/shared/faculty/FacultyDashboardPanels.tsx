@@ -5,8 +5,7 @@ import {
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 
-export const reportLeaveButtonClass =
-  'btn btn-primary';
+export const reportLeaveButtonClass = 'btn btn-primary';
 
 export function AccrualBalancePanel({
   balances,
@@ -82,11 +81,11 @@ export function QuickActionsPanel({
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
       <h2 className="mb-5 font-bold text-primary">Quick Actions</h2>
       <button
-        className={`${reportLeaveButtonClass} w-full`}
+        className={`${reportLeaveButtonClass} w-full btn-lg`}
         onClick={onReportLeave}
         type="button"
       >
-        + Report Leave
+        Report Leave
       </button>
       <div className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/70">
         <span className="font-bold text-base-content">Department:</span>{' '}
@@ -210,7 +209,9 @@ export function RequestStatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+    >
       {status}
     </span>
   );
@@ -349,7 +350,5 @@ export function isIsoDate(value: string) {
 }
 
 function parseIsoDate(value: string) {
-  return isIsoDate(value)
-    ? new Date(`${value}T00:00:00`)
-    : new Date(value);
+  return isIsoDate(value) ? new Date(`${value}T00:00:00`) : new Date(value);
 }

@@ -83,7 +83,7 @@ function DashboardContent({ data }: { data: FacultyDashboardResponse }) {
 
   return (
     <div className="container">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-2 py-8">
+      <div className="mx-auto grid gap-5 lg:grid-cols-2 py-8">
         <div className="space-y-5">
           <QuickActionsPanel
             data={data}
@@ -98,7 +98,7 @@ function DashboardContent({ data }: { data: FacultyDashboardResponse }) {
         <AccrualBalancePanel balances={data.accrualBalances} />
       </div>
 
-      <div className="mx-auto mt-6 max-w-6xl">
+      <div className="mx-auto mt-6">
         <LeaveCalendar faculty={data.faculty} requests={data.recentRequests} />
       </div>
 
