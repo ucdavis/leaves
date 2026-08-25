@@ -74,11 +74,7 @@ function RouteComponent() {
   return <DashboardContent data={dashboardQuery.data} />;
 }
 
-function DashboardContent({
-  data,
-}: {
-  data: FacultyDashboardResponse;
-}) {
+function DashboardContent({ data }: { data: FacultyDashboardResponse }) {
   const navigate = useNavigate();
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
@@ -86,9 +82,8 @@ function DashboardContent({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   return (
-    <div className="container py-8 lg:py-10">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-2">
-        <AccrualBalancePanel balances={data.accrualBalances} />
+    <div className="container">
+      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-2 py-8">
         <div className="space-y-5">
           <QuickActionsPanel
             data={data}
@@ -100,6 +95,7 @@ function DashboardContent({
             requests={data.recentRequests.slice(0, 5)}
           />
         </div>
+        <AccrualBalancePanel balances={data.accrualBalances} />
       </div>
 
       <div className="mx-auto mt-6 max-w-6xl">

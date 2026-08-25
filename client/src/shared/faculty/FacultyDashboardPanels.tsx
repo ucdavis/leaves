@@ -6,7 +6,7 @@ import {
 } from '@/queries/faculty.ts';
 
 export const reportLeaveButtonClass =
-  'btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85';
+  'btn btn-primary';
 
 export function AccrualBalancePanel({
   balances,
@@ -81,26 +81,24 @@ export function QuickActionsPanel({
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
       <h2 className="mb-5 font-bold text-primary">Quick Actions</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          className={reportLeaveButtonClass}
-          onClick={onReportLeave}
-          type="button"
-        >
-          + Report Leave
-        </button>
-        <button
-          className="btn btn-outline btn-primary"
-          onClick={onViewHistory}
-          type="button"
-        >
-          View History
-        </button>
-      </div>
+      <button
+        className={`${reportLeaveButtonClass} w-full`}
+        onClick={onReportLeave}
+        type="button"
+      >
+        + Report Leave
+      </button>
       <div className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/70">
-        <span className="font-bold text-base-content">Dept mode:</span>{' '}
+        <span className="font-bold text-base-content">Department:</span>{' '}
         {data.faculty.departmentName ?? 'No reporting department'}.
       </div>
+      <button
+        className="btn btn-outline btn-primary mt-3"
+        onClick={onViewHistory}
+        type="button"
+      >
+        View History
+      </button>
     </section>
   );
 }

@@ -19,7 +19,7 @@ export const AuthenticatedShell = ({
   const items = isAdmin
     ? [...navigationItems, { label: 'Admin', to: '/admin' as const }]
     : navigationItems;
-  const showSecondaryNav = !pathname.startsWith('/admin');
+  const showSecondaryNav = isAdmin && !pathname.startsWith('/admin');
   const initials = user.name
     .split(' ')
     .filter(Boolean)
