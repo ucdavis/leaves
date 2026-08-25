@@ -25,7 +25,10 @@ export function AdminLayout() {
           <nav className="overflow-x-auto">
             <div className="inline-flex bg-base-100 border border-primary/10 min-w-full gap-2 rounded-sm p-1">
               {adminTabs.map((tab) => {
-                const isActive = pathname.startsWith(tab.to);
+                const isActive =
+                  tab.to === '/admin'
+                    ? pathname === tab.to
+                    : pathname.startsWith(tab.to);
                 const Icon = tab.icon;
 
                 return (

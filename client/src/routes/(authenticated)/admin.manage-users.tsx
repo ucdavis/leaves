@@ -21,15 +21,18 @@ import { WarningModal } from '@/shared/WarningModal.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
   component: AdminUsersRoute,
-  loader: ({ context }) => context.queryClient.ensureQueryData(adminRolesQueryOptions()),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(adminRolesQueryOptions()),
   pendingComponent: () => (
-    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-        Loading role assignments
-      </h2>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-        Pulling admins, CAOs, and department chairs from the database.
-      </p>
+    <section className="card border border-main-border bg-base-100">
+      <div className="card-body p-6">
+        <h2 className="text-lg font-semibold text-primary">
+          Loading role assignments
+        </h2>
+        <p className="mt-2 text-sm text-base-content/70">
+          Pulling admins, CAOs, and department chairs from the database.
+        </p>
+      </div>
     </section>
   ),
 });
@@ -110,8 +113,9 @@ function AdminUsersRoute() {
   const chairDepartmentOptions = selectedUser?.departmentOptions ?? [];
   const selectedChairDepartment =
     type === 'chair' && targetId
-      ? (chairDepartmentOptions.find((department) => department.id === targetId) ??
-        null)
+      ? (chairDepartmentOptions.find(
+          (department) => department.id === targetId
+        ) ?? null)
       : null;
   const targetOptions = type === 'cao' ? data.clusters : data.departments;
   const selectedTarget =
@@ -124,8 +128,8 @@ function AdminUsersRoute() {
     type === 'admin'
       ? null
       : type === 'chair'
-        ? selectedChairDepartment?.name ?? null
-      : selectedTarget?.name ?? null;
+        ? (selectedChairDepartment?.name ?? null)
+        : (selectedTarget?.name ?? null);
   const selectedUserName = selectedUser?.name ?? iamId;
   const assignmentRows = data.assignments.filter((assignment) =>
     showInactiveAssignments ? true : assignment.active
@@ -229,10 +233,10 @@ function AdminUsersRoute() {
       accessorKey: 'name',
       cell: ({ row }) => (
         <div>
-          <div className="font-semibold text-[var(--admin-ink)]">
+          <div className="font-semibold text-base-content">
             {row.original.name}
           </div>
-          <div className="text-xs text-[var(--admin-ink-muted)]">
+          <div className="text-xs text-base-content/70">
             {row.original.email || row.original.iamId}
           </div>
         </div>
@@ -259,9 +263,7 @@ function AdminUsersRoute() {
       cell: ({ row }) => (
         <span
           className={`badge border-0 px-3 py-3 text-xs font-semibold ${
-            row.original.active
-              ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-slate-200 text-slate-700'
+            row.original.active ? 'badge-success' : 'badge-neutral'
           }`}
         >
           {row.original.active ? 'Active' : 'Inactive'}
@@ -296,183 +298,197 @@ function AdminUsersRoute() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-          Assign CAO, department chair, or application admin roles
-        </h2>
+      <section className="card border border-main-border bg-base-100">
+        <div className="card-body p-6">
+          <h2 className="text-2xl font-semibold text-primary">
+            Assign CAO, department chair, or application admin roles
+          </h2>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-end">
-          <label className="form-control">
-            <span className="label-text font-medium">Role</span>
-            <select
-              className="select select-bordered mt-2 w-full"
-              onChange={(event) => {
-                const nextType = event.target.value as AdminAssignableRoleType;
-                setType(nextType);
-                setTargetId(
-                  nextType === 'chair' && selectedUser
-                    ? (selectedUser.departmentOptions.length === 1
-                        ? selectedUser.departmentOptions[0]?.id ?? ''
-                        : '')
-                    : ''
-                );
-                setError(null);
-              }}
-              value={type}
-            >
-              <option value="admin">Admin</option>
-              <option value="cao">CAO</option>
-              <option value="chair">Department chair</option>
-            </select>
-          </label>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-end">
+            <label className="form-control">
+              <span className="label-text font-medium">Role</span>
+              <select
+                className="select select-bordered mt-2 w-full"
+                onChange={(event) => {
+                  const nextType = event.target
+                    .value as AdminAssignableRoleType;
+                  setType(nextType);
+                  setTargetId(
+                    nextType === 'chair' && selectedUser
+                      ? selectedUser.departmentOptions.length === 1
+                        ? (selectedUser.departmentOptions[0]?.id ?? '')
+                        : ''
+                      : ''
+                  );
+                  setError(null);
+                }}
+                value={type}
+              >
+                <option value="admin">Admin</option>
+                <option value="cao">CAO</option>
+                <option value="chair">Department chair</option>
+              </select>
+            </label>
 
-          <label className="form-control">
-            <span className="label-text font-medium">Person</span>
-            <PersonSearchField
-              allUsers={data.users}
-              isOpen={isPersonSearchOpen}
-              onChangeOpen={setIsPersonSearchOpen}
-              onChangeQuery={(value) => {
-                setPersonQuery(value);
-                setIamId('');
-                if (type === 'chair') {
-                  setTargetId('');
-                }
-                setIsPersonSearchOpen(true);
-              }}
-              onSelectUser={(user) => {
-                setIamId(user.iamId);
-                setPersonQuery(user.name);
-                setIsPersonSearchOpen(false);
-                setTargetId(
-                  type === 'chair'
-                    ? (user.departmentOptions.length === 1
-                        ? user.departmentOptions[0]?.id ?? ''
-                        : '')
-                    : ''
-                );
-                setError(null);
-              }}
-              query={personQuery}
-              selectedIamId={iamId}
-              users={filteredUsers}
-            />
-          </label>
-
-          {type !== 'admin' ? (
-            type === 'cao' ? (
-              <label className="form-control">
-                <span className="label-text font-medium">Cluster</span>
-                <select
-                  className="select select-bordered mt-2 w-full"
-                  onChange={(event) => setTargetId(event.target.value)}
-                  value={targetId}
-                >
-                  <option value="">Select scope</option>
-                  {targetOptions.map((option) => (
-                    <option
-                      disabled={!option.active}
-                      key={option.id}
-                      value={option.id}
-                    >
-                      {option.name}
-                      {!option.active ? ' (inactive)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label className="form-control">
-                <span className="label-text font-medium">Department</span>
-                <select
-                  className="select select-bordered mt-2 w-full"
-                  disabled={!selectedUser || chairDepartmentOptions.length === 0}
-                  onChange={(event) => setTargetId(event.target.value)}
-                  value={targetId}
-                >
-                  <option value="">
-                    {!selectedUser
-                      ? 'Select a person first'
-                      : chairDepartmentOptions.length === 0
-                        ? 'No current departments available'
-                        : 'Select department'}
-                  </option>
-                  {chairDepartmentOptions.map((department) => (
-                    <option
-                      disabled={!department.active}
-                      key={department.id}
-                      value={department.id}
-                    >
-                      {department.name}
-                      {!department.active ? ' (inactive)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )
-          ) : (
-            <div className="hidden lg:block" />
-          )}
-
-          <button
-            className={`btn border-0 bg-[var(--admin-gold)] text-[var(--admin-blue)] hover:bg-[var(--admin-gold)]/85 lg:self-end ${
-              !pendingAction && error ? 'opacity-60' : ''
-            }`}
-            disabled={
-              isSaving ||
-              !iamId ||
-              (type === 'cao' && !targetId) ||
-              (type === 'chair' && !targetId) ||
-              (type !== 'admin' && selectedTarget !== null && !selectedTarget.active)
-            }
-            onClick={() =>
-              setPendingAction({
-                kind: 'add',
-                roleType: type,
-                targetName: selectedTargetName,
-                userName: selectedUserName,
-              })
-            }
-            type="button"
-          >
-            {isSaving ? 'Adding...' : 'Add role'}
-          </button>
-        </div>
-
-        {!pendingAction && error ? (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <DataTable
-          columns={columns}
-          data={assignmentRows}
-          filterPlaceholder="Search role, person, IAM ID, or scope..."
-          globalFilter="left"
-          initialState={{
-            pagination: {
-              pageSize: 10,
-            },
-          }}
-          tableActions={
-            <label className="label cursor-pointer gap-3 rounded-xl border border-[var(--admin-border)] px-4 py-2">
-              <span className="label-text text-sm text-[var(--admin-ink)]">
-                Show inactive
-              </span>
-              <input
-                checked={showInactiveAssignments}
-                className="toggle toggle-sm"
-                onChange={(event) =>
-                  setShowInactiveAssignments(event.target.checked)
-                }
-                type="checkbox"
+            <label className="form-control">
+              <span className="label-text font-medium">Person</span>
+              <PersonSearchField
+                allUsers={data.users}
+                isOpen={isPersonSearchOpen}
+                onChangeOpen={setIsPersonSearchOpen}
+                onChangeQuery={(value) => {
+                  setPersonQuery(value);
+                  setIamId('');
+                  if (type === 'chair') {
+                    setTargetId('');
+                  }
+                  setIsPersonSearchOpen(true);
+                }}
+                onSelectUser={(user) => {
+                  setIamId(user.iamId);
+                  setPersonQuery(user.name);
+                  setIsPersonSearchOpen(false);
+                  setTargetId(
+                    type === 'chair'
+                      ? user.departmentOptions.length === 1
+                        ? (user.departmentOptions[0]?.id ?? '')
+                        : ''
+                      : ''
+                  );
+                  setError(null);
+                }}
+                query={personQuery}
+                selectedIamId={iamId}
+                users={filteredUsers}
               />
             </label>
-          }
-        />
+
+            {type !== 'admin' ? (
+              type === 'cao' ? (
+                <label className="form-control">
+                  <span className="label-text font-medium">Cluster</span>
+                  <select
+                    className="select select-bordered mt-2 w-full"
+                    onChange={(event) => setTargetId(event.target.value)}
+                    value={targetId}
+                  >
+                    <option value="">Select scope</option>
+                    {targetOptions.map((option) => (
+                      <option
+                        disabled={!option.active}
+                        key={option.id}
+                        value={option.id}
+                      >
+                        {option.name}
+                        {!option.active ? ' (inactive)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="form-control">
+                  <span className="label-text font-medium">Department</span>
+                  <select
+                    className="select select-bordered mt-2 w-full"
+                    disabled={
+                      !selectedUser || chairDepartmentOptions.length === 0
+                    }
+                    onChange={(event) => setTargetId(event.target.value)}
+                    value={targetId}
+                  >
+                    <option value="">
+                      {!selectedUser
+                        ? 'Select a person first'
+                        : chairDepartmentOptions.length === 0
+                          ? 'No current departments available'
+                          : 'Select department'}
+                    </option>
+                    {chairDepartmentOptions.map((department) => (
+                      <option
+                        disabled={!department.active}
+                        key={department.id}
+                        value={department.id}
+                      >
+                        {department.name}
+                        {!department.active ? ' (inactive)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
+            ) : (
+              <div className="hidden lg:block" />
+            )}
+
+            <button
+              className={`btn btn-primary lg:self-end ${
+                !pendingAction && error ? 'opacity-60' : ''
+              }`}
+              disabled={
+                isSaving ||
+                !iamId ||
+                (type === 'cao' && !targetId) ||
+                (type === 'chair' && !targetId) ||
+                (type !== 'admin' &&
+                  selectedTarget !== null &&
+                  !selectedTarget.active)
+              }
+              onClick={() =>
+                setPendingAction({
+                  kind: 'add',
+                  roleType: type,
+                  targetName: selectedTargetName,
+                  userName: selectedUserName,
+                })
+              }
+              type="button"
+            >
+              {isSaving ? 'Adding...' : 'Add role'}
+            </button>
+          </div>
+
+          {!pendingAction && error ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="card border border-main-border bg-base-100">
+        <div className="card-body p-6">
+          <h2 className="text-lg font-semibold text-primary">
+            Role assignments
+          </h2>
+          <div className="mt-5">
+            <DataTable
+              columns={columns}
+              data={assignmentRows}
+              filterPlaceholder="Search role, person, IAM ID, or scope..."
+              globalFilter="left"
+              initialState={{
+                pagination: {
+                  pageSize: 10,
+                },
+              }}
+              tableActions={
+                <label className="label cursor-pointer gap-3 rounded-lg border border-base-300 px-4 py-2">
+                  <span className="label-text text-sm text-base-content">
+                    Show inactive
+                  </span>
+                  <input
+                    checked={showInactiveAssignments}
+                    className="toggle toggle-sm"
+                    onChange={(event) =>
+                      setShowInactiveAssignments(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                </label>
+              }
+            />
+          </div>
+        </div>
       </section>
 
       {pendingAction ? (
@@ -512,12 +528,22 @@ function getRoleWarningModalText(action: PendingRoleAction) {
     : (action.assignment.targetName ?? 'Application-wide');
   const message = isAdd ? (
     <span>
-      This will grant {roleLabels[roleType]} access to <strong>{personName}</strong>
-      {scopeName === 'Application-wide' ? '' : <> for <strong>{scopeName}</strong></>}.
+      This will grant {roleLabels[roleType]} access to{' '}
+      <strong>{personName}</strong>
+      {scopeName === 'Application-wide' ? (
+        ''
+      ) : (
+        <>
+          {' '}
+          for <strong>{scopeName}</strong>
+        </>
+      )}
+      .
     </span>
   ) : roleType === 'admin' ? (
     <span>
-      This will remove application admin access for <strong>{personName}</strong>.
+      This will remove application admin access for{' '}
+      <strong>{personName}</strong>.
     </span>
   ) : (
     <span>
@@ -629,7 +655,7 @@ export function PersonSearchField({
 
       {showResults ? (
         <div
-          className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-white shadow-lg"
+          className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg"
           id={resultsId}
           role="listbox"
         >
@@ -640,8 +666,8 @@ export function PersonSearchField({
             return (
               <button
                 aria-selected={isSelected}
-                className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-[var(--admin-sand)] ${
-                  isSelected || isActive ? 'bg-[var(--admin-sand)]' : ''
+                className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-base-200 ${
+                  isSelected || isActive ? 'bg-base-200' : ''
                 }`}
                 id={`person-search-option-${user.iamId}`}
                 key={user.iamId}
@@ -653,14 +679,14 @@ export function PersonSearchField({
                 type="button"
               >
                 <span>
-                  <span className="block font-semibold text-[var(--admin-ink)]">
+                  <span className="block font-semibold text-base-content">
                     {user.name}
                   </span>
-                  <span className="block text-xs text-[var(--admin-ink-muted)]">
+                  <span className="block text-xs text-base-content/70">
                     {user.email || user.iamId}
                   </span>
                 </span>
-                <span className="text-right text-xs text-[var(--admin-ink-muted)]">
+                <span className="text-right text-xs text-base-content/70">
                   <span className="block font-mono">{user.iamId}</span>
                   <span className="block">
                     {user.departmentName ?? 'No department'}
@@ -671,13 +697,12 @@ export function PersonSearchField({
           })}
 
           {visibleUsers.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-[var(--admin-ink-muted)]">
+            <div className="px-4 py-3 text-sm text-base-content/70">
               No people match that search.
             </div>
           ) : null}
         </div>
       ) : null}
-
     </div>
   );
 }

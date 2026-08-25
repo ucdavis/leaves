@@ -16,7 +16,7 @@ export function AppFooter() {
             rel="noopener noreferrer"
             target="_blank"
           >
-            <img alt="CA&ES wordmark" className="w-52" src="/caes.svg" />
+            <img alt="CA&ES wordmark" className="w-76" src="/caes.svg" />
           </a>
           <p className="mt-2 text-center text-sm text-base-content/70">
             created by
