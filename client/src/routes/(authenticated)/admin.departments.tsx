@@ -156,9 +156,6 @@ function AdminDepartmentsRoute() {
                     {selectedDepartment.name}
                   </h2>
                 </div>
-                <div className="text-sm text-base-content/70">
-                  {departmentUsers.length} people linked by request history
-                </div>
               </div>
 
               <div className="overflow-x-auto">

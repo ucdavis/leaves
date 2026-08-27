@@ -4,7 +4,12 @@ using Server.Core.Domain;
 
 namespace Server.Services;
 
-public sealed class AdminDirectoryDataService
+public interface IAdminDirectoryDataService
+{
+    Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken);
+}
+
+public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
 {
     private readonly AppDbContext _db;
 

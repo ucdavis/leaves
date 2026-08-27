@@ -25,11 +25,14 @@ export function AdminLayout() {
           <nav className="overflow-x-auto">
             <div className="inline-flex bg-base-100 border border-primary/10 min-w-full gap-2 rounded-sm p-1">
               {adminTabs.map((tab) => {
-                const isActive = pathname.startsWith(tab.to);
+                const isActive =
+                  tab.to === '/admin'
+                    ? pathname === '/admin'
+                    : pathname.startsWith(tab.to);
                 const Icon = tab.icon;
 
                 return (
-                <Link
+                  <Link
                     activeOptions={{ exact: tab.to === '/admin' }}
                     className={`admin-tab flex flex-1 items-center justify-center gap-2 rounded-sm px-4 py-3 text-center font-semibold transition ${
                       isActive

@@ -30,6 +30,34 @@ public sealed class FacultyController : ApiControllerBase
         return Ok(dashboard);
     }
 
+    [HttpGet("dashboard/{iamId}")]
+    public async Task<IActionResult> GetDashboardForViewer(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        if (!CanAccessApprovalWorkspace(User))
+        {
+            return Forbid();
+        }
+
+        var result = await _facultyDashboardService.GetDashboardForViewerAsync(
+            User,
+            iamId,
+            cancellationToken);
+
+        if (result.ViewerMissing || result.TargetMissing)
+        {
+            return NotFound("The requested faculty dashboard was not found.");
+        }
+
+        if (result.IsForbidden || result.Dashboard == null)
+        {
+            return Forbid();
+        }
+
+        return Ok(result.Dashboard);
+    }
+
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory(CancellationToken cancellationToken)
     {
@@ -96,5 +124,12 @@ public sealed class FacultyController : ApiControllerBase
         return principal.FindAll(ClaimTypes.Role).Any(roleClaim =>
             roleClaim.Value.Equals("faculty", StringComparison.OrdinalIgnoreCase) ||
             roleClaim.Value.Equals("chair", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool CanAccessApprovalWorkspace(ClaimsPrincipal principal)
+    {
+        return principal.FindAll(ClaimTypes.Role).Any(roleClaim =>
+            roleClaim.Value.Equals("chair", StringComparison.OrdinalIgnoreCase) ||
+            roleClaim.Value.Equals("cao", StringComparison.OrdinalIgnoreCase));
     }
 }

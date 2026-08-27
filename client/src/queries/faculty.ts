@@ -21,6 +21,7 @@ export interface FacultyProfile {
   jobTitle?: string | null;
   latestSnapshotDate?: string | null;
   name: string;
+  workflowMode?: string | null;
 }
 
 export interface FacultyDashboardSnapshot {
@@ -79,6 +80,18 @@ export const facultyDashboardQueryOptions = () =>
         signal
       ),
     queryKey: ['faculty', 'dashboard'] as const,
+    retry: false,
+  });
+
+export const facultyDashboardByIamIdQueryOptions = (iamId: string) =>
+  queryOptions({
+    queryFn: ({ signal }) =>
+      fetchJsonWithTimeout<FacultyDashboardResponse>(
+        `/api/faculty/dashboard/${encodeURIComponent(iamId)}`,
+        dashboardRequestTimeoutMs,
+        signal
+      ),
+    queryKey: ['faculty', 'dashboard', iamId] as const,
     retry: false,
   });
 

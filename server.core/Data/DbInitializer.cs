@@ -14,7 +14,9 @@ public class DbInitializer : IDbInitializer
     private static readonly AppUserSeed[] DevUsers =
     [
         new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEntraObjectId.ToString(), DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, DevelopmentSeedData.LocalAdminEmail, true, "2026-07-01T15:55:00", "2026-07-08T18:05:00"),
-        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEntraObjectId.ToString(), DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, DevelopmentSeedData.LocalRequesterEmail, true, "2026-07-01T15:56:00", "2026-07-08T18:00:00"),
+        new(DevelopmentSeedData.LocalFacultyIamId, DevelopmentSeedData.LocalFacultyEntraObjectId.ToString(), DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyDisplayName, DevelopmentSeedData.LocalFacultyEmail, true, "2026-07-01T15:56:00", "2026-07-08T18:00:00"),
+        new(DevelopmentSeedData.LocalChairIamId, DevelopmentSeedData.LocalChairEntraObjectId.ToString(), DevelopmentSeedData.LocalChairEmployeeId, DevelopmentSeedData.LocalChairDisplayName, DevelopmentSeedData.LocalChairEmail, true, "2026-08-21T08:00:00", "2026-08-21T08:00:00"),
+        new(DevelopmentSeedData.LocalCaoIamId, DevelopmentSeedData.LocalCaoEntraObjectId.ToString(), DevelopmentSeedData.LocalCaoEmployeeId, DevelopmentSeedData.LocalCaoDisplayName, DevelopmentSeedData.LocalCaoEmail, true, "2026-08-21T08:05:00", "2026-08-21T08:05:00"),
         new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEntraObjectId.ToString(), DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, DevelopmentSeedData.LocalUnauthorizedEmail, true, "2026-07-01T15:57:00", "2026-07-08T17:55:00"),
         new("adminherd", "11111111-1111-1111-1111-111111111111", "84726195", "Maya Thompson", "adminherd@fake.ucdavis.edu", true, "2026-07-01T16:00:00", "2026-07-08T18:10:00"),
         new("apatel", "22222222-2222-2222-2222-222222222222", "36190428", "Asha Patel", "apatel@fake.ucdavis.edu", true, "2026-07-01T16:15:00", "2026-07-08T17:42:00"),
@@ -33,12 +35,14 @@ public class DbInitializer : IDbInitializer
     [
         new("Animal Sciences Cluster", true, "adminherd"),
         new("Land & Environment Cluster", true, "adminherd"),
+        new(DevelopmentSeedData.TestClusterName, true, "adminherd"),
     ];
 
     private static readonly DepartmentSeed[] DevDepartments =
     [
         new("030045", "ANIMAL SCIENCE", 5, "Animal Sciences Cluster", WorkflowMode.ApprovalRequired, true, "2026-07-08T08:00:00"),
         new("030000", "AGR & ENV SCI DEANS OFFICE", 5, "Land & Environment Cluster", WorkflowMode.DirectSubmission, true, "2026-07-08T08:00:00"),
+        new(DevelopmentSeedData.TestDepartmentCode, DevelopmentSeedData.TestDepartmentName, 5, DevelopmentSeedData.TestClusterName, WorkflowMode.ApprovalRequired, true, "2026-08-21T08:10:00"),
     ];
 
     private static readonly DepartmentEmailRoutingSeed[] DevDepartmentEmailRoutings =
@@ -52,7 +56,9 @@ public class DbInitializer : IDbInitializer
     private static readonly PersonSeed[] DevPeople =
     [
         new(DevelopmentSeedData.LocalAdminIamId, DevelopmentSeedData.LocalAdminEmployeeId, DevelopmentSeedData.LocalAdminDisplayName, "Admin", DevelopmentSeedData.LocalAdminEmail, true, false, false, true, "030045", "2026-07-08T08:00:00"),
-        new(DevelopmentSeedData.LocalRequesterIamId, DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterDisplayName, "Faculty", DevelopmentSeedData.LocalRequesterEmail, true, true, false, true, "030045", "2026-07-08T08:05:00"),
+        new(DevelopmentSeedData.LocalFacultyIamId, DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyDisplayName, "Faculty", DevelopmentSeedData.LocalFacultyEmail, true, true, false, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:15:00"),
+        new(DevelopmentSeedData.LocalChairIamId, DevelopmentSeedData.LocalChairEmployeeId, DevelopmentSeedData.LocalChairDisplayName, "Chair", DevelopmentSeedData.LocalChairEmail, true, true, false, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:20:00"),
+        new(DevelopmentSeedData.LocalCaoIamId, DevelopmentSeedData.LocalCaoEmployeeId, DevelopmentSeedData.LocalCaoDisplayName, "CAO", DevelopmentSeedData.LocalCaoEmail, true, false, true, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:25:00"),
         new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "030000", "2026-07-08T08:10:00"),
         new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "030000", "2026-07-08T08:15:00"),
         new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:20:00"),
@@ -71,6 +77,9 @@ public class DbInitializer : IDbInitializer
     [
         new("sbaker", "030045", "2026-07-01", null, "Temporary reporting line coverage for summer operations.", "adminherd", "2026-07-08T09:20:00", null, null),
         new("tnguyen", "030045", "2026-06-15", "2026-07-15", "Historical override retained for testing closed records.", "adminherd", "2026-07-01T09:20:00", "apatel", "2026-07-15T17:00:00"),
+        new(DevelopmentSeedData.LocalFacultyIamId, DevelopmentSeedData.TestDepartmentCode, "2026-08-21", null, "Move test faculty into the seeded test department.", "adminherd", "2026-08-21T08:30:00", null, null),
+        new(DevelopmentSeedData.LocalChairIamId, DevelopmentSeedData.TestDepartmentCode, "2026-08-21", null, "Assign the seeded test chair to the test department.", "adminherd", "2026-08-21T08:35:00", null, null),
+        new(DevelopmentSeedData.LocalCaoIamId, DevelopmentSeedData.TestDepartmentCode, "2026-08-21", null, "Assign the seeded test CAO to the test department.", "adminherd", "2026-08-21T08:40:00", null, null),
     ];
 
     private static readonly DepartmentChairAssignmentSeed[] DevDepartmentChairAssignments =
@@ -78,12 +87,14 @@ public class DbInitializer : IDbInitializer
         new("030045", "apatel", "2026-01-01", null, "adminherd", "2026-07-08T09:25:00", null, null),
         new("030045", "jlin", "2026-01-01", null, "adminherd", "2026-07-08T09:26:00", null, null),
         new("030000", "kchen", "2025-09-01", "2026-06-30", "adminherd", "2026-06-01T09:26:00", "apatel", "2026-06-30T17:00:00"),
+        new(DevelopmentSeedData.TestDepartmentCode, DevelopmentSeedData.LocalChairIamId, "2026-08-21", null, "adminherd", "2026-08-21T08:45:00", null, null),
     ];
 
     private static readonly ClusterCaoAssignmentSeed[] DevClusterCaoAssignments =
     [
         new("Animal Sciences Cluster", "adminherd", "2026-01-01", null, "adminherd", "2026-07-08T09:30:00", null, null),
         new("Land & Environment Cluster", "mowens", "2026-01-01", null, "adminherd", "2026-07-08T09:31:00", null, null),
+        new(DevelopmentSeedData.TestClusterName, DevelopmentSeedData.LocalCaoIamId, "2026-08-21", null, "adminherd", "2026-08-21T08:50:00", null, null),
     ];
 
     private static readonly LeaveTypeSeed[] DevLeaveTypes =
@@ -99,9 +110,9 @@ public class DbInitializer : IDbInitializer
     private static readonly EmployeeAccrualBalanceSeed[] DevEmployeeAccrualBalances =
     [
         // The local faculty persona has two biweekly snapshots so balance-history development has useful data.
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-06-28", "40001234", 10, "Vacation", 88.00m, 0.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 10, "Vacation", 96.00m, 8.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
-        new(DevelopmentSeedData.LocalRequesterEmployeeId, DevelopmentSeedData.LocalRequesterEmail, DevelopmentSeedData.LocalRequesterDisplayName, "2026-07-12", "40001234", 20, "Sick Leave", 280.00m, 0.00m, 8.00m, 0.00m, 288.00m, 0.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyEmail, DevelopmentSeedData.LocalFacultyDisplayName, "2026-06-28", "40001234", 10, "Vacation", 88.00m, 0.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyEmail, DevelopmentSeedData.LocalFacultyDisplayName, "2026-07-12", "40001234", 10, "Vacation", 96.00m, 8.00m, 8.00m, 0.00m, 96.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
+        new(DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyEmail, DevelopmentSeedData.LocalFacultyDisplayName, "2026-07-12", "40001234", 20, "Sick Leave", 280.00m, 0.00m, 8.00m, 0.00m, 288.00m, 0.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
 
         // Monthly and biweekly employees intentionally have different latest dates.
         new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 10, "Vacation", 160.00m, 0.00m, 8.00m, 0.00m, 168.00m, 240.00m, "FAC", "Faculty", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
@@ -223,39 +234,87 @@ public class DbInitializer : IDbInitializer
 
     private async Task SeedAppUsersAsync(DateTime nowUtc, CancellationToken ct)
     {
-        var existingIamIds = await _db.AppUsers
-            .Select(user => user.IamId)
-            .ToListAsync(ct);
+        var existingUsers = await _db.AppUsers.ToListAsync(ct);
+        var newUsers = new List<AppUser>();
 
-        var existing = existingIamIds
-            .Select(NormalizeKey)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var missingUsers = DevUsers
-            .Where(user => !existing.Contains(user.IamId))
-            .Select(user => new AppUser
+        foreach (var seed in DevUsers)
+        {
+            var user = FindExistingUser(existingUsers, seed);
+            if (user == null)
             {
-                EntraObjectId = Guid.Parse(user.EntraObjectId),
-                IamId = user.IamId,
-                EmployeeId = user.EmployeeId,
-                DisplayName = user.DisplayName,
-                Email = user.Email,
-                IsActive = user.IsActive,
-                FirstLoginUtc = ParseUtc(user.FirstLoginUtc),
-                LastLoginUtc = ParseUtc(user.LastLoginUtc),
-                CreatedUtc = nowUtc,
-                UpdatedUtc = nowUtc,
-            })
-            .ToArray();
+                newUsers.Add(CreateAppUser(seed, nowUtc));
+                continue;
+            }
 
-        if (missingUsers.Length == 0)
+            ApplyAppUserSeed(user, seed, nowUtc);
+        }
+
+        if (newUsers.Count > 0)
+        {
+            await _db.AppUsers.AddRangeAsync(newUsers, ct);
+        }
+
+        if (newUsers.Count == 0 && existingUsers.Count == 0)
         {
             return;
         }
 
-        await _db.AppUsers.AddRangeAsync(missingUsers, ct);
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seeded {Count} development AppUser rows.", missingUsers.Length);
+        _logger.LogInformation("Seeded or updated development AppUser rows.");
+    }
+
+    private static AppUser? FindExistingUser(
+        IReadOnlyCollection<AppUser> existingUsers,
+        AppUserSeed seed)
+    {
+        var normalizedIamId = NormalizeKey(seed.IamId);
+        var normalizedEmployeeId = NormalizeKey(seed.EmployeeId);
+
+        var userByIamId = existingUsers.FirstOrDefault(user =>
+            NormalizeKey(user.IamId) == normalizedIamId);
+        if (userByIamId != null)
+        {
+            return userByIamId;
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedEmployeeId))
+        {
+            return null;
+        }
+
+        return existingUsers.FirstOrDefault(user =>
+            !string.IsNullOrWhiteSpace(user.EmployeeId) &&
+            NormalizeKey(user.EmployeeId) == normalizedEmployeeId);
+    }
+
+    private static AppUser CreateAppUser(AppUserSeed seed, DateTime nowUtc)
+    {
+        return new AppUser
+        {
+            EntraObjectId = Guid.Parse(seed.EntraObjectId),
+            IamId = seed.IamId,
+            EmployeeId = seed.EmployeeId,
+            DisplayName = seed.DisplayName,
+            Email = seed.Email,
+            IsActive = seed.IsActive,
+            FirstLoginUtc = ParseUtc(seed.FirstLoginUtc),
+            LastLoginUtc = ParseUtc(seed.LastLoginUtc),
+            CreatedUtc = nowUtc,
+            UpdatedUtc = nowUtc,
+        };
+    }
+
+    private static void ApplyAppUserSeed(AppUser user, AppUserSeed seed, DateTime nowUtc)
+    {
+        user.EntraObjectId = Guid.Parse(seed.EntraObjectId);
+        user.IamId = seed.IamId;
+        user.EmployeeId = seed.EmployeeId;
+        user.DisplayName = seed.DisplayName;
+        user.Email = seed.Email;
+        user.IsActive = seed.IsActive;
+        user.FirstLoginUtc = ParseUtc(seed.FirstLoginUtc);
+        user.LastLoginUtc = ParseUtc(seed.LastLoginUtc);
+        user.UpdatedUtc = nowUtc;
     }
 
     private async Task SeedAppAdminAssignmentsAsync(
@@ -521,14 +580,55 @@ public class DbInitializer : IDbInitializer
 
     private async Task SeedLeaveTypesAsync(CancellationToken ct)
     {
-        var existingKeys = await _db.LeaveTypes
-            .Select(leaveType => leaveType.LeaveTypeKey)
+        var existingLeaveTypes = await _db.LeaveTypes
             .ToListAsync(ct);
 
-        var existing = existingKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingByKey = existingLeaveTypes.ToDictionary(
+            leaveType => leaveType.LeaveTypeKey,
+            StringComparer.OrdinalIgnoreCase);
+
+        var updated = false;
+
+        foreach (var seed in DevLeaveTypes)
+        {
+            if (!existingByKey.TryGetValue(seed.LeaveTypeKey, out var existingLeaveType))
+            {
+                continue;
+            }
+
+            if (existingLeaveType.SourceLeaveTypeNumber != seed.SourceLeaveTypeNumber)
+            {
+                existingLeaveType.SourceLeaveTypeNumber = seed.SourceLeaveTypeNumber;
+                updated = true;
+            }
+
+            if (!string.Equals(existingLeaveType.DisplayName, seed.DisplayName, StringComparison.Ordinal))
+            {
+                existingLeaveType.DisplayName = seed.DisplayName;
+                updated = true;
+            }
+
+            if (existingLeaveType.HasAccrualBalance != seed.HasAccrualBalance)
+            {
+                existingLeaveType.HasAccrualBalance = seed.HasAccrualBalance;
+                updated = true;
+            }
+
+            if (existingLeaveType.IsActive != seed.IsActive)
+            {
+                existingLeaveType.IsActive = seed.IsActive;
+                updated = true;
+            }
+        }
+
+        if (updated)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Updated existing development LeaveType rows.");
+        }
 
         var missingLeaveTypes = DevLeaveTypes
-            .Where(leaveType => !existing.Contains(leaveType.LeaveTypeKey))
+            .Where(leaveType => !existingByKey.ContainsKey(leaveType.LeaveTypeKey))
             .Select(leaveType => new LeaveType
             {
                 LeaveTypeKey = leaveType.LeaveTypeKey,

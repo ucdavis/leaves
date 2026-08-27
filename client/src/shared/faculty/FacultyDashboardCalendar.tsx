@@ -54,9 +54,11 @@ export const calendarLegend = [
 export const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function LeaveCalendar({
+  allowEmailPreview = true,
   faculty,
   requests,
 }: {
+  allowEmailPreview?: boolean;
   faculty: FacultyDashboardResponse['faculty'];
   requests: FacultyLeaveRequest[];
 }) {
@@ -178,6 +180,7 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
+          allowEmailPreview={allowEmailPreview}
           faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}

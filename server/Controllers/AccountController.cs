@@ -65,18 +65,24 @@ public class AccountController : Controller
                 iamIdFallback: DevelopmentSeedData.LocalAdminIamId,
                 safeReturnUrl: safeReturnUrl,
                 roles: ["Admin"]),
-            "faculty" or "requester" => await SignInAsSeededDevPersonaAsync(
-                displayNameFallback: DevelopmentSeedData.LocalRequesterDisplayName,
-                email: DevelopmentSeedData.LocalRequesterEmail,
-                iamIdFallback: DevelopmentSeedData.LocalRequesterIamId,
+            "faculty" => await SignInAsSeededDevPersonaAsync(
+                displayNameFallback: DevelopmentSeedData.LocalFacultyDisplayName,
+                email: DevelopmentSeedData.LocalFacultyEmail,
+                iamIdFallback: DevelopmentSeedData.LocalFacultyIamId,
                 safeReturnUrl: safeReturnUrl,
                 roles: ["Faculty"]),
-            "unauthorized" => await SignInAsSeededDevPersonaAsync(
-                displayNameFallback: DevelopmentSeedData.LocalUnauthorizedDisplayName,
-                email: DevelopmentSeedData.LocalUnauthorizedEmail,
-                iamIdFallback: DevelopmentSeedData.LocalUnauthorizedIamId,
+            "chair" => await SignInAsSeededDevPersonaAsync(
+                displayNameFallback: DevelopmentSeedData.LocalChairDisplayName,
+                email: DevelopmentSeedData.LocalChairEmail,
+                iamIdFallback: DevelopmentSeedData.LocalChairIamId,
                 safeReturnUrl: safeReturnUrl,
-                roles: []),
+                roles: ["Faculty", "Chair"]),
+            "cao" => await SignInAsSeededDevPersonaAsync(
+                displayNameFallback: DevelopmentSeedData.LocalCaoDisplayName,
+                email: DevelopmentSeedData.LocalCaoEmail,
+                iamIdFallback: DevelopmentSeedData.LocalCaoIamId,
+                safeReturnUrl: safeReturnUrl,
+                roles: ["CAO"]),
             _ => RenderDevLoginPage(safeReturnUrl, $"Unknown login option '{asOption}'."),
         };
     }
@@ -194,9 +200,13 @@ public class AccountController : Controller
                   <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Faculty</div>
                   <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Simulates a standard signed-in faculty member with no admin authority.</div>
                 </a>
-                <a href="/login?as=unauthorized&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
-                  <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Unauthorized User</div>
-                  <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Signs in without app roles so you can verify unauthorized states.</div>
+                <a href="/login?as=chair&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
+                  <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Chair</div>
+                  <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Signs in as the seeded Test Chair persona for the test department.</div>
+                </a>
+                <a href="/login?as=cao&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
+                  <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as CAO</div>
+                  <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: #4b5563;">Signs in as the seeded Test CAO persona for the test cluster.</div>
                 </a>
                 <a href="/login?as=self&returnUrl={{encodedReturnUrl}}" style="display: block; border-radius: 18px; border: 1px solid #dbe4f0; background: #ffffff; padding: 18px 20px; text-decoration: none; color: inherit;">
                   <div style="font-size: 18px; font-weight: 700; color: #111827;">Login as Self</div>
