@@ -47,7 +47,9 @@
   --color-warning: var(--color-warning-color);
   --color-warning-content: var(--color-light-font);
 }
-
+html {
+  background-color: var(--color-light-bg-200);
+}
 body {
   @apply bg-base-100 text-base-content;
 }

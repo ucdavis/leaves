@@ -10,6 +10,26 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+let bodyScrollLockCount = 0;
+let bodyOverflowBeforeScrollLock = '';
+
+function lockBodyScroll() {
+  if (bodyScrollLockCount === 0) {
+    bodyOverflowBeforeScrollLock = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+
+  bodyScrollLockCount += 1;
+}
+
+function unlockBodyScroll() {
+  bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+
+  if (bodyScrollLockCount === 0) {
+    document.body.style.overflow = bodyOverflowBeforeScrollLock;
+  }
+}
+
 export function Modal({
   children,
   onClose,
@@ -38,11 +58,10 @@ export function Modal({
     const focusableElements = getFocusableElements(dialogElement);
     (focusableElements[0] ?? dialogElement).focus({ preventScroll: true });
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      unlockBodyScroll();
       if (dialogElement.open) {
         dialogElement.close();
       }

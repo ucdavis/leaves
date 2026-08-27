@@ -26,8 +26,8 @@ export function DepartmentRow({
         : 'Notification only';
 
   return (
-    <div className="card border border-main-border bg-base-100">
-      <div className="card-body flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="bg-primary/5 border-l-4 border-primary pl-2">
+      <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="w-full max-w-md text-lg font-bold uppercase tracking-wide text-primary">
@@ -50,7 +50,7 @@ export function DepartmentRow({
             <span>·</span>
             <span>{chairName ? `Chair: ${chairName}` : 'Add chair'}</span>
             <button
-              className="inline-flex items-center text-[var(--admin-blue)] hover:text-[var(--admin-gold-deep)]"
+              className="inline-flex items-center text-primary hover:text-primary/80"
               onClick={onOpenRoster}
               type="button"
             >
@@ -64,9 +64,9 @@ export function DepartmentRow({
         </div>
 
         <div className="flex flex-col gap-3 items-end">
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-nowrap">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-nowrap">
             <button
-              className="btn btn-primary"
+              className="btn btn-outline"
               onClick={onOpenRoster}
               type="button"
             >
