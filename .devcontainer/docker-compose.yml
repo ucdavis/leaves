@@ -24,7 +24,7 @@ services:
       MSSQL_SA_PASSWORD: "LocalDev123!"
       MSSQL_PID: "Developer" # can also use "Express" but Developer has more features
     healthcheck:
-      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "LocalDev123!", "-Q", "SELECT 1"]
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost", "-U", "sa", "-P", "LocalDev123!", "-Q", "SELECT 1"]
       interval: 6s
       timeout: 4s
       retries: 30
