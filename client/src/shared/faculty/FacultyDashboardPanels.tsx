@@ -92,7 +92,7 @@ export function QuickActionsPanel({
         {data.faculty.departmentName ?? 'No reporting department'}.
       </div>
       <button
-        className="btn btn-outline btn-primary mt-3"
+        className="btn btn-outline btn-primary mt-3 w-full"
         onClick={onViewHistory}
         type="button"
       >
