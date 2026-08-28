@@ -333,6 +333,39 @@ jobs:
             --settings "${settings[@]}" \
             --output none
 
+      - name: Wait for App Service restart
+        shell: bash
+        env:
+          WEB_APP_NAME: ${{ steps.deploy_infra.outputs.web_app_name || steps.resolve_existing.outputs.web_app_name }}
+        run: |
+          set -euo pipefail
+
+          app_url="https://${WEB_APP_NAME}.azurewebsites.net/health"
+          scm_url="https://${WEB_APP_NAME}.scm.azurewebsites.net/api/settings"
+          ready_count=0
+
+          for attempt in {1..12}; do
+            app_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 10 "$app_url" || true)"
+            scm_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 10 "$scm_url" || true)"
+
+            if [[ "$app_status" == "200" ]] && [[ "$scm_status" == "200" || "$scm_status" == "401" ]]; then
+              ((ready_count += 1))
+              if (( ready_count == 2 )); then
+                echo "App Service and SCM are ready."
+                exit 0
+              fi
+            else
+              ready_count=0
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "App Service did not become ready after its settings were updated."
+          exit 1
+
       - name: Deploy app package
         uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
         with:
