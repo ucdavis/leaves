@@ -6,7 +6,7 @@ namespace Server.Core.Data;
 
 public interface IDbInitializer
 {
-    Task InitializeAsync(CancellationToken cancellationToken = default);
+    Task InitializeAsync(bool includeDevSeed = false, CancellationToken cancellationToken = default);
 }
 
 public class DbInitializer : IDbInitializer
@@ -17,7 +17,6 @@ public class DbInitializer : IDbInitializer
         new(DevelopmentSeedData.LocalFacultyIamId, DevelopmentSeedData.LocalFacultyEntraObjectId.ToString(), DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyDisplayName, DevelopmentSeedData.LocalFacultyEmail, true, "2026-07-01T15:56:00", "2026-07-08T18:00:00"),
         new(DevelopmentSeedData.LocalChairIamId, DevelopmentSeedData.LocalChairEntraObjectId.ToString(), DevelopmentSeedData.LocalChairEmployeeId, DevelopmentSeedData.LocalChairDisplayName, DevelopmentSeedData.LocalChairEmail, true, "2026-08-21T08:00:00", "2026-08-21T08:00:00"),
         new(DevelopmentSeedData.LocalCaoIamId, DevelopmentSeedData.LocalCaoEntraObjectId.ToString(), DevelopmentSeedData.LocalCaoEmployeeId, DevelopmentSeedData.LocalCaoDisplayName, DevelopmentSeedData.LocalCaoEmail, true, "2026-08-21T08:05:00", "2026-08-21T08:05:00"),
-        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEntraObjectId.ToString(), DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, DevelopmentSeedData.LocalUnauthorizedEmail, true, "2026-07-01T15:57:00", "2026-07-08T17:55:00"),
         new("adminherd", "11111111-1111-1111-1111-111111111111", "84726195", "Maya Thompson", "adminherd@fake.ucdavis.edu", true, "2026-07-01T16:00:00", "2026-07-08T18:10:00"),
         new("apatel", "22222222-2222-2222-2222-222222222222", "36190428", "Asha Patel", "apatel@fake.ucdavis.edu", true, "2026-07-01T16:15:00", "2026-07-08T17:42:00"),
         new("jlin", "33333333-3333-3333-3333-333333333333", "59281746", "Jordan Lin", "jlin@fake.ucdavis.edu", true, "2026-07-01T16:20:00", "2026-07-08T17:35:00"),
@@ -59,7 +58,6 @@ public class DbInitializer : IDbInitializer
         new(DevelopmentSeedData.LocalFacultyIamId, DevelopmentSeedData.LocalFacultyEmployeeId, DevelopmentSeedData.LocalFacultyDisplayName, "Faculty", DevelopmentSeedData.LocalFacultyEmail, true, true, false, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:15:00"),
         new(DevelopmentSeedData.LocalChairIamId, DevelopmentSeedData.LocalChairEmployeeId, DevelopmentSeedData.LocalChairDisplayName, "Chair", DevelopmentSeedData.LocalChairEmail, true, true, false, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:20:00"),
         new(DevelopmentSeedData.LocalCaoIamId, DevelopmentSeedData.LocalCaoEmployeeId, DevelopmentSeedData.LocalCaoDisplayName, "CAO", DevelopmentSeedData.LocalCaoEmail, true, false, true, true, DevelopmentSeedData.TestDepartmentCode, "2026-08-21T08:25:00"),
-        new(DevelopmentSeedData.LocalUnauthorizedIamId, DevelopmentSeedData.LocalUnauthorizedEmployeeId, DevelopmentSeedData.LocalUnauthorizedDisplayName, "Unauthorized", DevelopmentSeedData.LocalUnauthorizedEmail, true, false, false, true, "030000", "2026-07-08T08:10:00"),
         new("adminherd", "84726195", "Maya Thompson", null, "adminherd@fake.ucdavis.edu", true, false, true, true, "030000", "2026-07-08T08:15:00"),
         new("apatel", "36190428", "Asha Patel", null, "apatel@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:20:00"),
         new("jlin", "59281746", "Jordan Lin", null, "jlin@fake.ucdavis.edu", true, false, true, true, "030045", "2026-07-08T08:25:00"),
@@ -155,8 +153,14 @@ public class DbInitializer : IDbInitializer
         _logger = logger;
     }
 
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeAsync(bool includeDevSeed = false, CancellationToken cancellationToken = default)
     {
+        if (!includeDevSeed)
+        {
+            _logger.LogInformation("Database initialization skipped outside local development.");
+            return;
+        }
+
         if (_db.Database.IsRelational())
         {
             _logger.LogInformation("Applying database migrations...");
