@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query';
 import {
   adminDepartmentsQueryOptions,
   createAdminCluster,
@@ -31,13 +35,15 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
   pendingComponent: () => (
-    <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-        Loading department data
-      </h2>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-        Pulling the current department and cluster records from the database.
-      </p>
+    <section className="card border border-main-border bg-base-100">
+      <div className="card-body p-6">
+        <h2 className="text-lg font-semibold text-primary">
+          Loading department data
+        </h2>
+        <p className="mt-2 text-sm text-base-content/70">
+          Pulling the current department and cluster records from the database.
+        </p>
+      </div>
     </section>
   ),
 });
@@ -228,7 +234,8 @@ function AdminDepartmentsRoute() {
                           className="py-6 text-sm text-base-content/70"
                           colSpan={5}
                         >
-                          There are currently no faculty members assigned to this department.
+                          There are currently no faculty members assigned to
+                          this department.
                         </td>
                       </tr>
                     ) : null}
@@ -255,11 +262,15 @@ function AdminDepartmentsRoute() {
                   try {
                     await updateDepartmentMutation.mutateAsync({
                       departmentId: pendingChairChange.departmentId,
-                      updates: { chairUserId: pendingChairChange.nextChairUserId },
+                      updates: {
+                        chairUserId: pendingChairChange.nextChairUserId,
+                      },
                     });
                     setPendingChairChange(null);
                   } catch (error) {
-                    setPendingChairChangeError(getAdminMutationErrorMessage(error));
+                    setPendingChairChangeError(
+                      getAdminMutationErrorMessage(error)
+                    );
                   }
                 })();
               }}
@@ -279,7 +290,8 @@ function AdminDepartmentsRoute() {
   const editingClusterSettings =
     editingClusterSettingsId === null
       ? null
-      : (clusters.find((cluster) => cluster.id === editingClusterSettingsId) ?? null);
+      : (clusters.find((cluster) => cluster.id === editingClusterSettingsId) ??
+        null);
 
   return (
     <div className="space-y-6">
@@ -292,114 +304,110 @@ function AdminDepartmentsRoute() {
         }
       />
 
-      <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-        <div className="max-w-3xl space-y-2">
-          <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-            Department and cluster management
-          </h2>
-        </div>
-      </section>
+      <h2 className="text-2xl font-semibold text-primary">
+        Department and cluster management
+      </h2>
 
       {clusterGroups.map((cluster) => (
         <section
-          className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm"
+          className="card border border-main-border bg-base-100"
           key={cluster.id}
         >
-          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--admin-gold-deep)]">
-                Cluster
-              </label>
-              <div className="mt-2 w-full max-w-md rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-sand)] px-4 py-3 text-[var(--admin-blue)]">
-                {cluster.name}
+          <div className="card-body p-6">
+            <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-lg font-semibold">{cluster.name}</div>
+                <ClusterCaoEditor
+                  currentCaoName={
+                    users.find((user) => user.id === cluster.caoUserId)?.name ??
+                    null
+                  }
+                  isEditing={editingClusterCaoId === cluster.id}
+                  isSaving={updateClusterMutation.isPending}
+                  isSearchOpen={isClusterCaoSearchOpen}
+                  onCancel={() => {
+                    setEditingClusterCaoId(null);
+                    setClusterCaoQuery('');
+                    setIsClusterCaoSearchOpen(false);
+                    setSelectedClusterCaoUserId('');
+                  }}
+                  onChangeQuery={(value) => {
+                    setClusterCaoQuery(value);
+                    setIsClusterCaoSearchOpen(true);
+                  }}
+                  onConfirm={() => {
+                    const selectedUser = users.find(
+                      (user) => user.id === selectedClusterCaoUserId
+                    );
+                    if (!selectedUser) {
+                      return;
+                    }
+
+                    setPendingCaoChangeError(null);
+                    setPendingCaoChange({
+                      clusterId: cluster.id,
+                      clusterName: cluster.name,
+                      currentCaoName:
+                        users.find((user) => user.id === cluster.caoUserId)
+                          ?.name ?? null,
+                      nextCaoName: selectedUser.name,
+                      nextCaoUserId: selectedUser.id,
+                    });
+                  }}
+                  onEdit={() => {
+                    setEditingClusterCaoId(cluster.id);
+                    setClusterCaoQuery('');
+                    setIsClusterCaoSearchOpen(false);
+                    setSelectedClusterCaoUserId('');
+                  }}
+                  onSelectUser={(user) => {
+                    setSelectedClusterCaoUserId(user.id);
+                    setClusterCaoQuery(user.name);
+                    setIsClusterCaoSearchOpen(false);
+                  }}
+                  query={clusterCaoQuery}
+                  selectedUserId={selectedClusterCaoUserId}
+                  users={getAccrualAssignableUsers(users)}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  aria-label={`Open settings for ${cluster.name}`}
+                  className="btn btn-outline self-stretch shrink-0 px-4"
+                  onClick={() => setEditingClusterSettingsId(cluster.id)}
+                  type="button"
+                >
+                  <Cog6ToothIcon
+                    aria-hidden="true"
+                    className="h-5 w-5 shrink-0"
+                  />
+                  Cluster Settings
+                </button>
               </div>
             </div>
 
-            <div className="flex w-full max-w-md items-stretch gap-3">
-              <ClusterCaoEditor
-                currentCaoName={
-                  users.find((user) => user.id === cluster.caoUserId)?.name ?? null
-                }
-                isEditing={editingClusterCaoId === cluster.id}
-                isSaving={updateClusterMutation.isPending}
-                isSearchOpen={isClusterCaoSearchOpen}
-                onCancel={() => {
-                  setEditingClusterCaoId(null);
-                  setClusterCaoQuery('');
-                  setIsClusterCaoSearchOpen(false);
-                  setSelectedClusterCaoUserId('');
-                }}
-                onChangeQuery={(value) => {
-                  setClusterCaoQuery(value);
-                  setIsClusterCaoSearchOpen(true);
-                }}
-                onConfirm={() => {
-                  const selectedUser = users.find(
-                    (user) => user.id === selectedClusterCaoUserId
-                  );
-                  if (!selectedUser) {
-                    return;
-                  }
+            <div className="space-y-3">
+              {cluster.departments.map((department) => {
+                const linkedUserCount = users.filter(
+                  (user) => user.departmentId === department.id
+                ).length;
 
-                  setPendingCaoChangeError(null);
-                  setPendingCaoChange({
-                    clusterId: cluster.id,
-                    clusterName: cluster.name,
-                    currentCaoName:
-                      users.find((user) => user.id === cluster.caoUserId)?.name ??
-                      null,
-                    nextCaoName: selectedUser.name,
-                    nextCaoUserId: selectedUser.id,
-                  });
-                }}
-                onEdit={() => {
-                  setEditingClusterCaoId(cluster.id);
-                  setClusterCaoQuery('');
-                  setIsClusterCaoSearchOpen(false);
-                  setSelectedClusterCaoUserId('');
-                }}
-                onSelectUser={(user) => {
-                  setSelectedClusterCaoUserId(user.id);
-                  setClusterCaoQuery(user.name);
-                  setIsClusterCaoSearchOpen(false);
-                }}
-                query={clusterCaoQuery}
-                selectedUserId={selectedClusterCaoUserId}
-                users={getAccrualAssignableUsers(users)}
-              />
-
-              <button
-                aria-label={`Open settings for ${cluster.name}`}
-                className="btn btn-outline h-12 self-stretch shrink-0 px-4"
-                onClick={() => setEditingClusterSettingsId(cluster.id)}
-                type="button"
-              >
-                <Cog6ToothIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
-                Settings
-              </button>
+                return (
+                  <DepartmentRow
+                    chairName={
+                      users.find((user) => user.id === department.chairUserId)
+                        ?.name ?? null
+                    }
+                    department={department}
+                    key={department.id}
+                    linkedUserCount={linkedUserCount}
+                    onOpenRoster={() => setViewDepartmentId(department.id)}
+                    onOpenSettings={() => setEditingDepartmentId(department.id)}
+                  />
+                );
+              })}
             </div>
-          </div>
-
-          <div className="space-y-3 border-l-4 border-[var(--admin-border-strong)] pl-5">
-            {cluster.departments.map((department) => {
-              const linkedUserCount = users.filter(
-                (user) => user.departmentId === department.id
-              ).length;
-
-              return (
-                <DepartmentRow
-                  chairName={
-                    users.find((user) => user.id === department.chairUserId)?.name ??
-                    null
-                  }
-                  department={department}
-                  key={department.id}
-                  linkedUserCount={linkedUserCount}
-                  onOpenRoster={() => setViewDepartmentId(department.id)}
-                  onOpenSettings={() => setEditingDepartmentId(department.id)}
-                />
-              );
-            })}
           </div>
         </section>
       ))}
@@ -414,8 +422,8 @@ function AdminDepartmentsRoute() {
               {unassignedDepartments.map((department) => (
                 <DepartmentRow
                   chairName={
-                    users.find((user) => user.id === department.chairUserId)?.name ??
-                    null
+                    users.find((user) => user.id === department.chairUserId)
+                      ?.name ?? null
                   }
                   department={department}
                   key={department.id}
@@ -587,11 +595,7 @@ function ClusterCaoEditor({
   onChangeQuery: (value: string) => void;
   onConfirm: () => void;
   onEdit: () => void;
-  onSelectUser: (user: {
-    email: string;
-    id: string;
-    name: string;
-  }) => void;
+  onSelectUser: (user: { email: string; id: string; name: string }) => void;
   query: string;
   selectedUserId: string;
   users: Array<{
@@ -614,28 +618,21 @@ function ClusterCaoEditor({
   const showResults = isSearchOpen && query.trim().length > 0;
 
   return (
-    <div
-      className={`w-full max-w-md self-stretch rounded-xl border border-[var(--admin-border)] bg-white px-4 shadow-sm ${
-        isEditing ? 'py-2.5' : 'h-12 py-0'
-      }`}
-    >
-      <div className={`flex h-full items-center justify-between gap-3`}>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-[var(--admin-ink)]">
-            CAO: {currentCaoName ?? 'Add CAO'}
-          </div>
-        </div>
+    <div className="mt-2 max-w-md">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-base-content/70">
+        <span>CAO: {currentCaoName ?? 'Add CAO'}</span>
         <button
-          className="btn btn-ghost btn-sm h-8"
+          aria-label="Edit CAO"
+          className="inline-flex items-center text-primary hover:text-primary/80"
           onClick={onEdit}
           type="button"
         >
-          <PencilSquareIcon aria-hidden="true" aria-label="Edit CAO" className="h-4 w-4 shrink-0" />
+          <PencilSquareIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
         </button>
       </div>
 
       {isEditing ? (
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 space-y-3">
           <div className="relative">
             <input
               className="input input-bordered w-full"
@@ -650,11 +647,11 @@ function ClusterCaoEditor({
               value={query}
             />
             {showResults ? (
-              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-white shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg">
                 {filteredUsers.slice(0, 8).map((user) => (
                   <button
-                    className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-[var(--admin-sand)] ${
-                      user.id === selectedUserId ? 'bg-[var(--admin-sand)]' : ''
+                    className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-base-200 ${
+                      user.id === selectedUserId ? 'bg-base-200' : ''
                     }`}
                     key={user.id}
                     onClick={() => onSelectUser(user)}
@@ -662,14 +659,14 @@ function ClusterCaoEditor({
                     type="button"
                   >
                     <span>
-                      <span className="block font-semibold text-[var(--admin-ink)]">
+                      <span className="block font-semibold text-base-content">
                         {user.name}
                       </span>
-                      <span className="block text-xs text-[var(--admin-ink-muted)]">
+                      <span className="block text-xs text-base-content/70">
                         {user.email || user.id}
                       </span>
                     </span>
-                    <span className="text-right text-xs text-[var(--admin-ink-muted)]">
+                    <span className="text-right text-xs text-base-content/70">
                       {user.id}
                     </span>
                   </button>
@@ -679,7 +676,11 @@ function ClusterCaoEditor({
           </div>
 
           <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost btn-sm" onClick={onCancel} type="button">
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={onCancel}
+              type="button"
+            >
               Cancel
             </button>
             <button
@@ -731,16 +732,16 @@ function DepartmentChairWarningModal({
     >
       {action.currentChairName ? (
         <span>
-          This action will replace <strong>{action.currentChairName}</strong> with{' '}
-          <strong>{action.nextChairName}</strong>{' '}
-          as chair for the <strong>{action.departmentName}</strong> department effective
+          This action will replace <strong>{action.currentChairName}</strong>{' '}
+          with <strong>{action.nextChairName}</strong> as chair for the{' '}
+          <strong>{action.departmentName}</strong> department effective
           immediately.
         </span>
       ) : (
         <span>
-          This action will assign <strong>{action.nextChairName}</strong> as chair for the{' '}
-          <strong>{action.departmentName}</strong> department effective
-          immediately.
+          This action will assign <strong>{action.nextChairName}</strong> as
+          chair for the <strong>{action.departmentName}</strong> department
+          effective immediately.
         </span>
       )}
     </WarningModal>
@@ -778,13 +779,13 @@ function ClusterCaoWarningModal({
       {action.currentCaoName ? (
         <span>
           This will replace <strong>{action.currentCaoName}</strong> with{' '}
-          <strong>{action.nextCaoName}</strong>{' '}
-          as CAO for the <strong>{action.clusterName}</strong> cluster effective immediately.
+          <strong>{action.nextCaoName}</strong> as CAO for the{' '}
+          <strong>{action.clusterName}</strong> cluster effective immediately.
         </span>
       ) : (
         <span>
-          This will assign <strong>{action.nextCaoName}</strong> as CAO for the <strong>{action.clusterName}</strong>{' '}
-          cluster effective immediately.
+          This will assign <strong>{action.nextCaoName}</strong> as CAO for the{' '}
+          <strong>{action.clusterName}</strong> cluster effective immediately.
         </span>
       )}
     </WarningModal>

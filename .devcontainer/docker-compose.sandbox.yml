@@ -1,0 +1,73 @@
+services:
+  devcontainer:
+    user: root
+    environment:
+      HOME: /home/vscode
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:5165
+      DB_CONNECTION: Server=sql,1433;Database=LeavesDb;User ID=sa;Password=LocalDev123!;Encrypt=False;TrustServerCertificate=True;
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_EXPORTER_OTLP_HEADERS: ""
+      Smtp__Host: ""
+      Smtp__Username: ""
+      Smtp__Password: ""
+      Notification__BaseUrl: ""
+    depends_on:
+      sql:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        chown -R vscode:vscode \
+          /workspace/node_modules \
+          /workspace/client/node_modules \
+          /workspace/server/bin \
+          /workspace/server/obj \
+          /workspace/server.core/bin \
+          /workspace/server.core/obj \
+          /workspace/tests/server.tests/bin \
+          /workspace/tests/server.tests/obj \
+          /workspace/.aspnet \
+          /home/vscode/.dotnet \
+          /home/vscode/.nuget
+        exec setpriv --reuid=vscode --regid=vscode --init-groups \
+          bash -lc 'bash .devcontainer/setup.sh && exec ./node_modules/.bin/npm-run-all --parallel start:server start:client:debug'
+    ports: !override
+      - "127.0.0.1::5165"
+      - "127.0.0.1::5173"
+    volumes:
+      - devcontainer-node-modules:/workspace/node_modules
+      - sandbox-client-node-modules:/workspace/client/node_modules
+      - sandbox-server-bin:/workspace/server/bin
+      - sandbox-server-obj:/workspace/server/obj
+      - sandbox-core-bin:/workspace/server.core/bin
+      - sandbox-core-obj:/workspace/server.core/obj
+      - sandbox-tests-bin:/workspace/tests/server.tests/bin
+      - sandbox-tests-obj:/workspace/tests/server.tests/obj
+      - sandbox-aspnet:/workspace/.aspnet
+      - sandbox-dotnet-home:/home/vscode/.dotnet
+      - sandbox-nuget:/home/vscode/.nuget
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 3 http://127.0.0.1:5173/health >/dev/null"]
+      interval: 3s
+      timeout: 4s
+      retries: 3
+      start_period: 10m
+    stop_grace_period: 10s
+
+  sql:
+    ports: !override
+      - "127.0.0.1::1433"
+
+volumes:
+  sandbox-client-node-modules:
+  sandbox-server-bin:
+  sandbox-server-obj:
+  sandbox-core-bin:
+  sandbox-core-obj:
+  sandbox-tests-bin:
+  sandbox-tests-obj:
+  sandbox-aspnet:
+  sandbox-dotnet-home:
+  sandbox-nuget:

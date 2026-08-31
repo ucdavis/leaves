@@ -6,8 +6,7 @@ import {
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 
-export const reportLeaveButtonClass =
-  'btn btn-primary';
+export const reportLeaveButtonClass = 'btn btn-primary';
 
 export function AccrualBalancePanel({
   balances,
@@ -196,7 +195,9 @@ export function RequestStatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}
+    >
       {status}
     </span>
   );
@@ -347,7 +348,5 @@ export function isIsoDate(value: string) {
 }
 
 function parseIsoDate(value: string) {
-  return isIsoDate(value)
-    ? new Date(`${value}T00:00:00`)
-    : new Date(value);
+  return isIsoDate(value) ? new Date(`${value}T00:00:00`) : new Date(value);
 }
