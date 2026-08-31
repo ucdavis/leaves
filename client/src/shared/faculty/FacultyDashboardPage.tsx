@@ -31,37 +31,36 @@ export function FacultyDashboardPage({
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
+  const recentRequests = data.recentRequests.slice(0, 5);
 
   return (
     <div className="container py-8 lg:py-10">
-      <div className="mx-auto max-w-6xl space-y-6"> 
-
-        {readOnly ? (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            <ReadOnlyFacultyHeader data={data} />
-            <RecentRequestsPanel
-              onSelectRequest={setSelectedRequest}
-              requests={data.recentRequests}
-            />
-          </div>
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.9fr)]">
-            <AccrualBalancePanel balances={data.accrualBalances} />
+      {readOnly ? (
+        <div className="mx-auto grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] py-8">
+          <ReadOnlyFacultyHeader data={data} />
+          <RecentRequestsPanel
+            onSelectRequest={setSelectedRequest}
+            requests={recentRequests}
+          />
+        </div>
+      ) : (
+        <div className="mx-auto grid gap-5 lg:grid-cols-2 py-8">
+          <div className="space-y-5">
             <QuickActionsPanel
               data={data}
               onReportLeave={() => setReportModalOpen(true)}
               onViewHistory={() => void navigate({ to: '/history' })}
             />
+            <RecentRequestsPanel
+              onSelectRequest={setSelectedRequest}
+              requests={recentRequests}
+            />
           </div>
-        )}
+          <AccrualBalancePanel balances={data.accrualBalances} />
+        </div>
+      )}
 
-        {!readOnly ? (
-          <RecentRequestsPanel
-            onSelectRequest={setSelectedRequest}
-            requests={data.recentRequests}
-          />
-        ) : null}
-
+      <div className="mx-auto mt-6">
         <LeaveCalendar
           allowEmailPreview={!readOnly}
           faculty={data.faculty}
