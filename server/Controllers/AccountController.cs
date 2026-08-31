@@ -263,6 +263,7 @@ public class AccountController : Controller
             new("name", displayName),
             new(ClaimTypes.Email, resolvedEmail),
             new("preferred_username", resolvedEmail),
+            new("ucdPersonIAMID", user.IamId),
             new(DevPersonaClaimType, "true"),
         };
 

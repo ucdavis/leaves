@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
@@ -65,14 +64,23 @@ public class UserService : IUserService
             .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
         var matchedPerson = await FindPersonByEmailAsync(email, cancellationToken);
 
-        var resolvedAuthorizationKey = NormalizeAuthorizationKey(matchedPerson?.IamId) ?? existingUser?.IamId;
-        if (string.IsNullOrWhiteSpace(resolvedAuthorizationKey))
+        var iamId =
+            NormalizeIamIdToken(matchedPerson?.IamId)
+            ?? ResolveIamIdFromClaims(principal)
+            ?? existingUser?.IamId;
+        if (string.IsNullOrWhiteSpace(iamId))
         {
-            resolvedAuthorizationKey = ResolveAuthorizationKey(principal, entraObjectId);
+            throw new InvalidOperationException("IAM ID is required but was not found in the principal, matching person, or existing user record.");
         }
-        var resolvedEmployeeId = NormalizeEmployeeId(matchedPerson?.EmployeeId) ?? existingUser?.EmployeeId;
+        var matchedPersonByIamId = await FindPersonByIamIdAsync(iamId, cancellationToken);
+        var resolvedEmployeeId =
+            NormalizeEmployeeId(matchedPerson?.EmployeeId)
+            ?? NormalizeEmployeeId(matchedPersonByIamId?.EmployeeId)
+            ?? existingUser?.EmployeeId;
         var resolvedDisplayName = !string.IsNullOrWhiteSpace(matchedPerson?.FullName)
             ? matchedPerson.FullName
+            : !string.IsNullOrWhiteSpace(matchedPersonByIamId?.FullName)
+                ? matchedPersonByIamId.FullName
             : displayName;
 
         var now = DateTime.UtcNow;
@@ -87,7 +95,7 @@ public class UserService : IUserService
                 EmployeeId = resolvedEmployeeId,
                 EntraObjectId = entraObjectId,
                 FirstLoginUtc = now,
-                IamId = resolvedAuthorizationKey,
+                IamId = iamId,
                 LastLoginUtc = now,
                 UpdatedUtc = now
             };
@@ -101,7 +109,7 @@ public class UserService : IUserService
                 existingUser!,
                 resolvedDisplayName,
                 email ?? matchedPerson?.Email,
-                resolvedAuthorizationKey,
+                iamId,
                 resolvedEmployeeId,
                 recordSignIn,
                 now);
@@ -128,7 +136,7 @@ public class UserService : IUserService
                     concurrentUser,
                     resolvedDisplayName,
                     email ?? matchedPerson?.Email,
-                    resolvedAuthorizationKey,
+                    iamId,
                     resolvedEmployeeId,
                     recordSignIn,
                     now))
@@ -236,7 +244,7 @@ public class UserService : IUserService
         AppUser user,
         string? displayName,
         string? email,
-        string? resolvedAuthorizationKey,
+        string? iamId,
         string? resolvedEmployeeId,
         bool recordSignIn,
         DateTime now)
@@ -257,10 +265,10 @@ public class UserService : IUserService
             shouldSaveUser = true;
         }
 
-        if (!string.IsNullOrWhiteSpace(resolvedAuthorizationKey) &&
-            !string.Equals(user.IamId, resolvedAuthorizationKey, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(iamId) &&
+            !string.Equals(user.IamId, iamId, StringComparison.OrdinalIgnoreCase))
         {
-            user.IamId = resolvedAuthorizationKey;
+            user.IamId = iamId;
             shouldSaveUser = true;
         }
 
@@ -293,20 +301,12 @@ public class UserService : IUserService
                (sqlException.Number == 2601 || sqlException.Number == 2627);
     }
 
-    private string ResolveAuthorizationKey(ClaimsPrincipal principal, Guid entraObjectId)
+    private static string? ResolveIamIdFromClaims(ClaimsPrincipal principal)
     {
-        var directClaim =
-            NormalizeAuthorizationKey(principal.FindFirst("iam_id")?.Value)
-            ?? NormalizeAuthorizationKey(principal.FindFirst("iamid")?.Value);
-        if (!string.IsNullOrWhiteSpace(directClaim))
-        {
-            return directClaim;
-        }
-
-        return BuildSyntheticAuthorizationKey(entraObjectId);
+        return NormalizeIamIdToken(principal.FindFirst("ucdPersonIAMID")?.Value);
     }
 
-    private static string? NormalizeAuthorizationKey(string? value)
+    private static string? NormalizeIamIdToken(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -340,6 +340,24 @@ public class UserService : IUserService
         return matches.FirstOrDefault();
     }
 
+    // if the user does not hace an entry in the people table employeeID is unknown
+    private async Task<Person?> FindPersonByIamIdAsync(string? iamId, CancellationToken cancellationToken)
+    {
+        var normalizedIamId = NormalizeIamIdToken(iamId);
+        if (normalizedIamId == null)
+        {
+            return null;
+        }
+
+        var matches = await _dbContext.People
+            .Where(person => person.IamId.ToLower() == normalizedIamId)
+            .OrderByDescending(person => person.PromotedAt)
+            .ThenByDescending(person => person.ModifyDate)
+            .ToListAsync(cancellationToken);
+
+        return matches.FirstOrDefault();
+    }
+
     private static string? NormalizeEmail(string? email)
     {
         var normalized = email?.Trim().ToLowerInvariant();
@@ -350,11 +368,5 @@ public class UserService : IUserService
     {
         var normalized = employeeId?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
-
-    public static string BuildSyntheticAuthorizationKey(Guid entraObjectId)
-    {
-        var hash = SHA256.HashData(entraObjectId.ToByteArray());
-        return Convert.ToHexString(hash.AsSpan(0, 5)).ToLowerInvariant();
     }
 }
