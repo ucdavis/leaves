@@ -17,11 +17,6 @@ on:
         options:
           - test
           - prod
-      deploy_infra:
-        description: Deploy Azure infrastructure before deploying the app package.
-        required: true
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -79,12 +74,6 @@ jobs:
       id-token: write
     with:
       environment: test
-      deploy_infra: true
-    secrets:
-      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
-      DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
 
   deploy_manual:
     name: Deploy ${{ inputs.environment }}
@@ -95,9 +84,3 @@ jobs:
       id-token: write
     with:
       environment: ${{ inputs.environment }}
-      deploy_infra: ${{ inputs.deploy_infra }}
-    secrets:
-      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
-      DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
