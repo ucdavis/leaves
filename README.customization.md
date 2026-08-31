@@ -169,7 +169,9 @@ The `CI/CD` workflow:
 
 - Validates pull requests.
 - Deploys pushes to `main` to the `test` environment.
-- Supports manual deployments to `test` or `prod`, including a `deploy_infra` toggle.
+- Supports manual package deployments to `test` or `prod`.
+
+Package deployments do not apply Bicep or rewrite App Service settings. Run the manual `Configure Azure` workflow before the first package deployment and whenever infrastructure, GitHub Environment variables, or GitHub Environment secrets change. Wait for that workflow to finish before starting a package deployment. The two workflows share an environment-specific concurrency group, so they cannot execute against the same environment at the same time.
 
 For local deployment:
 

@@ -137,7 +137,7 @@ Responsibilities:
 
 - Validates pull requests
 - Deploys pushes to `main` to the `test` GitHub Environment
-- Supports manual deployments to `test` or `prod`
+- Supports manual package deployments to `test` or `prod`
 
 ### `.github/workflows/deploy-azure-appservice.yml`
 
@@ -146,7 +146,18 @@ Responsibilities:
 - Provides the reusable App Service deployment job
 - Builds, tests, publishes, and packages the app
 - Logs in to Azure with GitHub OIDC
-- Optionally deploys infrastructure and then zip deploys the app package
+- Resolves the existing App Service by environment tags
+- Checks SCM readiness and deploys the app package without changing configuration
+- Verifies application health after deployment
+
+### `.github/workflows/configure-azure.yml`
+
+Responsibilities:
+
+- Provides the manual `Configure Azure` workflow for `test` and `prod`
+- Applies Bicep-managed infrastructure and App Service settings
+- Waits for the SCM restart to finish
+- Uses the same environment concurrency group as package deployment, so configuration and package deployment cannot overlap
 
 ## Development Workflows
 

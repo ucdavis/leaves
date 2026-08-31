@@ -1,0 +1,206 @@
+name: Configure Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment and Azure environment to configure.
+        required: true
+        type: choice
+        default: test
+        options:
+          - test
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  configure:
+    name: Configure ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: azure-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      APP_NAME: ${{ vars.APP_NAME || 'leaves' }}
+      AUTH_CALLBACK_PATH: ${{ vars.AUTH_CALLBACK_PATH }}
+      AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
+      AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+      AUTH_INSTANCE: ${{ vars.AUTH_INSTANCE }}
+      AUTH_TENANT_ID: ${{ vars.AUTH_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      DEPLOY_ENV: ${{ inputs.environment }}
+      NOTIFICATION_BASE_URL: ${{ vars.NOTIFICATION_BASE_URL }}
+      NOTIFICATION_DEFAULT_APP_NAME: ${{ vars.NOTIFICATION_DEFAULT_APP_NAME }}
+      NOTIFICATION_DEFAULT_BUTTON_TEXT: ${{ vars.NOTIFICATION_DEFAULT_BUTTON_TEXT }}
+      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+      OTEL_RESOURCE_ATTRIBUTES: ${{ vars.OTEL_RESOURCE_ATTRIBUTES }}
+      OTEL_SERVICE_NAME: ${{ vars.OTEL_SERVICE_NAME }}
+      RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+      SMTP_BCC_EMAIL: ${{ vars.SMTP_BCC_EMAIL }}
+      SMTP_FROM_EMAIL: ${{ vars.SMTP_FROM_EMAIL }}
+      SMTP_FROM_NAME: ${{ vars.SMTP_FROM_NAME }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_PORT: ${{ vars.SMTP_PORT }}
+      SMTP_REPLY_TO_EMAIL: ${{ vars.SMTP_REPLY_TO_EMAIL }}
+      SMTP_TIMEOUT: ${{ vars.SMTP_TIMEOUT }}
+      SMTP_USERNAME: ${{ vars.SMTP_USERNAME }}
+      SMTP_USE_SSL: ${{ vars.SMTP_USE_SSL }}
+      SQL_ADMIN_LOGIN: ${{ vars.SQL_ADMIN_LOGIN || 'sqladmin' }}
+      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      SQL_DATABASE_NAME: ${{ vars.SQL_DATABASE_NAME }}
+      SQL_SKU_NAME: ${{ vars.SQL_SKU_NAME }}
+      SQL_SKU_TIER: ${{ vars.SQL_SKU_TIER }}
+      WEB_SKU_NAME: ${{ vars.WEB_SKU_NAME }}
+      WEB_SKU_TIER: ${{ vars.WEB_SKU_TIER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$DEPLOY_ENV" != "test" && "$DEPLOY_ENV" != "prod" ]]; then
+            echo "environment must be either test or prod."
+            exit 1
+          fi
+
+          missing=()
+          for name in APP_NAME AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID RESOURCE_GROUP SQL_ADMIN_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required GitHub Environment configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Azure login
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Apply infrastructure and app settings
+        id: configure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deployment_name="${APP_NAME}-${DEPLOY_ENV}-config-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          params=(
+            "appName=$APP_NAME"
+            "env=$DEPLOY_ENV"
+            "expectedSubscriptionId=$AZURE_SUBSCRIPTION_ID"
+            "sqlAdminLogin=$SQL_ADMIN_LOGIN"
+            "sqlAdminPassword=$SQL_ADMIN_PASSWORD"
+          )
+
+          add_param() {
+            local name="$1"
+            local value="$2"
+
+            if [[ -n "$value" ]]; then
+              params+=("$name=$value")
+            fi
+          }
+
+          add_param "location" "$AZURE_LOCATION"
+          add_param "sqlDatabaseName" "$SQL_DATABASE_NAME"
+          add_param "webSkuName" "$WEB_SKU_NAME"
+          add_param "webSkuTier" "$WEB_SKU_TIER"
+          add_param "sqlSkuName" "$SQL_SKU_NAME"
+          add_param "sqlSkuTier" "$SQL_SKU_TIER"
+          add_param "notificationBaseUrl" "$NOTIFICATION_BASE_URL"
+          add_param "notificationDefaultAppName" "$NOTIFICATION_DEFAULT_APP_NAME"
+          add_param "notificationDefaultButtonText" "$NOTIFICATION_DEFAULT_BUTTON_TEXT"
+          add_param "authClientId" "$AUTH_CLIENT_ID"
+          add_param "authTenantId" "$AUTH_TENANT_ID"
+          add_param "authDomain" "$AUTH_DOMAIN"
+          add_param "authInstance" "$AUTH_INSTANCE"
+          add_param "authCallbackPath" "$AUTH_CALLBACK_PATH"
+          add_param "smtpHost" "$SMTP_HOST"
+          add_param "smtpPort" "$SMTP_PORT"
+          add_param "smtpTimeout" "$SMTP_TIMEOUT"
+          add_param "smtpUseSsl" "$SMTP_USE_SSL"
+          add_param "smtpUsername" "$SMTP_USERNAME"
+          add_param "smtpPassword" "$SMTP_PASSWORD"
+          add_param "smtpFromEmail" "$SMTP_FROM_EMAIL"
+          add_param "smtpFromName" "$SMTP_FROM_NAME"
+          add_param "smtpReplyToEmail" "$SMTP_REPLY_TO_EMAIL"
+          add_param "smtpBccEmail" "$SMTP_BCC_EMAIL"
+          add_param "otelExporterOtlpEndpoint" "$OTEL_EXPORTER_OTLP_ENDPOINT"
+          add_param "otelExporterOtlpProtocol" "$OTEL_EXPORTER_OTLP_PROTOCOL"
+          add_param "otelExporterOtlpHeaders" "$OTEL_EXPORTER_OTLP_HEADERS"
+          add_param "otelServiceName" "$OTEL_SERVICE_NAME"
+          add_param "otelResourceAttributes" "$OTEL_RESOURCE_ATTRIBUTES"
+
+          az deployment group create \
+            --name "$deployment_name" \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infrastructure/azure/main.bicep \
+            --parameters "${params[@]}" \
+            --query properties.outputs \
+            --output json | tee deployment-outputs.json
+
+          deployment_guard_passed="$(jq -r '.deploymentGuardPassed.value // false' deployment-outputs.json)"
+          if [[ "$deployment_guard_passed" != "true" ]]; then
+            echo "Azure deployment guard did not pass. Check subscription ID, resource group suffix, and environment values."
+            exit 1
+          fi
+
+          web_app_name="$(jq -r '.webAppName.value // empty' deployment-outputs.json)"
+          if [[ -z "$web_app_name" ]]; then
+            echo "The configuration deployment did not return a webAppName output."
+            exit 1
+          fi
+
+          echo "web_app_name=$web_app_name" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for SCM restart
+        shell: bash
+        env:
+          WEB_APP_NAME: ${{ steps.configure.outputs.web_app_name }}
+        run: |
+          set -euo pipefail
+
+          scm_url="https://${WEB_APP_NAME}.scm.azurewebsites.net/api/settings"
+          ready_count=0
+
+          for attempt in {1..12}; do
+            scm_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 10 "$scm_url" || true)"
+
+            if [[ "$scm_status" == "200" || "$scm_status" == "401" ]]; then
+              ((ready_count += 1))
+              if (( ready_count == 2 )); then
+                echo "Azure configuration is applied and SCM is ready."
+                exit 0
+              fi
+            else
+              ready_count=0
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "SCM did not recover after Azure configuration was applied."
+          exit 1
