@@ -11,7 +11,7 @@ on:
         description: Application tag used to find the existing App Service.
         required: false
         type: string
-        default: webapp
+        default: leaves
       web_app_name:
         description: Existing App Service name. Defaults to tag-based discovery.
         required: false

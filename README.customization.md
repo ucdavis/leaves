@@ -90,10 +90,11 @@ When the workflow should create or update Azure SQL and App Service resources, a
 
 - `SQL_ADMIN_PASSWORD`
 
-Optional GitHub Environment variables/secrets used by the reusable deployment workflow include:
+The package deployment workflow uses `APP_NAME` to find the App Service by tag. It defaults to `leaves`. Set `WEB_APP_NAME` only when the workflow should target an App Service by its exact name instead.
+
+Optional GitHub Environment variables and secrets used by the manual `Configure Azure` workflow include:
 
 - App identity and location: `APP_NAME`, `AZURE_LOCATION`
-- Existing infrastructure deploys: `WEB_APP_NAME`, `DB_CONNECTION` secret
 - Auth: `AUTH_CLIENT_ID`, `AUTH_TENANT_ID`, `AUTH_DOMAIN`, `AUTH_INSTANCE`, `AUTH_CALLBACK_PATH`
 - Notifications and SMTP: `NOTIFICATION_BASE_URL`, `NOTIFICATION_DEFAULT_APP_NAME`, `NOTIFICATION_DEFAULT_BUTTON_TEXT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_TIMEOUT`, `SMTP_USE_SSL`, `SMTP_USERNAME`, `SMTP_PASSWORD` secret, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, `SMTP_REPLY_TO_EMAIL`, `SMTP_BCC_EMAIL`
 - Observability: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_HEADERS` secret, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`
