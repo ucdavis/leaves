@@ -39,7 +39,9 @@ export function AdminFacultyDataProvider({
   const updateUserMutation = useMutation({
     mutationFn: updateAdminFacultyUser,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'faculty'] });
+      await queryClient.invalidateQueries({
+        queryKey: adminFacultyQueryOptions().queryKey,
+      });
     },
   });
 

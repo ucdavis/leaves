@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
 import type { AdminDataSource } from '@/shared/admin/adminData.ts';
 
@@ -18,13 +19,18 @@ export type AdminStatusPageData = {
   statusSnapshot: AdminStatusSnapshot;
 };
 
-export const adminStatusQueryOptions = () => ({
-  queryFn: async ({
-    signal,
-  }: {
-    signal: AbortSignal;
-  }): Promise<AdminStatusPageData> => {
-    return await fetchJson<AdminStatusPageData>('/api/admin/status', {}, signal);
-  },
-  queryKey: ['admin', 'status'] as const,
-});
+export const adminStatusQueryOptions = () =>
+  queryOptions({
+    queryFn: async ({
+      signal,
+    }: {
+      signal: AbortSignal;
+    }): Promise<AdminStatusPageData> => {
+      return await fetchJson<AdminStatusPageData>(
+        '/api/admin/status',
+        {},
+        signal
+      );
+    },
+    queryKey: ['admin', 'status'] as const,
+  });

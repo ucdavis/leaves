@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
 
 export type AdminAssignableRoleType = 'admin' | 'cao' | 'chair';
@@ -37,16 +38,17 @@ export type AdminRolesResponse = {
   users: AdminRoleUserOption[];
 };
 
-export const adminRolesQueryOptions = () => ({
-  queryFn: async ({
-    signal,
-  }: {
-    signal: AbortSignal;
-  }): Promise<AdminRolesResponse> => {
-    return await fetchJson<AdminRolesResponse>('/api/admin/roles', {}, signal);
-  },
-  queryKey: ['admin', 'roles'] as const,
-});
+export const adminRolesQueryOptions = () =>
+  queryOptions({
+    queryFn: async ({
+      signal,
+    }: {
+      signal: AbortSignal;
+    }): Promise<AdminRolesResponse> => {
+      return await fetchJson<AdminRolesResponse>('/api/admin/roles', {}, signal);
+    },
+    queryKey: ['admin', 'roles'] as const,
+  });
 
 export async function addAdminAssignment({
   iamId,

@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
 import type {
   AdminDepartment,
@@ -73,22 +74,23 @@ function normalizeFacultyData(
   };
 }
 
-export const adminFacultyQueryOptions = () => ({
-  queryFn: async ({
-    signal,
-  }: {
-    signal: AbortSignal;
-  }): Promise<AdminFacultyPageData> => {
-    const response = await fetchJson<AdminFacultyResponse>(
-      '/api/admin/faculty',
-      {},
-      signal
-    );
+export const adminFacultyQueryOptions = () =>
+  queryOptions({
+    queryFn: async ({
+      signal,
+    }: {
+      signal: AbortSignal;
+    }): Promise<AdminFacultyPageData> => {
+      const response = await fetchJson<AdminFacultyResponse>(
+        '/api/admin/faculty',
+        {},
+        signal
+      );
 
-    return normalizeFacultyData(response);
-  },
-  queryKey: ['admin', 'faculty'] as const,
-});
+      return normalizeFacultyData(response);
+    },
+    queryKey: ['admin', 'faculty'] as const,
+  });
 
 export async function updateAdminFacultyUser({
   signal,

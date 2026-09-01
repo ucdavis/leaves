@@ -87,7 +87,9 @@ function AdminDepartmentsRoute() {
   >(null);
 
   const invalidateDepartments = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['admin', 'departments'] });
+    await queryClient.invalidateQueries({
+      queryKey: adminDepartmentsQueryOptions().queryKey,
+    });
   };
 
   const createClusterMutation = useMutation({
