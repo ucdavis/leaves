@@ -43,7 +43,7 @@ export const calendarLegend = [
   },
   {
     className:
-      'border-dashed border-base-content/50 bg-base-200 text-base-content/70',
+      'border-dashed border-warning/70 bg-warning/15 text-warning',
     label: 'Pending',
   },
 ] as const;
@@ -57,9 +57,13 @@ export function LeaveCalendar({
   faculty: FacultyDashboardResponse['faculty'];
   requests: FacultyLeaveRequest[];
 }) {
-  const initialMonth = useMemo(
-    () => getInitialCalendarMonth(requests),
+  const visibleRequests = useMemo(
+    () => requests.filter((request) => !isDeniedRequest(request.status)),
     [requests]
+  );
+  const initialMonth = useMemo(
+    () => getInitialCalendarMonth(visibleRequests),
+    [visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -69,7 +73,10 @@ export function LeaveCalendar({
     () => buildCalendarDays(visibleMonth),
     [visibleMonth]
   );
-  const requestsByDate = useMemo(() => mapRequestsByDate(requests), [requests]);
+  const requestsByDate = useMemo(
+    () => mapRequestsByDate(visibleRequests),
+    [visibleRequests]
+  );
 
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
@@ -137,6 +144,7 @@ export function LeaveCalendar({
                   <div className="mt-3 space-y-1">
                     {dayRequests.map((request) => {
                       const tone = getLeaveTone(request.leaveType);
+                      const pending = isPendingRequest(request.status);
 
                       return (
                         <button
@@ -150,6 +158,14 @@ export function LeaveCalendar({
                             event.stopPropagation();
                             setSelectedRequest(request);
                           }}
+                          style={
+                            pending
+                              ? {
+                                  backgroundImage:
+                                    'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 4px, transparent 4px 8px)',
+                                }
+                              : undefined
+                          }
                           type="button"
                         >
                           {request.leaveType}
@@ -226,4 +242,12 @@ function mapRequestsByDate(requests: FacultyLeaveRequest[]) {
   }
 
   return map;
+}
+
+function isDeniedRequest(status: string) {
+  return status.toLowerCase().includes('denied');
+}
+
+function isPendingRequest(status: string) {
+  return status.toLowerCase().includes('pending');
 }

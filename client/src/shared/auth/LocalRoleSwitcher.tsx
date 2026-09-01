@@ -89,20 +89,24 @@ export function LocalRoleSwitcher({
     <div className="dropdown dropdown-end" ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-right transition hover:bg-primary-content/10"
+        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
-        <div className="hidden sm:block">
-          <div className="text-sm font-semibold">{userName}</div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success text-sm font-bold text-white">
+          {initials || '?'}
+        </div>
+        <div className="hidden min-w-0 sm:block">
+          <div className="truncate text-sm font-semibold leading-tight">
+            {userName}
+          </div>
+          <div className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
             {authLabel}
           </div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
-          {initials || '?'}
-        </div>
-        <span className="hidden text-primary-content/70 sm:block">▾</span>
+        <span className="hidden shrink-0 text-primary-content/70 sm:block">
+          ▾
+        </span>
       </button>
 
       {isOpen ? (

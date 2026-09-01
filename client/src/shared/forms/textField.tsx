@@ -19,7 +19,7 @@ export function TextField({
   type,
 }: TextFieldProps) {
   const field = useFieldContext<string>();
-  const hasError = field.state.meta.isTouched && !field.state.meta.isValid;
+  const hasError = field.state.meta.errors.length > 0;
 
   return (
     <FieldWrapper helperText={helperText} label={label} required={required}>

@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { HttpError } from '@/lib/api.ts';
 import type { RouterContext } from '@/main.tsx';
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approvalWorkspaceQueryOptions,
   submitApprovalDecision,
@@ -31,23 +31,12 @@ export const Route = createFileRoute('/(authenticated)/approvals')({
 function RouteComponent() {
   const queryClient = useQueryClient();
   const workspaceQuery = useQuery(approvalWorkspaceQueryOptions());
-  const [dismissedRequestIds, setDismissedRequestIds] = useState<number[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] =
-    useState<ApprovalToastMessage | null>(null);
-
+  const [toastMessage, setToastMessage] = useState<ApprovalToastMessage | null>(
+    null
+  );
   const decisionMutation = useMutation({
     mutationFn: submitApprovalDecision,
-    onError: () => {
-      setErrorMessage('We could not save that decision. Please try again.');
-    },
-    onSuccess: async (_data, variables) => {
-      setDismissedRequestIds((current) => [...current, variables.requestId]);
-      setToastMessage({
-        decision: variables.decision,
-        facultyName: variables.facultyName,
-        id: variables.requestId,
-      });
+    onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: approvalWorkspaceQueryOptions().queryKey,
       });
@@ -82,34 +71,33 @@ function RouteComponent() {
     );
   }
 
-  const requests = workspaceQuery.data.pendingRequests.filter(
-    (request) => !dismissedRequestIds.includes(request.id)
-  );
-
   const handleDecision = (
     request: ApprovalRequest,
     decision: ApprovalDecision
-  ) => {
-    setErrorMessage(null);
-    decisionMutation.mutate({
-      decision,
-      facultyName: request.facultyName,
-      requestId: request.id,
-    });
-  };
+  ) =>
+    void (async () => {
+      try {
+        await decisionMutation.mutateAsync({
+          decision,
+          requestId: request.id,
+        });
+        setToastMessage({
+          decision,
+          facultyName: request.facultyName,
+          id: request.id,
+        });
+      } catch {
+        // Let the panel remain visible so the user can retry.
+      }
+    })();
 
   return (
     <div className="container py-8 lg:py-10">
       <div className="mx-auto max-w-5xl">
-        {errorMessage ? (
-          <div className="alert alert-error mb-4" role="alert">
-            {errorMessage}
-          </div>
-        ) : null}
         <PendingApprovalsPanel
-          isSubmitting={decisionMutation.isPending}
+          disabledRequestId={decisionMutation.variables?.requestId ?? null}
           onDecision={handleDecision}
-          requests={requests}
+          requests={workspaceQuery.data.pendingRequests}
         />
       </div>
       <ApprovalToast

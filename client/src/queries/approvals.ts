@@ -15,6 +15,11 @@ export type ApprovalWorkspaceResponse = {
   scope: ApprovalScope;
 };
 
+export type ApprovalDecisionInput = {
+  decision: ApprovalDecision;
+  requestId: number;
+};
+
 export const approvalWorkspaceQueryOptions = () =>
   queryOptions({
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
@@ -31,11 +36,7 @@ export const approvalWorkspaceQueryOptions = () =>
 export async function submitApprovalDecision({
   decision,
   requestId,
-}: {
-  decision: ApprovalDecision;
-  facultyName: string;
-  requestId: number;
-}) {
+}: ApprovalDecisionInput) {
   await fetchJson<void>(
     `/api/approvalworkspace/requests/${requestId}/decision`,
     {

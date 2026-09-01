@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { useFieldContext } from './formContext.tsx';
+import { getValidationErrorMessage } from './validationError.ts';
 
 interface FieldWrapperProps {
   children: ReactNode;
@@ -20,7 +21,7 @@ export function FieldWrapper({
   wrapperClassName,
 }: FieldWrapperProps) {
   const field = useFieldContext<string>();
-  const hasError = field.state.meta.isTouched && !field.state.meta.isValid;
+  const hasError = field.state.meta.errors.length > 0;
 
   return (
     <div className={wrapperClassName ?? 'form-control w-full'}>
@@ -34,7 +35,7 @@ export function FieldWrapper({
       {hasError && (
         <label className="label">
           <span className="label-text-alt text-error" role="alert">
-            {field.state.meta.errors.map((err) => err.message).join(', ')}
+            {field.state.meta.errors.map(getValidationErrorMessage).join(', ')}
           </span>
         </label>
       )}

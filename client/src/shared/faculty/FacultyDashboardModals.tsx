@@ -27,6 +27,7 @@ import {
   reportLeaveButtonClass,
 } from './FacultyDashboardPanels.tsx';
 import { RequestStatusBadge } from './FacultyDashboardPanels.tsx';
+import { getValidationErrorMessage } from '@/shared/forms/validationError.ts';
 
 const myInfoVaultUrl = 'https://myinfovault.ucdavis.edu/';
 const noPayOptionValue = 'none';
@@ -58,17 +59,6 @@ type LeaveRequestFormValues = {
   startDate: string;
   totalHours: string;
 };
-
-const leaveRequestFormFieldNames = new Set<string>([
-  'approvedInMyInfoVault',
-  'dateSelection',
-  'endDate',
-  'leaveTypeId',
-  'note',
-  'payLeaveTypeId',
-  'startDate',
-  'totalHours',
-] satisfies (keyof LeaveRequestFormValues)[]);
 
 function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
   return z
@@ -294,6 +284,7 @@ function LeaveRequestForm({
   onTitleChange: (title: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const leaveTypeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const leaveTypeLabelById = new Map(
     leaveTypeOptions.map((option) => [option.value, option.label])
@@ -321,7 +312,18 @@ function LeaveRequestForm({
   const form = useAppForm({
     defaultValues,
     onSubmit: async ({ value }) => {
-      form.setErrorMap({ onSubmit: undefined });
+      const overlapError = getOverlapValidationError(
+        value,
+        data.recentRequests,
+        leaveTypeLabelById
+      );
+
+      if (overlapError) {
+        setSubmitError(overlapError.form);
+        return;
+      }
+
+      setSubmitError(null);
 
       const selectedLeaveType = getSelectedLeaveTypeLabel(
         value.leaveTypeId,
@@ -339,7 +341,6 @@ function LeaveRequestForm({
         value.payLeaveTypeId && value.payLeaveTypeId !== noPayOptionValue
           ? Number(value.payLeaveTypeId)
           : null;
-
       try {
         await requestMutation.mutateAsync({
           coveragePlan: null,
@@ -355,9 +356,9 @@ function LeaveRequestForm({
         onSent(getSuccessMessage(selectedLeaveType));
         onSubmitted();
       } catch (error) {
-        form.setErrorMap({
-          onSubmit: getSubmitErrorMap(error),
-        });
+        const errorMap = getSubmitErrorMap(error);
+        form.setErrorMap({ onSubmit: errorMap });
+        setSubmitError(errorMap.form ?? null);
       }
     },
     validators: {
@@ -375,7 +376,6 @@ function LeaveRequestForm({
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
-  const submitError = getSubmitErrorMessage(form.state.errorMap.onSubmit);
 
   return (
     <>
@@ -402,9 +402,7 @@ function LeaveRequestForm({
                   <select
                     aria-required
                     className={`select select-bordered w-full ${
-                      field.state.meta.isTouched && !field.state.meta.isValid
-                        ? 'select-error'
-                        : ''
+                      field.state.meta.errors.length > 0 ? 'select-error' : ''
                     }`}
                     onBlur={field.handleBlur}
                     onChange={(event) => {
@@ -436,11 +434,11 @@ function LeaveRequestForm({
                       </option>
                     ))}
                   </select>
-                  {field.state.meta.isTouched && !field.state.meta.isValid ? (
+                  {field.state.meta.errors.length > 0 ? (
                     <label className="label">
                       <span className="label-text-alt text-error" role="alert">
                         {field.state.meta.errors
-                          .map((error) => error?.message ?? '')
+                          .map(getValidationErrorMessage)
                           .join(', ')}
                       </span>
                     </label>
@@ -673,6 +671,33 @@ function getSubmitLabel(selectedLeaveType: string) {
   return 'Submit Leave Report';
 }
 
+function getOverlapValidationError(
+  value: LeaveRequestFormValues,
+  requests: FacultyLeaveRequest[],
+  leaveTypeLabelById: Map<string, string>
+): { form: string } | undefined {
+  const selectedLeaveType = getSelectedLeaveTypeLabel(
+    value.leaveTypeId,
+    leaveTypeLabelById
+  );
+  const usesDateRange =
+    selectedLeaveType === sabbaticalLeaveTypeLabel ||
+    value.dateSelection === 'range';
+  const overlapRequest = findOverlappingActiveRequest(
+    requests,
+    value.startDate,
+    usesDateRange ? value.endDate : value.startDate
+  );
+
+  if (!overlapRequest) {
+    return undefined;
+  }
+
+  return {
+    form: buildOverlapMessage(overlapRequest),
+  };
+}
+
 function getSuccessMessage(selectedLeaveType: string) {
   if (selectedLeaveType === professionalDevelopmentLeaveTypeLabel) {
     return 'Professional development notification submitted.';
@@ -760,24 +785,16 @@ function getSubmitErrorMap(error: unknown) {
     error.status === 400 &&
     isValidationProblemDetails(error.body)
   ) {
-    const entries = Object.entries(error.body.errors).map(
-      ([fieldName, messages]) =>
-        [toClientFieldName(fieldName), messages.join(', ')] as const
-    );
-    const unmappedEntries = entries.filter(
-      ([fieldName]) => !leaveRequestFormFieldNames.has(fieldName)
+    const fields = Object.fromEntries(
+      Object.entries(error.body.errors).map(([fieldName, messages]) => [
+        toClientFieldName(fieldName),
+        messages.join(', '),
+      ])
     );
 
     return {
-      fields: Object.fromEntries(
-        entries.filter(([fieldName]) =>
-          leaveRequestFormFieldNames.has(fieldName)
-        )
-      ),
-      form:
-        unmappedEntries.length > 0
-          ? unmappedEntries.map(([, message]) => message).join(' ')
-          : undefined,
+      fields,
+      form: getFirstValidationMessage(error.body.errors),
     };
   }
 
@@ -785,15 +802,6 @@ function getSubmitErrorMap(error: unknown) {
     fields: {},
     form: 'The leave request could not be submitted. Please review the form and try again.',
   };
-}
-
-function getSubmitErrorMessage(error: unknown) {
-  if (!error || typeof error !== 'object') {
-    return null;
-  }
-
-  const formError = (error as { form?: unknown }).form;
-  return typeof formError === 'string' ? formError : null;
 }
 
 function isValidationProblemDetails(
@@ -804,6 +812,39 @@ function isValidationProblemDetails(
   }
 
   return typeof value.errors === 'object' && value.errors !== null;
+}
+
+function getFirstValidationMessage(errors: Record<string, string[]>) {
+  return (
+    Object.values(errors)
+      .flat()
+      .find((message) => message.length > 0) ?? null
+  );
+}
+
+function findOverlappingActiveRequest(
+  requests: FacultyLeaveRequest[],
+  startDate: string,
+  endDate: string
+) {
+  return requests.find(
+    (request) =>
+      isActiveRequestStatus(request.status) &&
+      request.startDate <= endDate &&
+      request.endDate >= startDate
+  );
+}
+
+function buildOverlapMessage(request: FacultyLeaveRequest) {
+  return `This overlaps with your ${request.leaveType} request (${formatDateRange(
+    request.startDate,
+    request.endDate
+  )}, ${formatCompactHours(request.totalHours)}, request r${request.id}).`;
+}
+
+function isActiveRequestStatus(status: string) {
+  const normalized = status.toLowerCase();
+  return normalized.includes('approved') || normalized.includes('pending');
 }
 
 function toClientFieldName(fieldName: string) {

@@ -189,7 +189,7 @@ function CalendarDayCell({
 }) {
   if (!leave) {
     return (
-      <td className="h-11 border-r border-t border-base-300 bg-base-100 last:border-r-0" />
+      <td className="h-11 border-r border-t border-base-300 bg-base-100 p-0 last:border-r-0" />
     );
   }
 
@@ -198,10 +198,10 @@ function CalendarDayCell({
   const endsOnDay = leave.endDate === day.isoDate;
 
   return (
-    <td className="border-r border-t border-base-300 last:border-r-0">
+    <td className="h-11 border-r border-t border-base-300 p-0 last:border-r-0">
       <button
         aria-label={`View ${leave.leaveType} for ${facultyName}`}
-        className={`h-11 w-full ${tone.background} text-left transition hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-inset ${
+        className={`block h-full w-full ${tone.background} text-left transition hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-inset ${
           startsOnDay ? `border-l-4 ${tone.border}` : ''
         } ${endsOnDay ? 'rounded-r-sm' : ''}`}
         onClick={() => onSelectFaculty(facultyId)}

@@ -281,7 +281,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         {
             return CreateLeaveRequestResult.Invalid(
                 "startDate",
-                "A leave request already exists for these dates.");
+                "You already have a leave request that includes one or more of these dates.");
         }
 
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);

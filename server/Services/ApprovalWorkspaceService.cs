@@ -17,6 +17,12 @@ public interface IApprovalWorkspaceService
         int requestId,
         SubmitApprovalDecisionRequest request,
         CancellationToken cancellationToken);
+
+    Task<bool> DecideRequestAsync(
+        ClaimsPrincipal principal,
+        int requestId,
+        LeaveRequestActionType decision,
+        CancellationToken cancellationToken);
 }
 
 public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
@@ -35,6 +41,71 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
     }
 
     public async Task<ApprovalWorkspaceResponse?> GetWorkspaceAsync(
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken)
+    {
+        var context = await ResolveWorkspaceContextAsync(principal, cancellationToken);
+        if (context == null)
+        {
+            return null;
+        }
+
+        var scopedLeaveRequests = await LoadScopedLeaveRequestsAsync(
+            context.FacultyIds,
+            cancellationToken);
+
+        var leaveTypeIds = scopedLeaveRequests
+            .SelectMany(request => new[] { request.LeaveTypeId, request.PayLeaveTypeId ?? 0 })
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        var leaveTypesById = await _db.LeaveTypes
+            .AsNoTracking()
+            .Where(type => leaveTypeIds.Contains(type.Id))
+            .ToDictionaryAsync(type => type.Id, cancellationToken);
+
+        var leaves = scopedLeaveRequests
+            .Where(request =>
+                request.Status == LeaveRequestStatus.Approved ||
+                request.Status == LeaveRequestStatus.PendingApproval)
+            .Select(request => new ApprovalWorkspaceLeaveResponse(
+                EndDate: request.EndDate.ToString("yyyy-MM-dd"),
+                FacultyId: request.IamId.Trim(),
+                Id: request.Id,
+                LeaveType: GetLeaveTypeName(request, leaveTypesById),
+                StartDate: request.StartDate.ToString("yyyy-MM-dd"),
+                Status: request.Status.ToString()))
+            .ToList();
+
+        var pendingRequests = scopedLeaveRequests
+            .Where(request => request.Status == LeaveRequestStatus.PendingApproval)
+            .Select(request => new ApprovalWorkspaceRequestResponse(
+                DepartmentName: request.ReportingDepartmentNameSnapshot,
+                EndDate: request.EndDate.ToString("yyyy-MM-dd"),
+                FacultyInitials: BuildInitials(GetFacultyDisplayName(
+                    request.IamId,
+                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.AppUsers)),
+                FacultyName: GetFacultyDisplayName(
+                    request.IamId,
+                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.AppUsers),
+                Id: request.Id,
+                LeaveType: GetLeaveTypeName(request, leaveTypesById),
+                Note: request.Note,
+                StartDate: request.StartDate.ToString("yyyy-MM-dd"),
+                TotalHours: request.TotalHours))
+            .ToList();
+
+        return new ApprovalWorkspaceResponse(
+            Scope: context.Scope,
+            Faculty: context.Faculty,
+            Leaves: leaves,
+            PendingRequests: pendingRequests);
+    }
+
+    private async Task<ApprovalWorkspaceContext?> ResolveWorkspaceContextAsync(
         ClaimsPrincipal principal,
         CancellationToken cancellationToken)
     {
@@ -98,61 +169,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             scope,
             currentDepartmentCode,
             clusterId);
-        var facultyIds = faculty.Select(item => item.Id).ToArray();
 
-        var scopedLeaveRequests = await LoadScopedLeaveRequestsAsync(
-            facultyIds,
-            cancellationToken);
-
-        var leaveTypeIds = scopedLeaveRequests
-            .SelectMany(request => new[] { request.LeaveTypeId, request.PayLeaveTypeId ?? 0 })
-            .Where(id => id > 0)
-            .Distinct()
-            .ToArray();
-
-        var leaveTypesById = await _db.LeaveTypes
-            .AsNoTracking()
-            .Where(type => leaveTypeIds.Contains(type.Id))
-            .ToDictionaryAsync(type => type.Id, cancellationToken);
-
-        var leaves = scopedLeaveRequests
-            .Where(request =>
-                request.Status == LeaveRequestStatus.Approved ||
-                request.Status == LeaveRequestStatus.PendingApproval)
-            .Select(request => new ApprovalWorkspaceLeaveResponse(
-                EndDate: request.EndDate.ToString("yyyy-MM-dd"),
-                FacultyId: request.IamId.Trim(),
-                Id: request.Id,
-                LeaveType: GetLeaveTypeName(request, leaveTypesById),
-                StartDate: request.StartDate.ToString("yyyy-MM-dd"),
-                Status: request.Status.ToString()))
-            .ToList();
-
-        var pendingRequests = scopedLeaveRequests
-            .Where(request => request.Status == LeaveRequestStatus.PendingApproval)
-            .Select(request => new ApprovalWorkspaceRequestResponse(
-                DepartmentName: request.ReportingDepartmentNameSnapshot,
-                EndDate: request.EndDate.ToString("yyyy-MM-dd"),
-                FacultyInitials: BuildInitials(GetFacultyDisplayName(
-                    request.IamId,
-                    directoryData.CurrentEmployees,
-                    directoryData.AppUsers)),
-                FacultyName: GetFacultyDisplayName(
-                    request.IamId,
-                    directoryData.CurrentEmployees,
-                    directoryData.AppUsers),
-                Id: request.Id,
-                LeaveType: GetLeaveTypeName(request, leaveTypesById),
-                Note: request.Note,
-                StartDate: request.StartDate.ToString("yyyy-MM-dd"),
-                TotalHours: request.TotalHours))
-            .ToList();
-
-        return new ApprovalWorkspaceResponse(
-            Scope: scope,
+        return new ApprovalWorkspaceContext(
+            AppUser: appUser,
+            DirectoryData: directoryData,
             Faculty: faculty,
-            Leaves: leaves,
-            PendingRequests: pendingRequests);
+            FacultyIds: faculty.Select(item => item.Id).ToArray(),
+            Scope: scope);
     }
 
     public async Task<ApprovalDecisionResult> SubmitDecisionAsync(
@@ -215,6 +238,24 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
         await _db.SaveChangesAsync(cancellationToken);
         return ApprovalDecisionResult.Success();
+    }
+
+    public async Task<bool> DecideRequestAsync(
+        ClaimsPrincipal principal,
+        int requestId,
+        LeaveRequestActionType decision,
+        CancellationToken cancellationToken)
+    {
+        var decisionText = decision == LeaveRequestActionType.Approved
+            ? "approved"
+            : "denied";
+        var result = await SubmitDecisionAsync(
+            principal,
+            requestId,
+            new SubmitApprovalDecisionRequest(decisionText, null),
+            cancellationToken);
+
+        return result.Succeeded;
     }
 
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
@@ -425,6 +466,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
     {
         return value?.Trim().ToLowerInvariant() ?? string.Empty;
     }
+
+    private sealed record ApprovalWorkspaceContext(
+        AppUser AppUser,
+        AdminDirectoryData DirectoryData,
+        IReadOnlyList<ApprovalWorkspaceFacultyResponse> Faculty,
+        IReadOnlyCollection<string> FacultyIds,
+        string Scope);
 }
 
 public sealed record ApprovalWorkspaceResponse(
