@@ -159,12 +159,6 @@ public class DbInitializer : IDbInitializer
 
     public async Task InitializeAsync(bool includeDevSeed = false, CancellationToken cancellationToken = default)
     {
-        if (!includeDevSeed)
-        {
-            _logger.LogInformation("Database initialization skipped outside local development.");
-            return;
-        }
-
         if (_db.Database.IsRelational())
         {
             _logger.LogInformation("Applying database migrations...");
@@ -178,7 +172,10 @@ public class DbInitializer : IDbInitializer
             _logger.LogInformation("Database ensured.");
         }
 
-        await SeedDevelopmentAsync(cancellationToken);
+        if (includeDevSeed)
+        {
+            await SeedDevelopmentAsync(cancellationToken);
+        }
     }
 
     private async Task SeedDevelopmentAsync(CancellationToken ct)
