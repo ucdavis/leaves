@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { createFileRoute } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import { useState } from 'react';
 import { RouterContext } from '@/main.tsx';
@@ -104,7 +103,6 @@ function HistoryContent({
   selectedType: string;
   toastMessage: string | null;
 }) {
-  const navigate = useNavigate();
   const typeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const requests = selectedType
     ? data.recentRequests.filter(
