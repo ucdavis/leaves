@@ -28,6 +28,7 @@ public interface IApprovalWorkspaceService
 public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 {
     private const string CaoRole = "CAO";
+    private const string ChairRole = "Chair";
 
     private readonly IAdminDirectoryDataService _directoryDataService;
     private readonly AppDbContext _db;
@@ -139,22 +140,14 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return null;
         }
 
-        var normalizedIamId = NormalizeKey(appUser.IamId);
         var clusterId = currentDepartment.ClusterId;
 
-        var hasCurrentCaoAssignment = clusterId.HasValue &&
-            directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(clusterId.Value, out var currentCaoAssignment) &&
-            NormalizeKey(currentCaoAssignment.IamId) == normalizedIamId;
-        var hasCurrentChairAssignment =
-            directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(currentDepartmentCode, out var currentChairAssignment) &&
-            NormalizeKey(currentChairAssignment.IamId) == normalizedIamId;
-
         string scope;
-        if (HasRole(principal, CaoRole) && hasCurrentCaoAssignment)
+        if (HasRole(principal, CaoRole))
         {
             scope = "cluster";
         }
-        else if (hasCurrentChairAssignment)
+        else if (HasRole(principal, ChairRole))
         {
             scope = "team";
         }
@@ -348,21 +341,14 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return null;
         }
 
-        var normalizedIamId = NormalizeKey(appUser.IamId);
         var clusterId = currentDepartment.ClusterId;
-        var hasCurrentCaoAssignment = clusterId.HasValue &&
-            directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(clusterId.Value, out var currentCaoAssignment) &&
-            NormalizeKey(currentCaoAssignment.IamId) == normalizedIamId;
-        var hasCurrentChairAssignment =
-            directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(currentDepartmentCode, out var currentChairAssignment) &&
-            NormalizeKey(currentChairAssignment.IamId) == normalizedIamId;
 
         string scope;
-        if (HasRole(principal, CaoRole) && hasCurrentCaoAssignment)
+        if (HasRole(principal, CaoRole))
         {
             scope = "cluster";
         }
-        else if (hasCurrentChairAssignment)
+        else if (HasRole(principal, ChairRole))
         {
             scope = "team";
         }

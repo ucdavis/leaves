@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import type {
   FacultyAccrualBalance,
   FacultyDashboardResponse,
@@ -27,7 +26,6 @@ export function FacultyDashboardPage({
   data: FacultyDashboardResponse;
   readOnly?: boolean;
 }) {
-  const navigate = useNavigate();
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
@@ -49,7 +47,6 @@ export function FacultyDashboardPage({
             <QuickActionsPanel
               data={data}
               onReportLeave={() => setReportModalOpen(true)}
-              onViewHistory={() => void navigate({ to: '/history' })}
             />
             <RecentRequestsPanel
               onSelectRequest={setSelectedRequest}

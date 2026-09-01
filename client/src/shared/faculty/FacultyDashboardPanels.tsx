@@ -72,11 +72,9 @@ function AccrualBalanceBar({ balance }: { balance: FacultyAccrualBalance }) {
 export function QuickActionsPanel({
   data,
   onReportLeave,
-  onViewHistory,
 }: {
   data: FacultyDashboardResponse;
   onReportLeave: () => void;
-  onViewHistory: () => void;
 }) {
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
@@ -92,13 +90,6 @@ export function QuickActionsPanel({
         <span className="font-bold text-base-content">Department:</span>{' '}
         {data.faculty.departmentName ?? 'No reporting department'}.
       </div>
-      <button
-        className="btn btn-outline btn-primary mt-3 w-full"
-        onClick={onViewHistory}
-        type="button"
-      >
-        View History
-      </button>
     </section>
   );
 }

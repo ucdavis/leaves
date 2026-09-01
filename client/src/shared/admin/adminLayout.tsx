@@ -9,7 +9,7 @@ import {
 const adminTabs = [
   { icon: ChartBarSquareIcon, label: 'Status', to: '/admin' },
   { icon: UserGroupIcon, label: 'Faculty', to: '/admin/faculty' },
-  { icon: ShieldCheckIcon, label: 'Manage users', to: '/admin/manage-users' },
+  { icon: ShieldCheckIcon, label: 'Manage Admin', to: '/admin/manage-users' },
   { icon: BuildingOffice2Icon, label: 'Departments', to: '/admin/departments' },
 ] as const;
 

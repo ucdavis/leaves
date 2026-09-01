@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useStore } from '@tanstack/react-form';
 import { useState, type ReactNode } from 'react';
 import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
@@ -366,13 +367,14 @@ function LeaveRequestForm({
     },
   });
 
+  const formValues = useStore(form.store, (state) => state.values);
   const selectedLeaveType = getSelectedLeaveTypeLabel(
-    form.state.values.leaveTypeId,
+    formValues.leaveTypeId,
     leaveTypeLabelById
   );
   const usesDateRange =
     selectedLeaveType === sabbaticalLeaveTypeLabel ||
-    form.state.values.dateSelection === 'range';
+    formValues.dateSelection === 'range';
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;

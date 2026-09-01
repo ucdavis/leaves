@@ -39,7 +39,10 @@ export const AuthenticatedShell = ({
     ? [{ label: 'Admin', to: '/admin' as const }]
     : [
         ...(canAccessFacultyWorkspace(user.roles)
-          ? [{ label: 'Dashboard', to: '/' as const }]
+          ? [
+              { label: 'Dashboard', to: '/' as const },
+              { label: 'History', to: '/history' as const },
+            ]
           : []),
         ...(canApproveLeave
           ? [

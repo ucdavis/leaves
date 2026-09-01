@@ -93,12 +93,11 @@ public sealed class AdminRolesController : ApiControllerBase
 
         var hasActiveAssignment = await HasActiveClusterCaoAssignmentAsync(
             request.ClusterId,
-            validationResult.IamId!,
             validationResult.StartDate!.Value,
             cancellationToken);
         if (hasActiveAssignment)
         {
-            return Conflict("That user already has an active CAO assignment for this cluster.");
+            return Conflict("This cluster already has an active CAO assignment.");
         }
 
         _db.ClusterCaoAssignments.Add(new ClusterCaoAssignment
@@ -139,10 +138,13 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("Selected department is inactive.");
         }
 
-        var personDepartmentCodes = await GetCurrentDepartmentCodesAsync(validationResult.IamId!, cancellationToken);
-        if (!personDepartmentCodes.Contains(departmentCode, StringComparer.OrdinalIgnoreCase))
+        var isCurrentFacultyInDepartment = await IsCurrentFacultyInDepartmentAsync(
+            validationResult.IamId!,
+            departmentCode,
+            cancellationToken);
+        if (!isCurrentFacultyInDepartment)
         {
-            return ValidationProblem("Selected person can only be assigned as department chair for one of their current departments.");
+            return ValidationProblem("Selected chair must be a current faculty member in this department.");
         }
 
         var hasActiveAssignment = await HasActiveDepartmentChairAssignmentAsync(
@@ -255,7 +257,6 @@ public sealed class AdminRolesController : ApiControllerBase
 
     private Task<bool> HasActiveClusterCaoAssignmentAsync(
         int clusterId,
-        string iamId,
         DateOnly onDate,
         CancellationToken cancellationToken,
         int? excludeAssignmentId = null)
@@ -263,7 +264,6 @@ public sealed class AdminRolesController : ApiControllerBase
         return _db.ClusterCaoAssignments.AnyAsync(
             assignment => assignment.ClusterId == clusterId &&
                           assignment.ClosedUtc == null &&
-                          assignment.IamId == iamId &&
                           assignment.EffectiveStartDate <= onDate &&
                           (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > onDate) &&
                           (!excludeAssignmentId.HasValue || assignment.Id != excludeAssignmentId.Value),
@@ -287,18 +287,21 @@ public sealed class AdminRolesController : ApiControllerBase
             cancellationToken);
     }
 
-    private async Task<IReadOnlyList<string>> GetCurrentDepartmentCodesAsync(
+    private async Task<bool> IsCurrentFacultyInDepartmentAsync(
         string iamId,
+        string departmentCode,
         CancellationToken cancellationToken)
     {
-        var departmentCode = await _db.CurrentEmployees
-            .Where(employee => employee.IamId == iamId)
-            .Select(employee => employee.ResolvedReportingDepartmentCode)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return string.IsNullOrWhiteSpace(departmentCode)
-            ? []
-            : [departmentCode.Trim()];
+        return await (
+                from employee in _db.CurrentEmployees
+                join person in _db.People on employee.IamId equals person.IamId
+                where employee.IamId.Trim() == iamId &&
+                      employee.ResolvedReportingDepartmentCode != null &&
+                      employee.ResolvedReportingDepartmentCode.Trim() == departmentCode &&
+                      person.IsEmployee == true &&
+                      person.IsFaculty == true
+                select employee.IamId)
+            .AnyAsync(cancellationToken);
     }
 
     private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)

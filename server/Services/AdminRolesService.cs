@@ -61,7 +61,11 @@ public sealed class AdminRolesService
             .Where(assignment =>
                 !currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee) ||
                 !currentEmployee.HasCurrentAccrualRecord ||
-                !activeDepartmentCodes.Contains(assignment.DepartmentCode.Trim()))
+                !activeDepartmentCodes.Contains(assignment.DepartmentCode.Trim()) ||
+                !string.Equals(
+                    currentEmployee.ResolvedReportingDepartmentCode?.Trim(),
+                    assignment.DepartmentCode.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         return new InactiveRoleAssignmentChanges(

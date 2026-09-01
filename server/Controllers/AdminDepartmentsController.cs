@@ -259,9 +259,20 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.ApprovalMode))
         {
-            department.WorkflowMode = request.ApprovalMode == "approval"
+            var workflowMode = request.ApprovalMode == "approval"
                 ? WorkflowMode.ApprovalRequired
                 : WorkflowMode.DirectSubmission;
+            if (
+                department.WorkflowMode == WorkflowMode.ApprovalRequired &&
+                workflowMode == WorkflowMode.DirectSubmission)
+            {
+                await ApprovePendingRequestsAsync(
+                    department.DepartmentCode,
+                    DateTime.UtcNow,
+                    cancellationToken);
+            }
+
+            department.WorkflowMode = workflowMode;
         }
 
         if (request.ChairUserIdSet)
@@ -414,6 +425,24 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task ApprovePendingRequestsAsync(
+        string departmentCode,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var pendingRequests = await _db.LeaveRequests
+            .Where(request =>
+                request.ReportingDepartmentCodeSnapshot == departmentCode &&
+                request.Status == LeaveRequestStatus.PendingApproval)
+            .ToListAsync(cancellationToken);
+
+        foreach (var request in pendingRequests)
+        {
+            request.Status = LeaveRequestStatus.Approved;
+            request.UpdatedUtc = now;
+        }
+    }
+
     private async Task<IActionResult?> UpdateClusterCaoAssignmentAsync(
         int clusterId,
         string? caoUserId,
@@ -428,18 +457,18 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         var normalizedCaoUserId = caoUserId?.Trim();
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
-        var currentAssignment = await _db.ClusterCaoAssignments
+        var currentAssignments = await _db.ClusterCaoAssignments
             .Where(item => item.ClusterId == clusterId &&
                            item.ClosedUtc == null &&
                            item.EffectiveStartDate <= today &&
                            (!item.EffectiveEndDateExclusive.HasValue || item.EffectiveEndDateExclusive.Value > today))
             .OrderByDescending(item => item.EffectiveStartDate)
             .ThenByDescending(item => item.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
         if (string.IsNullOrWhiteSpace(normalizedCaoUserId))
         {
-            if (currentAssignment != null)
+            foreach (var currentAssignment in currentAssignments)
             {
                 AdminRolesService.CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
             }
@@ -455,24 +484,20 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Selected CAO must be a valid directory user.");
         }
 
-        if (currentAssignment != null &&
-            string.Equals(currentAssignment.IamId, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase))
+        var matchingAssignment = currentAssignments.FirstOrDefault(currentAssignment =>
+            string.Equals(currentAssignment.IamId, normalizedCaoUserId, StringComparison.OrdinalIgnoreCase));
+        if (matchingAssignment != null)
         {
+            foreach (var currentAssignment in currentAssignments.Where(currentAssignment =>
+                         currentAssignment.Id != matchingAssignment.Id))
+            {
+                AdminRolesService.CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
+            }
+
             return null;
         }
 
-        var hasDuplicateActiveAssignment = await HasActiveClusterCaoAssignmentAsync(
-            clusterId,
-            normalizedCaoUserId,
-            today,
-            cancellationToken,
-            currentAssignment?.Id);
-        if (hasDuplicateActiveAssignment)
-        {
-            return Conflict("That user already has an active CAO assignment for this cluster.");
-        }
-
-        if (currentAssignment != null)
+        foreach (var currentAssignment in currentAssignments)
         {
             AdminRolesService.CloseClusterCaoAssignment(currentAssignment, adminUserId.Value, now, today);
         }
@@ -522,13 +547,13 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return null;
         }
 
-        var userBelongsToDepartment = await _adminDirectoryDataService.UserBelongsToDepartmentAsync(
+        var isCurrentFacultyInDepartment = await _adminDirectoryDataService.IsCurrentFacultyInDepartmentAsync(
             normalizedChairUserId,
             departmentCode,
             cancellationToken);
-        if (!userBelongsToDepartment)
+        if (!isCurrentFacultyInDepartment)
         {
-            return ValidationProblem("Selected chair must currently belong to this department.");
+            return ValidationProblem("Selected chair must be a current faculty member in this department.");
         }
 
         if (currentAssignment != null &&
@@ -563,23 +588,6 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         });
 
         return null;
-    }
-
-    private Task<bool> HasActiveClusterCaoAssignmentAsync(
-        int clusterId,
-        string iamId,
-        DateOnly onDate,
-        CancellationToken cancellationToken,
-        int? excludeAssignmentId = null)
-    {
-        return _db.ClusterCaoAssignments.AnyAsync(
-            assignment => assignment.ClusterId == clusterId &&
-                          assignment.ClosedUtc == null &&
-                          assignment.IamId == iamId &&
-                          assignment.EffectiveStartDate <= onDate &&
-                          (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > onDate) &&
-                          (!excludeAssignmentId.HasValue || assignment.Id != excludeAssignmentId.Value),
-            cancellationToken);
     }
 
     private Task<bool> HasActiveDepartmentChairAssignmentAsync(

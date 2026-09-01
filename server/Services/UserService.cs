@@ -24,6 +24,9 @@ public interface IUserService
 public class UserService : IUserService
 {
     private const string AdminRole = "Admin";
+    private const string CaoRole = "CAO";
+    private const string ChairRole = "Chair";
+    private const string FacultyRole = "Faculty";
 
     private readonly ILogger<UserService> _logger;
     private readonly AppDbContext _dbContext;
@@ -175,16 +178,54 @@ public class UserService : IUserService
             return [];
         }
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var isAdmin = await _dbContext.AppAdminAssignments
             .AsNoTracking()
-            .AnyAsync(assignment => assignment.IamId == iamId);
+            .AnyAsync(assignment => assignment.IamId.Trim() == iamId);
+        var isFaculty = await _dbContext.People
+            .AnyAsync(person =>
+                person.IamId.Trim() == iamId &&
+                person.IsEmployee == true &&
+                person.IsFaculty == true);
+        var isChair = await _dbContext.DepartmentChairAssignments
+            .AsNoTracking()
+            .AnyAsync(assignment =>
+                assignment.IamId.Trim() == iamId &&
+                assignment.ClosedUtc == null &&
+                assignment.EffectiveStartDate <= today &&
+                (!assignment.EffectiveEndDateExclusive.HasValue ||
+                    assignment.EffectiveEndDateExclusive.Value > today));
+        var isCao = await _dbContext.ClusterCaoAssignments
+            .AsNoTracking()
+            .AnyAsync(assignment =>
+                assignment.IamId.Trim() == iamId &&
+                assignment.ClosedUtc == null &&
+                assignment.EffectiveStartDate <= today &&
+                (!assignment.EffectiveEndDateExclusive.HasValue ||
+                    assignment.EffectiveEndDateExclusive.Value > today));
 
-        if (!isAdmin)
+        var roles = new List<string>();
+        if (isAdmin)
         {
-            return [];
+            roles.Add(AdminRole);
         }
 
-        return [AdminRole];
+        if (isFaculty)
+        {
+            roles.Add(FacultyRole);
+        }
+
+        if (isChair)
+        {
+            roles.Add(ChairRole);
+        }
+
+        if (isCao)
+        {
+            roles.Add(CaoRole);
+        }
+
+        return roles;
     }
 
     public async Task<ClaimsPrincipal?> UpdateUserPrincipalIfNeeded(ClaimsPrincipal principal)
