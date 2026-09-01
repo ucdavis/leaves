@@ -10,9 +10,11 @@ import {
 } from './approvalDisplay.ts';
 
 export function PendingApprovalsPanel({
+  isSubmitting = false,
   onDecision,
   requests,
 }: {
+  isSubmitting?: boolean;
   onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
   requests: ApprovalRequest[];
 }) {
@@ -23,6 +25,7 @@ export function PendingApprovalsPanel({
         <div className="space-y-4">
           {requests.map((request) => (
             <ApprovalRequestCard
+              isSubmitting={isSubmitting}
               key={request.id}
               onDecision={onDecision}
               request={request}
@@ -37,9 +40,11 @@ export function PendingApprovalsPanel({
 }
 
 function ApprovalRequestCard({
+  isSubmitting,
   onDecision,
   request,
 }: {
+  isSubmitting: boolean;
   onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
   request: ApprovalRequest;
 }) {
@@ -64,6 +69,7 @@ function ApprovalRequestCard({
       <div className="flex flex-wrap gap-2 sm:justify-end">
         <button
           className="btn btn-primary btn-sm"
+          disabled={isSubmitting}
           onClick={() => onDecision(request, 'approved')}
           type="button"
         >
@@ -71,6 +77,7 @@ function ApprovalRequestCard({
         </button>
         <button
           className="btn btn-error btn-sm"
+          disabled={isSubmitting}
           onClick={() => onDecision(request, 'denied')}
           type="button"
         >

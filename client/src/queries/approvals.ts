@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
 import type {
+  ApprovalDecision,
   ApprovalRequest,
   ApprovalScope,
   CalendarFaculty,
@@ -26,3 +27,20 @@ export const approvalWorkspaceQueryOptions = () =>
     queryKey: ['approval-workspace'] as const,
     retry: false,
   });
+
+export async function submitApprovalDecision({
+  decision,
+  requestId,
+}: {
+  decision: ApprovalDecision;
+  facultyName: string;
+  requestId: number;
+}) {
+  await fetchJson<void>(
+    `/api/approvalworkspace/requests/${requestId}/decision`,
+    {
+      body: JSON.stringify({ decision }),
+      method: 'POST',
+    }
+  );
+}

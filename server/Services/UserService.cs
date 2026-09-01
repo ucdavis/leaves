@@ -9,7 +9,7 @@ namespace Server.Services;
 
 public interface IUserService
 {
-    Task EnsureUserProfileAsync(
+    Task<bool> EnsureUserProfileAsync(
         ClaimsPrincipal principal,
         bool recordSignIn = true,
         CancellationToken cancellationToken = default);
@@ -34,7 +34,7 @@ public class UserService : IUserService
         _dbContext = dbContext;
     }
 
-    public async Task EnsureUserProfileAsync(
+    public async Task<bool> EnsureUserProfileAsync(
         ClaimsPrincipal principal,
         bool recordSignIn = true,
         CancellationToken cancellationToken = default)
@@ -43,13 +43,13 @@ public class UserService : IUserService
 
         if (principal.HasClaim("dev_persona", "true"))
         {
-            return;
+            return true;
         }
 
         if (!principal.TryGetUserId(out var userId) || !Guid.TryParse(userId, out var entraObjectId))
         {
             _logger.LogWarning("Skipping user provisioning because the authenticated principal does not have a GUID object ID.");
-            return;
+            return false;
         }
 
         var email =
@@ -70,7 +70,10 @@ public class UserService : IUserService
             ?? existingUser?.IamId;
         if (string.IsNullOrWhiteSpace(iamId))
         {
-            throw new InvalidOperationException("IAM ID is required but was not found in the principal, matching person, or existing user record.");
+            _logger.LogWarning(
+                "Skipping user provisioning for Entra object ID {EntraObjectId} because no IAM ID could be resolved.",
+                entraObjectId);
+            return false;
         }
         var matchedPersonByIamId = await FindPersonByIamIdAsync(iamId, cancellationToken);
         var resolvedEmployeeId =
@@ -145,6 +148,8 @@ public class UserService : IUserService
                 }
             }
         }
+
+        return true;
     }
 
     public async Task<string?> GetDisplayNameForUser(string userId)

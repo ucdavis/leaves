@@ -2,8 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import type { RouterContext } from '@/main.tsx';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { approvalWorkspaceQueryOptions } from '@/queries/approvals.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  approvalWorkspaceQueryOptions,
+  submitApprovalDecision,
+} from '@/queries/approvals.ts';
 import { meQueryOptions } from '@/queries/user.ts';
 import { ApprovalToast } from '@/shared/approvals/ApprovalToast.tsx';
 import type { ApprovalToastMessage } from '@/shared/approvals/ApprovalToast.tsx';
@@ -26,10 +29,30 @@ export const Route = createFileRoute('/(authenticated)/approvals')({
 });
 
 function RouteComponent() {
+  const queryClient = useQueryClient();
   const workspaceQuery = useQuery(approvalWorkspaceQueryOptions());
   const [dismissedRequestIds, setDismissedRequestIds] = useState<number[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] =
     useState<ApprovalToastMessage | null>(null);
+
+  const decisionMutation = useMutation({
+    mutationFn: submitApprovalDecision,
+    onError: () => {
+      setErrorMessage('We could not save that decision. Please try again.');
+    },
+    onSuccess: async (_data, variables) => {
+      setDismissedRequestIds((current) => [...current, variables.requestId]);
+      setToastMessage({
+        decision: variables.decision,
+        facultyName: variables.facultyName,
+        id: variables.requestId,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: approvalWorkspaceQueryOptions().queryKey,
+      });
+    },
+  });
 
   if (workspaceQuery.isLoading) {
     return (
@@ -67,18 +90,24 @@ function RouteComponent() {
     request: ApprovalRequest,
     decision: ApprovalDecision
   ) => {
-    setDismissedRequestIds((current) => [...current, request.id]);
-    setToastMessage({
+    setErrorMessage(null);
+    decisionMutation.mutate({
       decision,
       facultyName: request.facultyName,
-      id: request.id,
+      requestId: request.id,
     });
   };
 
   return (
     <div className="container py-8 lg:py-10">
       <div className="mx-auto max-w-5xl">
+        {errorMessage ? (
+          <div className="alert alert-error mb-4" role="alert">
+            {errorMessage}
+          </div>
+        ) : null}
         <PendingApprovalsPanel
+          isSubmitting={decisionMutation.isPending}
           onDecision={handleDecision}
           requests={requests}
         />

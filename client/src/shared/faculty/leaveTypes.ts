@@ -15,3 +15,7 @@ export const facultyLeaveTypeLabels = [
 
 export type FacultyLeaveTypeLabel =
   (typeof facultyLeaveTypeLabels)[number];
+
+export function getFacultyLeaveTypeKey(label: string) {
+  return label.trim().toLowerCase().replace(/\s+leave$/, '');
+}

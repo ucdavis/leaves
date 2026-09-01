@@ -36,7 +36,7 @@ public class AccountController : Controller
     {
         var safeReturnUrl = NormalizeReturnUrl(returnUrl);
 
-        if (!IsDevLoopback(HttpContext))
+        if (!IsLocalLoopback(HttpContext))
         {
             if (User.Identity?.IsAuthenticated == true)
             {
@@ -109,9 +109,9 @@ public class AccountController : Controller
         return trimmed;
     }
 
-    private bool IsDevLoopback(HttpContext context)
+    private bool IsLocalLoopback(HttpContext context)
     {
-        if (!_environment.IsDevelopment())
+        if (!_environment.IsEnvironment("Local"))
         {
             return false;
         }

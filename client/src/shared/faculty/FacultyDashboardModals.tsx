@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
 import {
   createFacultyLeaveRequest,
-  facultyDashboardQueryOptions,
   type FacultyDashboardResponse,
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
@@ -16,6 +15,7 @@ import {
   sabbaticalLeaveTypeLabel,
   sickLeaveTypeLabel,
   vacationLeaveTypeLabel,
+  getFacultyLeaveTypeKey,
 } from './leaveTypes.ts';
 import { Modal } from './FacultyDashboardModal.tsx';
 import {
@@ -64,6 +64,17 @@ type LeaveRequestFormValues = {
   startDate: string;
   totalHours: string;
 };
+
+const leaveRequestFormFieldNames = new Set<string>([
+  'approvedInMyInfoVault',
+  'dateSelection',
+  'endDate',
+  'leaveTypeId',
+  'note',
+  'payLeaveTypeId',
+  'startDate',
+  'totalHours',
+] satisfies (keyof LeaveRequestFormValues)[]);
 
 type LeaveRequestDraft = {
   endDate: string;
@@ -131,7 +142,7 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
             message: dateRangeMessage,
             path: ['endDate'],
           });
-        } else if (value.startDate && value.endDate <= value.startDate) {
+        } else if (value.startDate && value.endDate < value.startDate) {
           context.addIssue({
             code: 'custom',
             message: 'End date must be after the start date.',
@@ -347,7 +358,7 @@ function LeaveRequestForm({
     mutationFn: createFacultyLeaveRequest,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: facultyDashboardQueryOptions().queryKey,
+        queryKey: ['faculty'],
       });
     },
   });
@@ -783,10 +794,16 @@ function getMyInfoVaultSubject(selectedLeaveType: string) {
 
 function getFmlaPayTypeOptions(data: FacultyDashboardResponse) {
   const leaveTypeIdByLabel = new Map(
-    data.leaveTypes.map((leaveType) => [leaveType.displayName, leaveType.id])
+    data.leaveTypes.map((leaveType) => [
+      getFacultyLeaveTypeKey(leaveType.displayName),
+      leaveType.id,
+    ])
   );
   const balancesByLabel = new Map(
-    data.accrualBalances.map((balance) => [balance.typeLabel, balance])
+    data.accrualBalances.map((balance) => [
+      getFacultyLeaveTypeKey(balance.typeLabel),
+      balance,
+    ])
   );
 
   return [
@@ -812,8 +829,9 @@ function createPayTypeOption(
   leaveTypeIdByLabel: Map<string, number>,
   balancesByLabel: Map<string, FacultyDashboardResponse['accrualBalances'][number]>
 ) {
-  const leaveTypeId = leaveTypeIdByLabel.get(leaveTypeLabel);
-  const balance = balancesByLabel.get(leaveTypeLabel);
+  const leaveTypeKey = getFacultyLeaveTypeKey(leaveTypeLabel);
+  const leaveTypeId = leaveTypeIdByLabel.get(leaveTypeKey);
+  const balance = balancesByLabel.get(leaveTypeKey);
 
   if (!leaveTypeId || !balance) {
     return null;
@@ -837,14 +855,24 @@ function getSubmitErrorMap(error: unknown) {
     error.status === 400 &&
     isValidationProblemDetails(error.body)
   ) {
+    const entries = Object.entries(error.body.errors).map(
+      ([fieldName, messages]) =>
+        [toClientFieldName(fieldName), messages.join(', ')] as const
+    );
+    const unmappedEntries = entries.filter(
+      ([fieldName]) => !leaveRequestFormFieldNames.has(fieldName)
+    );
+
     return {
       fields: Object.fromEntries(
-        Object.entries(error.body.errors).map(([fieldName, messages]) => [
-          toClientFieldName(fieldName),
-          messages.join(', '),
-        ])
+        entries.filter(([fieldName]) =>
+          leaveRequestFormFieldNames.has(fieldName)
+        )
       ),
-      form: undefined,
+      form:
+        unmappedEntries.length > 0
+          ? unmappedEntries.map(([, message]) => message).join(' ')
+          : undefined,
     };
   }
 

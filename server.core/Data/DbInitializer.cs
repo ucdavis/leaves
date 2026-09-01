@@ -6,6 +6,7 @@ namespace Server.Core.Data;
 
 public interface IDbInitializer
 {
+    Task InitializeAsync(CancellationToken cancellationToken);
     Task InitializeAsync(bool includeDevSeed = false, CancellationToken cancellationToken = default);
 }
 
@@ -152,6 +153,9 @@ public class DbInitializer : IDbInitializer
         _db = db;
         _logger = logger;
     }
+
+    public Task InitializeAsync(CancellationToken cancellationToken) =>
+        InitializeAsync(includeDevSeed: false, cancellationToken: cancellationToken);
 
     public async Task InitializeAsync(bool includeDevSeed = false, CancellationToken cancellationToken = default)
     {
@@ -655,41 +659,62 @@ public class DbInitializer : IDbInitializer
 
     private async Task SeedEmployeeAccrualBalancesAsync(CancellationToken ct)
     {
-        var existingKeys = await _db.EmployeeAccrualBalances
-            .Select(balance => new
-            {
-                balance.EmployeeId,
-                balance.AsOfDate,
-                balance.PositionNumber,
-                balance.LeaveTypeNumber,
-            })
+        var seededEmployeeIds = DevEmployeeAccrualBalances
+            .Select(balance => balance.EmployeeId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var existingBalances = await _db.EmployeeAccrualBalances
+            .Where(balance => seededEmployeeIds.Contains(balance.EmployeeId))
             .ToListAsync(ct);
 
-        var existing = existingKeys
-            .Select(balance => CreateEmployeeAccrualBalanceKey(
+        var existingByKey = existingBalances
+            .ToDictionary(balance => CreateEmployeeAccrualBalanceKey(
                 balance.EmployeeId,
                 balance.AsOfDate,
                 balance.PositionNumber,
-                balance.LeaveTypeNumber))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                balance.LeaveTypeNumber), StringComparer.OrdinalIgnoreCase);
 
-        var missingBalances = DevEmployeeAccrualBalances
-            .Where(balance => !existing.Contains(CreateEmployeeAccrualBalanceKey(
-                balance.EmployeeId,
-                ParseDateOnly(balance.AsOfDate),
-                balance.PositionNumber,
-                balance.LeaveTypeNumber)))
-            .Select(CreateEmployeeAccrualBalance)
-            .ToArray();
+        var missingBalances = new List<EmployeeAccrualBalance>();
+        var updatedCount = 0;
+        foreach (var seed in DevEmployeeAccrualBalances)
+        {
+            var key = CreateEmployeeAccrualBalanceKey(
+                seed.EmployeeId,
+                ParseDateOnly(seed.AsOfDate),
+                seed.PositionNumber,
+                seed.LeaveTypeNumber);
 
-        if (missingBalances.Length == 0)
+            if (existingByKey.TryGetValue(key, out var existingBalance))
+            {
+                if (existingBalance.EmployeeEmail != seed.EmployeeEmail ||
+                    existingBalance.EmployeeName != seed.EmployeeName)
+                {
+                    existingBalance.EmployeeEmail = seed.EmployeeEmail;
+                    existingBalance.EmployeeName = seed.EmployeeName;
+                    updatedCount++;
+                }
+
+                continue;
+            }
+
+            missingBalances.Add(CreateEmployeeAccrualBalance(seed));
+        }
+
+        if (missingBalances.Count == 0 && updatedCount == 0)
         {
             return;
         }
 
-        await _db.Set<EmployeeAccrualBalance>().AddRangeAsync(missingBalances, ct);
+        if (missingBalances.Count > 0)
+        {
+            await _db.Set<EmployeeAccrualBalance>().AddRangeAsync(missingBalances, ct);
+        }
+
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seeded {Count} development EmployeeAccrualBalances rows.", missingBalances.Length);
+        _logger.LogInformation(
+            "Seeded {SeededCount} and updated {UpdatedCount} development EmployeeAccrualBalances rows.",
+            missingBalances.Count,
+            updatedCount);
     }
 
     private async Task SeedLeaveRequestsAsync(
