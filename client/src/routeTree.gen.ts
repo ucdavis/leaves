@@ -11,9 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
 import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)/index'
+import { Route as authenticatedTeamCalendarRouteImport } from './routes/(authenticated)/team-calendar'
 import { Route as authenticatedHistoryRouteImport } from './routes/(authenticated)/history'
+import { Route as authenticatedApprovalsRouteImport } from './routes/(authenticated)/approvals'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
 import { Route as authenticatedAdminIndexRouteImport } from './routes/(authenticated)/admin.index'
+import { Route as authenticatedFacultyIamIdRouteImport } from './routes/(authenticated)/faculty.$iamId'
 import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
 import { Route as authenticatedAdminManageUsersRouteImport } from './routes/(authenticated)/admin.manage-users'
 import { Route as authenticatedAdminFacultyRouteImport } from './routes/(authenticated)/admin.faculty'
@@ -28,9 +31,20 @@ const authenticatedIndexRoute = authenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
+const authenticatedTeamCalendarRoute =
+  authenticatedTeamCalendarRouteImport.update({
+    id: '/team-calendar',
+    path: '/team-calendar',
+    getParentRoute: () => authenticatedRouteRoute,
+  } as any)
 const authenticatedHistoryRoute = authenticatedHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => authenticatedRouteRoute,
+} as any)
+const authenticatedApprovalsRoute = authenticatedApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
 const authenticatedAdminRoute = authenticatedAdminRouteImport.update({
@@ -43,6 +57,12 @@ const authenticatedAdminIndexRoute = authenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => authenticatedAdminRoute,
 } as any)
+const authenticatedFacultyIamIdRoute =
+  authenticatedFacultyIamIdRouteImport.update({
+    id: '/faculty/$iamId',
+    path: '/faculty/$iamId',
+    getParentRoute: () => authenticatedRouteRoute,
+  } as any)
 const authenticatedAdminStatusRoute =
   authenticatedAdminStatusRouteImport.update({
     id: '/status',
@@ -70,65 +90,83 @@ const authenticatedAdminDepartmentsRoute =
 
 export interface FileRoutesByFullPath {
   '/admin': typeof authenticatedAdminRouteWithChildren
+  '/approvals': typeof authenticatedApprovalsRoute
   '/history': typeof authenticatedHistoryRoute
+  '/team-calendar': typeof authenticatedTeamCalendarRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/faculty': typeof authenticatedAdminFacultyRoute
   '/admin/manage-users': typeof authenticatedAdminManageUsersRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
+  '/faculty/$iamId': typeof authenticatedFacultyIamIdRoute
   '/admin/': typeof authenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
+  '/approvals': typeof authenticatedApprovalsRoute
   '/history': typeof authenticatedHistoryRoute
+  '/team-calendar': typeof authenticatedTeamCalendarRoute
   '/': typeof authenticatedIndexRoute
   '/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/admin/faculty': typeof authenticatedAdminFacultyRoute
   '/admin/manage-users': typeof authenticatedAdminManageUsersRoute
   '/admin/status': typeof authenticatedAdminStatusRoute
+  '/faculty/$iamId': typeof authenticatedFacultyIamIdRoute
   '/admin': typeof authenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(authenticated)': typeof authenticatedRouteRouteWithChildren
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
+  '/(authenticated)/approvals': typeof authenticatedApprovalsRoute
   '/(authenticated)/history': typeof authenticatedHistoryRoute
+  '/(authenticated)/team-calendar': typeof authenticatedTeamCalendarRoute
   '/(authenticated)/': typeof authenticatedIndexRoute
   '/(authenticated)/admin/departments': typeof authenticatedAdminDepartmentsRoute
   '/(authenticated)/admin/faculty': typeof authenticatedAdminFacultyRoute
   '/(authenticated)/admin/manage-users': typeof authenticatedAdminManageUsersRoute
   '/(authenticated)/admin/status': typeof authenticatedAdminStatusRoute
+  '/(authenticated)/faculty/$iamId': typeof authenticatedFacultyIamIdRoute
   '/(authenticated)/admin/': typeof authenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/admin'
+    | '/approvals'
     | '/history'
+    | '/team-calendar'
     | '/'
     | '/admin/departments'
     | '/admin/faculty'
     | '/admin/manage-users'
     | '/admin/status'
+    | '/faculty/$iamId'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/approvals'
     | '/history'
+    | '/team-calendar'
     | '/'
     | '/admin/departments'
     | '/admin/faculty'
     | '/admin/manage-users'
     | '/admin/status'
+    | '/faculty/$iamId'
     | '/admin'
   id:
     | '__root__'
     | '/(authenticated)'
     | '/(authenticated)/admin'
+    | '/(authenticated)/approvals'
     | '/(authenticated)/history'
+    | '/(authenticated)/team-calendar'
     | '/(authenticated)/'
     | '/(authenticated)/admin/departments'
     | '/(authenticated)/admin/faculty'
     | '/(authenticated)/admin/manage-users'
     | '/(authenticated)/admin/status'
+    | '/(authenticated)/faculty/$iamId'
     | '/(authenticated)/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -152,11 +190,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authenticatedIndexRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
+    '/(authenticated)/team-calendar': {
+      id: '/(authenticated)/team-calendar'
+      path: '/team-calendar'
+      fullPath: '/team-calendar'
+      preLoaderRoute: typeof authenticatedTeamCalendarRouteImport
+      parentRoute: typeof authenticatedRouteRoute
+    }
     '/(authenticated)/history': {
       id: '/(authenticated)/history'
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof authenticatedHistoryRouteImport
+      parentRoute: typeof authenticatedRouteRoute
+    }
+    '/(authenticated)/approvals': {
+      id: '/(authenticated)/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof authenticatedApprovalsRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/admin': {
@@ -172,6 +224,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof authenticatedAdminIndexRouteImport
       parentRoute: typeof authenticatedAdminRoute
+    }
+    '/(authenticated)/faculty/$iamId': {
+      id: '/(authenticated)/faculty/$iamId'
+      path: '/faculty/$iamId'
+      fullPath: '/faculty/$iamId'
+      preLoaderRoute: typeof authenticatedFacultyIamIdRouteImport
+      parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/admin/status': {
       id: '/(authenticated)/admin/status'
@@ -225,14 +284,20 @@ const authenticatedAdminRouteWithChildren =
 
 interface authenticatedRouteRouteChildren {
   authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
+  authenticatedApprovalsRoute: typeof authenticatedApprovalsRoute
   authenticatedHistoryRoute: typeof authenticatedHistoryRoute
+  authenticatedTeamCalendarRoute: typeof authenticatedTeamCalendarRoute
   authenticatedIndexRoute: typeof authenticatedIndexRoute
+  authenticatedFacultyIamIdRoute: typeof authenticatedFacultyIamIdRoute
 }
 
 const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
   authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
+  authenticatedApprovalsRoute: authenticatedApprovalsRoute,
   authenticatedHistoryRoute: authenticatedHistoryRoute,
+  authenticatedTeamCalendarRoute: authenticatedTeamCalendarRoute,
   authenticatedIndexRoute: authenticatedIndexRoute,
+  authenticatedFacultyIamIdRoute: authenticatedFacultyIamIdRoute,
 }
 
 const authenticatedRouteRouteWithChildren =

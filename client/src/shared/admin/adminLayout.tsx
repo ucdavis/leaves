@@ -27,12 +27,12 @@ export function AdminLayout() {
               {adminTabs.map((tab) => {
                 const isActive =
                   tab.to === '/admin'
-                    ? pathname === tab.to
+                    ? pathname === '/admin'
                     : pathname.startsWith(tab.to);
                 const Icon = tab.icon;
 
                 return (
-                <Link
+                  <Link
                     activeOptions={{ exact: tab.to === '/admin' }}
                     className={`admin-tab flex flex-1 items-center justify-center gap-2 rounded-sm px-4 py-3 text-center font-semibold transition ${
                       isActive

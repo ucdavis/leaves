@@ -9,6 +9,10 @@ namespace Server.Services;
 public interface IFacultyDashboardService
 {
     Task<FacultyDashboardResponse?> GetDashboardAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
+    Task<FacultyDashboardViewerResult> GetDashboardForViewerAsync(
+        ClaimsPrincipal principal,
+        string iamId,
+        CancellationToken cancellationToken);
     Task<FacultyDashboardResponse?> GetHistoryAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
     Task<FacultyLeaveRequestResponse?> GetRequestAsync(
         ClaimsPrincipal principal,
@@ -23,7 +27,14 @@ public interface IFacultyDashboardService
 
 public sealed class FacultyDashboardService : IFacultyDashboardService
 {
+    private const string CaoRole = "CAO";
     private const int RecentRequestsLimit = 24;
+    private const string FamilyCareLeaveTypeKey = "FamilyCare";
+    private const string ProfessionalDevelopmentLeaveTypeLabel = "Professional Development";
+    private const string SabbaticalLeaveTypeLabel = "Sabbatical";
+    private const string FmlaLeaveTypeLabel = "FMLA";
+    private const string ProfessionalDevelopmentLeaveTypeKey = "ProfessionalDevelopment";
+    private const string SabbaticalLeaveTypeKey = "Sabbatical";
 
     private static readonly string[] DesiredLeaveTypeLabels =
     [
@@ -31,7 +42,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         "Sick Leave",
         "Professional Development",
         "Sabbatical",
-        "FMLA",
+        FmlaLeaveTypeLabel,
     ];
 
     private readonly AppDbContext _db;
@@ -55,6 +66,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
         var iamId = NormalizeIamId(appUser.IamId);
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
         var recentRequests = await GetLeaveRequestsAsync(
@@ -67,11 +79,100 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             appUser,
             iamId,
             employee,
+            department,
             accrualBalances,
             recentRequests,
             leaveTypes,
             pendingCount,
             approvedCount);
+    }
+
+    public async Task<FacultyDashboardViewerResult> GetDashboardForViewerAsync(
+        ClaimsPrincipal principal,
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var viewer = await ResolveAppUserAsync(principal, cancellationToken);
+        if (viewer == null)
+        {
+            return FacultyDashboardViewerResult.ViewerNotFound();
+        }
+
+        var normalizedTargetIamId = NormalizeIamId(iamId);
+        if (string.Equals(viewer.IamId, normalizedTargetIamId, StringComparison.OrdinalIgnoreCase))
+        {
+            var ownDashboard = await GetDashboardAsync(principal, cancellationToken);
+            return ownDashboard == null
+                ? FacultyDashboardViewerResult.TargetNotFound()
+                : FacultyDashboardViewerResult.Success(ownDashboard);
+        }
+
+        var viewerEmployee = await GetCurrentEmployeeAsync(
+            NormalizeIamId(viewer.IamId),
+            cancellationToken);
+        var targetUser = await _db.AppUsers
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                user => user.IamId == normalizedTargetIamId,
+                cancellationToken);
+        var targetEmployee = await GetCurrentEmployeeAsync(
+            normalizedTargetIamId,
+            cancellationToken);
+
+        if (viewerEmployee == null || targetUser == null || targetEmployee == null)
+        {
+            return FacultyDashboardViewerResult.TargetNotFound();
+        }
+
+        var viewerDepartment = await ResolveReportingDepartmentAsync(
+            viewerEmployee,
+            cancellationToken);
+        var targetDepartment = await ResolveReportingDepartmentAsync(
+            targetEmployee,
+            cancellationToken);
+
+        if (viewerDepartment == null || targetDepartment == null)
+        {
+            return FacultyDashboardViewerResult.Forbidden();
+        }
+
+        var isCao = HasRole(principal, CaoRole);
+        var canViewTarget = isCao
+            ? viewerDepartment.ClusterId.HasValue &&
+                viewerDepartment.ClusterId == targetDepartment.ClusterId
+            : string.Equals(
+                viewerDepartment.DepartmentCode,
+                targetDepartment.DepartmentCode,
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!canViewTarget)
+        {
+            return FacultyDashboardViewerResult.Forbidden();
+        }
+
+        var accrualBalances = await GetCurrentAccrualBalancesAsync(
+            normalizedTargetIamId,
+            cancellationToken);
+        var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(
+            normalizedTargetIamId,
+            cancellationToken);
+        var recentRequests = await GetLeaveRequestsAsync(
+            targetUser.Id,
+            RecentRequestsLimit,
+            cancellationToken);
+        var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
+
+        return FacultyDashboardViewerResult.Success(
+            BuildDashboardResponse(
+                targetUser,
+                normalizedTargetIamId,
+                targetEmployee,
+                targetDepartment,
+                accrualBalances,
+                recentRequests,
+                leaveTypes,
+                pendingCount,
+                approvedCount));
     }
 
     public async Task<FacultyDashboardResponse?> GetHistoryAsync(
@@ -86,6 +187,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
         var iamId = NormalizeIamId(appUser.IamId);
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
         var allRequests = await GetLeaveRequestsAsync(appUser.Id, null, cancellationToken);
@@ -95,6 +197,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             appUser,
             iamId,
             employee,
+            department,
             accrualBalances,
             allRequests,
             leaveTypes,
@@ -137,12 +240,6 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             return CreateLeaveRequestResult.UserNotFound();
         }
 
-        var validationErrors = ValidateRequestShape(request);
-        if (validationErrors.Count > 0)
-        {
-            return CreateLeaveRequestResult.Invalid(validationErrors);
-        }
-
         var leaveType = await _db.LeaveTypes
             .AsNoTracking()
             .Where(type => type.Id == request.LeaveTypeId && type.IsActive)
@@ -151,6 +248,12 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         if (leaveType == null)
         {
             return CreateLeaveRequestResult.Invalid("leaveTypeId", "Select an active leave type.");
+        }
+
+        var validationErrors = ValidateRequestShape(request, leaveType);
+        if (validationErrors.Count > 0)
+        {
+            return CreateLeaveRequestResult.Invalid(validationErrors);
         }
 
         LeaveType? payLeaveType = null;
@@ -326,6 +429,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         AppUser appUser,
         string iamId,
         CurrentEmployee? employee,
+        Department? department,
         IReadOnlyCollection<CurrentAccrualBalance> accrualBalances,
         IReadOnlyCollection<FacultyLeaveRequestResponse> requests,
         IReadOnlyCollection<LeaveType> leaveTypes,
@@ -342,6 +446,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 Email: employee?.Email ?? appUser.Email,
                 DepartmentCode: employee?.ResolvedReportingDepartmentCode,
                 DepartmentName: employee?.ResolvedReportingDepartmentName,
+                WorkflowMode: department?.WorkflowMode.ToString(),
                 EmployeeClass: employee?.EmployeeClassDescription,
                 JobTitle: employee?.JobCodeDescription,
                 LatestSnapshotDate: employee?.LatestAsOfDate),
@@ -482,7 +587,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         foreach (var label in DesiredLeaveTypeLabels)
         {
             var matchingType = leaveTypes.FirstOrDefault(type =>
-                string.Equals(type.DisplayName, label, StringComparison.Ordinal));
+                string.Equals(GetCanonicalLeaveTypeLabel(type), label, StringComparison.Ordinal));
 
             if (matchingType != null)
             {
@@ -511,9 +616,20 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .SingleOrDefaultAsync(department => department.DepartmentCode == departmentCode, cancellationToken);
     }
 
-    private static Dictionary<string, string[]> ValidateRequestShape(CreateFacultyLeaveRequest request)
+    private static Dictionary<string, string[]> ValidateRequestShape(
+        CreateFacultyLeaveRequest request,
+        LeaveType leaveType)
     {
         var errors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var allowsZeroHours =
+            string.Equals(
+                leaveType.LeaveTypeKey,
+                ProfessionalDevelopmentLeaveTypeKey,
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                leaveType.LeaveTypeKey,
+                SabbaticalLeaveTypeKey,
+                StringComparison.OrdinalIgnoreCase);
 
         if (request.LeaveTypeId <= 0)
         {
@@ -525,7 +641,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             errors["endDate"] = ["End date must be on or after the start date."];
         }
 
-        if (request.TotalHours <= 0)
+        if (!allowsZeroHours && request.TotalHours <= 0)
         {
             errors["totalHours"] = ["Total hours must be greater than zero."];
         }
@@ -553,6 +669,41 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
     private static string NormalizeIamId(string value) => value.Trim();
 
+    private static string GetCanonicalLeaveTypeLabel(LeaveType leaveType)
+    {
+        if (string.Equals(
+                leaveType.LeaveTypeKey,
+                FamilyCareLeaveTypeKey,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return FmlaLeaveTypeLabel;
+        }
+
+        if (string.Equals(
+                leaveType.LeaveTypeKey,
+                ProfessionalDevelopmentLeaveTypeKey,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return ProfessionalDevelopmentLeaveTypeLabel;
+        }
+
+        if (string.Equals(
+                leaveType.LeaveTypeKey,
+                SabbaticalLeaveTypeKey,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return SabbaticalLeaveTypeLabel;
+        }
+
+        return leaveType.DisplayName;
+    }
+
+    private static bool HasRole(ClaimsPrincipal principal, string role)
+    {
+        return principal.FindAll(ClaimTypes.Role).Any(roleClaim =>
+            string.Equals(roleClaim.Value, role, StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed record FacultyBalanceSummary(decimal AvailableBalanceHours, int AccrualsApproachingCap);
 }
 
@@ -570,6 +721,7 @@ public sealed record FacultyProfileResponse(
     string? Email,
     string? DepartmentCode,
     string? DepartmentName,
+    string? WorkflowMode,
     string? EmployeeClass,
     string? JobTitle,
     DateOnly? LatestSnapshotDate);
@@ -633,4 +785,23 @@ public sealed record CreateLeaveRequestResult(
 
     public static CreateLeaveRequestResult UserNotFound() =>
         new(false, true, null, []);
+}
+
+public sealed record FacultyDashboardViewerResult(
+    FacultyDashboardResponse? Dashboard,
+    bool IsForbidden,
+    bool ViewerMissing,
+    bool TargetMissing)
+{
+    public static FacultyDashboardViewerResult Success(FacultyDashboardResponse dashboard) =>
+        new(dashboard, false, false, false);
+
+    public static FacultyDashboardViewerResult Forbidden() =>
+        new(null, true, false, false);
+
+    public static FacultyDashboardViewerResult ViewerNotFound() =>
+        new(null, false, true, false);
+
+    public static FacultyDashboardViewerResult TargetNotFound() =>
+        new(null, false, false, true);
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { HttpError } from '@/lib/api.ts';
 import { useState } from 'react';
 import { RouterContext } from '@/main.tsx';
@@ -112,6 +113,7 @@ function HistoryContent({
   selectedType: string;
   toastMessage: string | null;
 }) {
+  const navigate = useNavigate();
   const typeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const requests = selectedType
     ? data.recentRequests.filter(
@@ -120,7 +122,16 @@ function HistoryContent({
     : data.recentRequests;
 
   return (
-    <div className="container">
+    <div className="container py-8 lg:py-10">
+      <button
+        className="btn btn-ghost mb-5"
+        onClick={() => void navigate({ to: '/' })}
+        type="button"
+      >
+        <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+        Back to dashboard
+      </button>
+
       <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm mt-10">
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-lg font-bold text-primary">Request History</h1>

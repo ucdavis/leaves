@@ -49,10 +49,13 @@ try
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
     builder.Services.AddScoped<AdminDirectoryDataService>();
+    builder.Services.AddScoped<IAdminDirectoryDataService>(sp =>
+        sp.GetRequiredService<AdminDirectoryDataService>());
     builder.Services.AddScoped<AdminDirectoryService>();
     builder.Services.AddScoped<AdminRolesService>();
     builder.Services.AddScoped<AdminStatusDataService>();
     builder.Services.AddScoped<AdminStatusService>();
+    builder.Services.AddScoped<IApprovalWorkspaceService, ApprovalWorkspaceService>();
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddSingleton<AdminRoleCleanupBackgroundService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
@@ -101,7 +104,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-        await init.InitializeAsync();
+        await init.InitializeAsync(app.Environment.IsEnvironment("Local"));
     }
 
     app.UseForwardedHeaders();

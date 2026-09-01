@@ -83,7 +83,9 @@ function AdminUsersRoute() {
   );
 
   const refreshRoles = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
+    await queryClient.invalidateQueries({
+      queryKey: adminRolesQueryOptions().queryKey,
+    });
   };
 
   const addAdminMutation = useMutation({

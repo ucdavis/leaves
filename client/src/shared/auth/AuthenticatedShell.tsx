@@ -1,24 +1,53 @@
 import { Link } from '@tanstack/react-router';
 import { useRouterState } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { approvalWorkspaceQueryOptions } from '@/queries/approvals.ts';
 import { AppFooter } from '@/shared/AppFooter.tsx';
-import { hasAdminRole } from './roleAccess.ts';
+import { LocalRoleSwitcher } from './LocalRoleSwitcher.tsx';
+import {
+  canAccessApprovalWorkspace,
+  canAccessFacultyWorkspace,
+  hasAdminRole,
+  hasCaoRole,
+} from './roleAccess.ts';
 import { useUser } from './UserContext.tsx';
-
-const navigationItems = [{ label: 'Home', to: '/' }] as const;
 
 export const AuthenticatedShell = ({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) => {
   const user = useUser();
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
+  const location = useRouterState({
+    select: (state) => state.location,
   });
+  const pathname = location.pathname;
   const isAdmin = hasAdminRole(user.roles);
+  const canApproveLeave = canAccessApprovalWorkspace(user.roles);
+  const isLocalDevelopment = import.meta.env.DEV;
+  const approvalWorkspaceQuery = useQuery({
+    ...approvalWorkspaceQueryOptions(),
+    enabled: canApproveLeave,
+  });
+  const pendingApprovalCount =
+    approvalWorkspaceQuery.data?.pendingRequests.length ?? 0;
+  const calendarLabel = hasCaoRole(user.roles)
+    ? 'CAO Calendar'
+    : 'Team Calendar';
   const items = isAdmin
-    ? [...navigationItems, { label: 'Admin', to: '/admin' as const }]
-    : navigationItems;
+    ? [{ label: 'Admin', to: '/admin' as const }]
+    : [
+        ...(canAccessFacultyWorkspace(user.roles)
+          ? [{ label: 'Dashboard', to: '/' as const }]
+          : []),
+        ...(canApproveLeave
+          ? [
+              { label: calendarLabel, to: '/team-calendar' as const },
+              { label: 'Approvals', to: '/approvals' as const },
+            ]
+          : []),
+      ];
   const showSecondaryNav = !pathname.startsWith('/admin');
   const initials = user.name
     .split(' ')
@@ -27,7 +56,7 @@ export const AuthenticatedShell = ({
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  const roleLabel = isAdmin ? 'ADMIN · LOCAL' : 'SIGNED IN';
+  const currentReturnUrl = `${location.pathname}${location.search}`;
 
   return (
     <div className="flex min-h-screen flex-col bg-base-200">
@@ -46,20 +75,27 @@ export const AuthenticatedShell = ({
               </div>
             </Link>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 text-right">
-                <div className="hidden sm:block">
-                  <div className="text-sm font-semibold">{user.name}</div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
-                    {roleLabel}
+            {isLocalDevelopment ? (
+              <LocalRoleSwitcher
+                currentReturnUrl={currentReturnUrl}
+                roles={user.roles}
+                userName={user.name}
+              />
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 text-right">
+                  <div className="hidden sm:block">
+                    <div className="text-sm font-semibold">{user.name}</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+                      SIGNED IN
+                    </div>
+                  </div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
+                    {initials || '?'}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
-                  {initials || '?'}
-                </div>
               </div>
-              <span className="hidden text-primary-content/70 sm:block">▾</span>
-            </div>
+            )}
           </div>
         </div>
       </header>
@@ -69,19 +105,23 @@ export const AuthenticatedShell = ({
           <div className="container flex gap-1 overflow-x-auto">
             {items.map((item) => (
               <Link
-                activeOptions={{ exact: item.to === '/' }}
                 className="border-b-2 border-transparent px-5 py-4 text-sm font-semibold text-base-content/60 transition hover:text-base-content data-[status=active]:border-primary data-[status=active]:text-primary"
                 key={item.to}
                 to={item.to}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.to === '/approvals' && pendingApprovalCount > 0 ? (
+                  <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-xs font-bold text-primary">
+                    {pendingApprovalCount}
+                  </span>
+                ) : null}
               </Link>
             ))}
           </div>
         </nav>
       ) : null}
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 pt-6 lg:pt-8">{children}</main>
       <AppFooter />
     </div>
   );

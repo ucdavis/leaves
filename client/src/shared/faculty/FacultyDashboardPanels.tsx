@@ -1,4 +1,5 @@
-import { EnvelopeIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon } from '@heroicons/react/24/outline';
+import { Toast } from '@/shared/Toast.tsx';
 import {
   type FacultyAccrualBalance,
   type FacultyDashboardResponse,
@@ -171,24 +172,9 @@ export function FacultyToast({
   }
 
   return (
-    <div
-      aria-live="polite"
-      className="fixed right-6 top-6 z-50 max-w-xl"
-      role="status"
-    >
-      <div className="flex items-start gap-3 rounded-lg bg-success px-5 py-4 text-sm font-semibold text-success-content shadow-lg">
-        <EnvelopeIcon className="mt-0.5 h-5 w-5 shrink-0" />
-        <span>{message}</span>
-        <button
-          aria-label="Dismiss notification"
-          className="btn btn-ghost btn-xs ml-2 text-success-content hover:bg-success/20"
-          onClick={onDismiss}
-          type="button"
-        >
-          <XMarkIcon className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
+    <Toast className="fixed right-6 top-6 z-50 max-w-xl" icon={EnvelopeIcon} onDismiss={onDismiss} tone="success">
+      {message}
+    </Toast>
   );
 }
 
@@ -311,6 +297,18 @@ export function getLeaveTone(leaveType: string) {
 
 export function formatHours(value: number) {
   return `${numberFormatter.format(value)} hrs`;
+}
+
+export function formatWorkflowModeLabel(workflowMode: string | null | undefined) {
+  if (workflowMode === 'ApprovalRequired') {
+    return 'Approval required';
+  }
+
+  if (workflowMode === 'DirectSubmission') {
+    return 'Auto-approve';
+  }
+
+  return 'No reporting department';
 }
 
 export function formatCompactHours(value: number) {

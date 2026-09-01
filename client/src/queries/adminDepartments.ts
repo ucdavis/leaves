@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/api.ts';
 import type {
   AdminCluster,
@@ -69,22 +70,23 @@ function normalizeDepartmentData(
   };
 }
 
-export const adminDepartmentsQueryOptions = () => ({
-  queryFn: async ({
-    signal,
-  }: {
-    signal: AbortSignal;
-  }): Promise<AdminDepartmentsPageData> => {
-    const response = await fetchJson<AdminDepartmentsResponse>(
-      '/api/admin/departments',
-      {},
-      signal
-    );
+export const adminDepartmentsQueryOptions = () =>
+  queryOptions({
+    queryFn: async ({
+      signal,
+    }: {
+      signal: AbortSignal;
+    }): Promise<AdminDepartmentsPageData> => {
+      const response = await fetchJson<AdminDepartmentsResponse>(
+        '/api/admin/departments',
+        {},
+        signal
+      );
 
-    return normalizeDepartmentData(response);
-  },
-  queryKey: ['admin', 'departments'] as const,
-});
+      return normalizeDepartmentData(response);
+    },
+    queryKey: ['admin', 'departments'] as const,
+  });
 
 export async function createAdminCluster({
   name,

@@ -88,12 +88,21 @@ public static class AuthenticationHelper
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
         var hasUserId = principal.TryGetUserId(out var userId);
 
-        if (!hasUserId) return;
+        if (!hasUserId)
+        {
+            ctx.Fail("Your account is missing a required object ID. Contact support.");
+            return;
+        }
 
-        await userService.EnsureUserProfileAsync(
+        var profileProvisioned = await userService.EnsureUserProfileAsync(
             principal,
             recordSignIn: true,
             cancellationToken: ctx.HttpContext.RequestAborted);
+        if (!profileProvisioned)
+        {
+            ctx.Fail("Your account could not be matched to an IAM ID. Contact support.");
+            return;
+        }
 
         var roles = await userService.GetRolesForUser(userId);
 
@@ -127,10 +136,16 @@ public static class AuthenticationHelper
         // On every request with a cookie, check if the user's roles/claims need updating
         // We could use a cache here or roleVersion or timestamp or something, but for simplicity we'll just hit the DB every time
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-        await userService.EnsureUserProfileAsync(
+        var profileProvisioned = await userService.EnsureUserProfileAsync(
             principal,
             recordSignIn: false,
             cancellationToken: ctx.HttpContext.RequestAborted);
+        if (!profileProvisioned)
+        {
+            ctx.RejectPrincipal();
+            return;
+        }
+
         var updated = await userService.UpdateUserPrincipalIfNeeded(principal);
 
         if (updated != null)
