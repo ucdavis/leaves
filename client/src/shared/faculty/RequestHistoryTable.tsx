@@ -13,11 +13,9 @@ import {
 
 export function RequestHistoryTable({
   onSelectRequest,
-  onViewEmail,
   requests,
 }: {
   onSelectRequest: (request: FacultyLeaveRequest) => void;
-  onViewEmail: (request: FacultyLeaveRequest) => void;
   requests: FacultyLeaveRequest[];
 }) {
   const columns = useMemo<ColumnDef<FacultyLeaveRequest>[]>(
@@ -69,33 +67,21 @@ export function RequestHistoryTable({
       {
         accessorKey: 'totalHours',
         cell: ({ getValue }) => (
-          <span className="font-bold">{formatCompactHours(getValue<number>())}</span>
+          <span className="font-bold">
+            {formatCompactHours(getValue<number>())}
+          </span>
         ),
         header: 'Hours',
       },
       {
         accessorKey: 'status',
-        cell: ({ getValue }) => <RequestStatusBadge status={getValue<string>()} />,
+        cell: ({ getValue }) => (
+          <RequestStatusBadge status={getValue<string>()} />
+        ),
         header: 'Status',
       },
-      {
-        cell: ({ row }) => (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={(event) => {
-              event.stopPropagation();
-              onViewEmail(row.original);
-            }}
-            type="button"
-          >
-            View Email
-          </button>
-        ),
-        header: () => <span className="sr-only">Email</span>,
-        id: 'email',
-      },
     ],
-    [onSelectRequest, onViewEmail]
+    [onSelectRequest]
   );
 
   if (requests.length === 0) {
@@ -107,7 +93,8 @@ export function RequestHistoryTable({
       columns={columns}
       data={requests}
       getRowProps={(row) => ({
-        className: 'cursor-pointer border-base-300 transition hover:bg-base-200',
+        className:
+          'cursor-pointer border-base-300 transition hover:bg-base-200',
         onClick: () => onSelectRequest(row.original),
       })}
       globalFilter="none"

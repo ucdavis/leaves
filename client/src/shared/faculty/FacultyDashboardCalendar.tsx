@@ -16,10 +16,7 @@ import type {
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 import { RequestDetailModal } from './FacultyDashboardModals.tsx';
-import {
-  formatDateRange,
-  getLeaveTone,
-} from './FacultyDashboardPanels.tsx';
+import { formatDateRange, getLeaveTone } from './FacultyDashboardPanels.tsx';
 
 const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'long',
@@ -54,11 +51,9 @@ export const calendarLegend = [
 export const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function LeaveCalendar({
-  allowEmailPreview = true,
   faculty,
   requests,
 }: {
-  allowEmailPreview?: boolean;
   faculty: FacultyDashboardResponse['faculty'];
   requests: FacultyLeaveRequest[];
 }) {
@@ -180,7 +175,6 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
-          allowEmailPreview={allowEmailPreview}
           faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}

@@ -61,11 +61,7 @@ export function FacultyDashboardPage({
       )}
 
       <div className="mx-auto mt-6">
-        <LeaveCalendar
-          allowEmailPreview={!readOnly}
-          faculty={data.faculty}
-          requests={data.recentRequests}
-        />
+        <LeaveCalendar faculty={data.faculty} requests={data.recentRequests} />
       </div>
 
       {reportModalOpen ? (
@@ -78,7 +74,6 @@ export function FacultyDashboardPage({
 
       {selectedRequest ? (
         <RequestDetailModal
-          allowEmailPreview={!readOnly}
           faculty={data.faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
@@ -88,11 +83,7 @@ export function FacultyDashboardPage({
   );
 }
 
-function ReadOnlyFacultyHeader({
-  data,
-}: {
-  data: FacultyDashboardResponse;
-}) {
+function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
   const balances = [...data.accrualBalances].sort((left, right) => {
     return (
       getLeaveBalanceSortRank(left.typeLabel) -
@@ -139,11 +130,7 @@ function ReadOnlyFacultyHeader({
   );
 }
 
-function ReadOnlyBalanceRow({
-  balance,
-}: {
-  balance: FacultyAccrualBalance;
-}) {
+function ReadOnlyBalanceRow({ balance }: { balance: FacultyAccrualBalance }) {
   const tone = getLeaveTone(balance.typeLabel);
 
   return (

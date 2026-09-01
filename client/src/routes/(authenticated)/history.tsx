@@ -21,7 +21,6 @@ import {
   RequestDetailModal,
   getReportLeaveTypeOptions,
 } from '@/shared/faculty/FacultyDashboardModals.tsx';
-import { ExistingRequestEmailPreviewModal } from '@/shared/faculty/FacultyDashboardEmailPreviews.tsx';
 import { RequestHistoryTable } from '@/shared/faculty/RequestHistoryTable.tsx';
 
 export const Route = createFileRoute('/(authenticated)/history')({
@@ -40,8 +39,6 @@ function RouteComponent() {
   const [selectedType, setSelectedType] = useState('');
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
-    useState<FacultyLeaveRequest | null>(null);
-  const [emailPreviewRequest, setEmailPreviewRequest] =
     useState<FacultyLeaveRequest | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -74,8 +71,6 @@ function RouteComponent() {
   return (
     <HistoryContent
       data={dashboardQuery.data}
-      emailPreviewRequest={emailPreviewRequest}
-      onEmailPreviewRequest={setEmailPreviewRequest}
       onReportModalOpen={setReportModalOpen}
       onRequestSelected={setSelectedRequest}
       onSelectedTypeChange={setSelectedType}
@@ -90,8 +85,6 @@ function RouteComponent() {
 
 function HistoryContent({
   data,
-  emailPreviewRequest,
-  onEmailPreviewRequest,
   onReportModalOpen,
   onRequestSelected,
   onSelectedTypeChange,
@@ -102,8 +95,6 @@ function HistoryContent({
   toastMessage,
 }: {
   data: FacultyDashboardResponse;
-  emailPreviewRequest: FacultyLeaveRequest | null;
-  onEmailPreviewRequest: (request: FacultyLeaveRequest | null) => void;
   onReportModalOpen: (value: boolean) => void;
   onRequestSelected: (request: FacultyLeaveRequest | null) => void;
   onSelectedTypeChange: (value: string) => void;
@@ -161,7 +152,6 @@ function HistoryContent({
         <RequestHistoryTable
           key={selectedType}
           onSelectRequest={onRequestSelected}
-          onViewEmail={onEmailPreviewRequest}
           requests={requests}
         />
       </section>
@@ -178,16 +168,6 @@ function HistoryContent({
           faculty={data.faculty}
           onClose={() => onRequestSelected(null)}
           request={selectedRequest}
-        />
-      ) : null}
-      {emailPreviewRequest ? (
-        <ExistingRequestEmailPreviewModal
-          faculty={data.faculty}
-          onClose={() => onEmailPreviewRequest(null)}
-          onPrimaryAction={() => onEmailPreviewRequest(null)}
-          primaryLabel="Close"
-          request={emailPreviewRequest}
-          secondaryLabel={null}
         />
       ) : null}
       <FacultyToast
