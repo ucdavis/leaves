@@ -124,7 +124,10 @@ public sealed class AdminRolesService
 
         var assignments = roleAssignmentsData.AdminAssignments
             .Select(assignment => CreateAssignmentResponse(
-                active: IsRoleAssignmentActive(currentEmployeesByIamId, assignment.IamId, true),
+                active: IsRoleAssignmentActive(
+                    currentEmployeesByIamId,
+                    assignment.IamId,
+                    true),
                 effectiveEndDate: null,
                 effectiveStartDate: null,
                 id: assignment.Id.ToString(),

@@ -104,7 +104,8 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-        await init.InitializeAsync(app.Environment.IsEnvironment("Local"));
+        await init.InitializeAsync(
+            app.Environment.IsEnvironment("Local") || app.Environment.IsDevelopment());
     }
 
     app.UseForwardedHeaders();

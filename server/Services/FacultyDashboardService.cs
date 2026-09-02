@@ -28,6 +28,7 @@ public interface IFacultyDashboardService
 public sealed class FacultyDashboardService : IFacultyDashboardService
 {
     private const string CaoRole = "CAO";
+    private const string ChairRole = "Chair";
     private const int RecentRequestsLimit = 24;
     private const string FamilyCareLeaveTypeKey = "FamilyCare";
     private const string ProfessionalDevelopmentLeaveTypeLabel = "Professional Development";
@@ -107,9 +108,6 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 : FacultyDashboardViewerResult.Success(ownDashboard);
         }
 
-        var viewerEmployee = await GetCurrentEmployeeAsync(
-            NormalizeIamId(viewer.IamId),
-            cancellationToken);
         var targetUser = await _db.AppUsers
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -119,19 +117,16 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             normalizedTargetIamId,
             cancellationToken);
 
-        if (viewerEmployee == null || targetEmployee == null)
+        if (targetEmployee == null)
         {
             return FacultyDashboardViewerResult.TargetNotFound();
         }
 
-        var viewerDepartment = await ResolveReportingDepartmentAsync(
-            viewerEmployee,
-            cancellationToken);
         var targetDepartment = await ResolveReportingDepartmentAsync(
             targetEmployee,
             cancellationToken);
 
-        if (viewerDepartment == null || targetDepartment == null)
+        if (targetDepartment == null)
         {
             return FacultyDashboardViewerResult.Forbidden();
         }
@@ -143,10 +138,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var canViewTarget = isCao
             ? targetDepartment.ClusterId.HasValue &&
                 assignedCaoClusterIds.Contains(targetDepartment.ClusterId.Value)
-            : string.Equals(
-                viewerDepartment.DepartmentCode,
-                targetDepartment.DepartmentCode,
-                StringComparison.OrdinalIgnoreCase);
+            : HasRole(principal, ChairRole) &&
+                (await GetActiveChairDepartmentCodesAsync(viewer.IamId, cancellationToken))
+                    .Contains(targetDepartment.DepartmentCode);
 
         if (!canViewTarget)
         {
@@ -644,6 +638,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 .Select(assignment => assignment.ClusterId)
                 .ToListAsync(cancellationToken))
             .ToHashSet();
+    }
+
+    private async Task<HashSet<string>> GetActiveChairDepartmentCodesAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.DepartmentChairAssignments
+                .AsNoTracking()
+                .Where(assignment =>
+                    assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue ||
+                        assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.DepartmentCode)
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static Dictionary<string, string[]> ValidateRequestShape(

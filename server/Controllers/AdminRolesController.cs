@@ -42,6 +42,15 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("IAM ID is required.");
         }
 
+        var isEligibleForAdminAssignment = await _db.CurrentEmployees
+            .AnyAsync(
+                employee => employee.IamId.Trim() == iamId && employee.HasCurrentAccrualRecord,
+                cancellationToken);
+        if (!isEligibleForAdminAssignment)
+        {
+            return ValidationProblem("Selected user must have both a People record and a current accrual record.");
+        }
+
         var createdByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
         if (createdByAppUserId == null)
         {
@@ -240,6 +249,14 @@ public sealed class AdminRolesController : ApiControllerBase
         if (string.IsNullOrWhiteSpace(trimmedIamId))
         {
             return ImmediateAssignmentValidationResult.WithError(ValidationProblem("IAM ID is required."));
+        }
+
+        var directoryUserExists = await _db.CurrentEmployees
+            .AnyAsync(employee => employee.IamId.Trim() == trimmedIamId, cancellationToken);
+        if (!directoryUserExists)
+        {
+            return ImmediateAssignmentValidationResult.WithError(
+                ValidationProblem("Selected user must be a current directory user."));
         }
 
         var createdByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);

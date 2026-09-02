@@ -8,8 +8,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   addAdminAssignment,
-  addCaoAssignment,
-  addChairAssignment,
   adminRolesQueryOptions,
   removeRoleAssignment,
   type AdminAssignableRoleType,
@@ -30,7 +28,7 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
           Loading role assignments
         </h2>
         <p className="mt-2 text-sm text-base-content/70">
-          Pulling admins, CAOs, and department chairs from the database.
+          Pulling application admins from the database.
         </p>
       </div>
     </section>
@@ -71,11 +69,9 @@ export type AdminRolePersonOption = {
 function AdminUsersRoute() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminRolesQueryOptions());
-  const [type, setType] = useState<AdminAssignableRoleType>('admin');
   const [iamId, setIamId] = useState('');
   const [personQuery, setPersonQuery] = useState('');
   const [isPersonSearchOpen, setIsPersonSearchOpen] = useState(false);
-  const [targetId, setTargetId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showInactiveAssignments, setShowInactiveAssignments] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingRoleAction | null>(
@@ -92,14 +88,6 @@ function AdminUsersRoute() {
     mutationFn: addAdminAssignment,
     onSuccess: refreshRoles,
   });
-  const addCaoMutation = useMutation({
-    mutationFn: addCaoAssignment,
-    onSuccess: refreshRoles,
-  });
-  const addChairMutation = useMutation({
-    mutationFn: addChairAssignment,
-    onSuccess: refreshRoles,
-  });
   const removeMutation = useMutation({
     mutationFn: removeRoleAssignment,
     onSuccess: refreshRoles,
@@ -107,86 +95,54 @@ function AdminUsersRoute() {
 
   const isSaving =
     addAdminMutation.isPending ||
-    addCaoMutation.isPending ||
-    addChairMutation.isPending ||
     removeMutation.isPending;
 
   const selectedUser = data.users.find((user) => user.iamId === iamId) ?? null;
-  const chairDepartmentOptions = selectedUser?.departmentOptions ?? [];
-  const selectedChairDepartment =
-    type === 'chair' && targetId
-      ? (chairDepartmentOptions.find(
-          (department) => department.id === targetId
-        ) ?? null)
-      : null;
-  const targetOptions = type === 'cao' ? data.clusters : data.departments;
-  const selectedTarget =
-    type === 'admin'
-      ? null
-      : type === 'chair'
-        ? selectedChairDepartment
-        : (targetOptions.find((option) => option.id === targetId) ?? null);
-  const selectedTargetName =
-    type === 'admin'
-      ? null
-      : type === 'chair'
-        ? (selectedChairDepartment?.name ?? null)
-        : (selectedTarget?.name ?? null);
   const selectedUserName = selectedUser?.name ?? iamId;
-  const assignmentRows = data.assignments.filter((assignment) =>
-    showInactiveAssignments ? true : assignment.active
+  const assignmentRows = data.assignments.filter(
+    (assignment) =>
+      assignment.type === 'admin' &&
+      (showInactiveAssignments || assignment.active)
+  );
+  const assignedAdminIamIds = useMemo(
+    () =>
+      new Set(
+        data.assignments
+          .filter((assignment) => assignment.type === 'admin')
+          .map((assignment) => assignment.iamId.toLowerCase())
+      ),
+    [data.assignments]
   );
   const normalizedPersonQuery = personQuery.trim().toLowerCase();
   const filteredUsers = useMemo(
     () =>
       data.users.filter((user) => {
+        if (assignedAdminIamIds.has(user.iamId.toLowerCase())) {
+          return false;
+        }
+
         if (!normalizedPersonQuery) {
           return true;
         }
 
-        const searchableText = [
-          user.name,
-          user.email,
-          user.iamId,
-          user.departmentName ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
+        const searchableText = [user.name, user.email].join(' ').toLowerCase();
 
         return searchableText.includes(normalizedPersonQuery);
       }),
-    [data.users, normalizedPersonQuery]
+    [assignedAdminIamIds, data.users, normalizedPersonQuery]
   );
 
   const resetForm = () => {
     setIamId('');
     setPersonQuery('');
     setIsPersonSearchOpen(false);
-    setTargetId('');
   };
 
   const handleAdd = async () => {
     setError(null);
 
-    if (type !== 'admin' && selectedTarget && !selectedTarget.active) {
-      setError('Selected scope is inactive.');
-      return false;
-    }
-
     try {
-      if (type === 'admin') {
-        await addAdminMutation.mutateAsync({ iamId });
-      } else if (type === 'cao') {
-        await addCaoMutation.mutateAsync({
-          clusterId: targetId,
-          iamId,
-        });
-      } else {
-        await addChairMutation.mutateAsync({
-          departmentCode: targetId,
-          iamId,
-        });
-      }
+      await addAdminMutation.mutateAsync({ iamId });
 
       resetForm();
       return true;
@@ -251,16 +207,6 @@ function AdminUsersRoute() {
       header: 'Scope',
     },
     {
-      accessorKey: 'effectiveStartDate',
-      cell: ({ row }) => row.original.effectiveStartDate ?? 'Immediate',
-      header: 'Start',
-    },
-    {
-      accessorKey: 'effectiveEndDate',
-      cell: ({ row }) => row.original.effectiveEndDate ?? 'Open',
-      header: 'End',
-    },
-    {
       accessorKey: 'active',
       cell: ({ row }) => (
         <span
@@ -290,7 +236,7 @@ function AdminUsersRoute() {
           }
           type="button"
         >
-          {row.original.type === 'admin' ? 'Remove' : 'Close out assignment'}
+          Remove
         </button>
       ),
       header: 'Actions',
@@ -303,60 +249,24 @@ function AdminUsersRoute() {
       <section className="card border border-main-border bg-base-100">
         <div className="card-body p-6">
           <h2 className="text-2xl font-semibold text-primary">
-            Assign CAO, department chair, or application admin roles
+            Assign Application Admins
           </h2>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-end">
-            <label className="form-control">
-              <span className="label-text font-medium">Role</span>
-              <select
-                className="select select-bordered mt-2 w-full"
-                onChange={(event) => {
-                  const nextType = event.target
-                    .value as AdminAssignableRoleType;
-                  setType(nextType);
-                  setTargetId(
-                    nextType === 'chair' && selectedUser
-                      ? selectedUser.departmentOptions.length === 1
-                        ? (selectedUser.departmentOptions[0]?.id ?? '')
-                        : ''
-                      : ''
-                  );
-                  setError(null);
-                }}
-                value={type}
-              >
-                <option value="admin">Admin</option>
-                <option value="cao">CAO</option>
-                <option value="chair">Department chair</option>
-              </select>
-            </label>
-
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <label className="form-control">
               <span className="label-text font-medium">Person</span>
               <PersonSearchField
-                allUsers={data.users}
                 isOpen={isPersonSearchOpen}
                 onChangeOpen={setIsPersonSearchOpen}
                 onChangeQuery={(value) => {
                   setPersonQuery(value);
                   setIamId('');
-                  if (type === 'chair') {
-                    setTargetId('');
-                  }
                   setIsPersonSearchOpen(true);
                 }}
                 onSelectUser={(user) => {
                   setIamId(user.iamId);
                   setPersonQuery(user.name);
                   setIsPersonSearchOpen(false);
-                  setTargetId(
-                    type === 'chair'
-                      ? user.departmentOptions.length === 1
-                        ? (user.departmentOptions[0]?.id ?? '')
-                        : ''
-                      : ''
-                  );
                   setError(null);
                 }}
                 query={personQuery}
@@ -365,87 +275,25 @@ function AdminUsersRoute() {
               />
             </label>
 
-            {type !== 'admin' ? (
-              type === 'cao' ? (
-                <label className="form-control">
-                  <span className="label-text font-medium">Cluster</span>
-                  <select
-                    className="select select-bordered mt-2 w-full"
-                    onChange={(event) => setTargetId(event.target.value)}
-                    value={targetId}
-                  >
-                    <option value="">Select scope</option>
-                    {targetOptions.map((option) => (
-                      <option
-                        disabled={!option.active}
-                        key={option.id}
-                        value={option.id}
-                      >
-                        {option.name}
-                        {!option.active ? ' (inactive)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <label className="form-control">
-                  <span className="label-text font-medium">Department</span>
-                  <select
-                    className="select select-bordered mt-2 w-full"
-                    disabled={
-                      !selectedUser || chairDepartmentOptions.length === 0
-                    }
-                    onChange={(event) => setTargetId(event.target.value)}
-                    value={targetId}
-                  >
-                    <option value="">
-                      {!selectedUser
-                        ? 'Select a person first'
-                        : chairDepartmentOptions.length === 0
-                          ? 'No current departments available'
-                          : 'Select department'}
-                    </option>
-                    {chairDepartmentOptions.map((department) => (
-                      <option
-                        disabled={!department.active}
-                        key={department.id}
-                        value={department.id}
-                      >
-                        {department.name}
-                        {!department.active ? ' (inactive)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )
-            ) : (
-              <div className="hidden lg:block" />
-            )}
-
             <button
               className={`btn btn-primary lg:self-end ${
                 !pendingAction && error ? 'opacity-60' : ''
               }`}
               disabled={
                 isSaving ||
-                !iamId ||
-                (type === 'cao' && !targetId) ||
-                (type === 'chair' && !targetId) ||
-                (type !== 'admin' &&
-                  selectedTarget !== null &&
-                  !selectedTarget.active)
+                !iamId
               }
               onClick={() =>
                 setPendingAction({
                   kind: 'add',
-                  roleType: type,
-                  targetName: selectedTargetName,
+                  roleType: 'admin',
+                  targetName: null,
                   userName: selectedUserName,
                 })
               }
               type="button"
             >
-              {isSaving ? 'Adding...' : 'Add role'}
+              {isSaving ? 'Adding...' : 'Add admin'}
             </button>
           </div>
 
@@ -460,13 +308,13 @@ function AdminUsersRoute() {
       <section className="card border border-main-border bg-base-100">
         <div className="card-body p-6">
           <h2 className="text-lg font-semibold text-primary">
-            Role assignments
+            Application admins
           </h2>
           <div className="mt-5">
             <DataTable
               columns={columns}
               data={assignmentRows}
-              filterPlaceholder="Search role, person, IAM ID, or scope..."
+              filterPlaceholder="Search admin or email..."
               globalFilter="left"
               initialState={{
                 pagination: {
@@ -592,7 +440,6 @@ function RoleWarningModal({
 }
 
 export function PersonSearchField({
-  allUsers,
   isOpen,
   onChangeOpen,
   onChangeQuery,
@@ -601,7 +448,6 @@ export function PersonSearchField({
   selectedIamId,
   users,
 }: {
-  allUsers: AdminRolePersonOption[];
   isOpen: boolean;
   onChangeOpen: (value: boolean) => void;
   onChangeQuery: (value: string) => void;
@@ -649,7 +495,7 @@ export function PersonSearchField({
             onChangeOpen(false);
           }
         }}
-        placeholder="Search name, email, IAM ID, or department"
+        placeholder="Search name or email"
         role="combobox"
         type="text"
         value={query}
@@ -689,10 +535,7 @@ export function PersonSearchField({
                   </span>
                 </span>
                 <span className="text-right text-xs text-base-content/70">
-                  <span className="block font-mono">{user.iamId}</span>
-                  <span className="block">
-                    {user.departmentName ?? 'No department'}
-                  </span>
+                  {user.departmentName ?? 'No department'}
                 </span>
               </button>
             );

@@ -152,6 +152,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         var faculty = BuildFacultyRoster(
             directoryData.CurrentEmployees,
             departmentByCode,
+            directoryData.NonFacultyIamIds,
             scope,
             reportingDepartmentCodes,
             clusterIds);
@@ -242,12 +243,14 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
         IReadOnlyList<CurrentEmployee> currentEmployees,
         IReadOnlyDictionary<string, Department> departmentByCode,
+        IReadOnlySet<string> nonFacultyIamIds,
         string scope,
         IReadOnlySet<string> reportingDepartmentCodes,
         IReadOnlySet<int> clusterIds)
     {
         var faculty = currentEmployees
             .Where(employee => employee.HasCurrentAccrualRecord)
+            .Where(employee => !nonFacultyIamIds.Contains(employee.IamId.Trim()))
             .Where(employee =>
             {
                 var departmentCode = NormalizeKey(employee.ResolvedReportingDepartmentCode);

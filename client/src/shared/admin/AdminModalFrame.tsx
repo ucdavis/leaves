@@ -13,6 +13,7 @@ const focusableSelector = [
 export function AdminModalFrame({
   children,
   description,
+  headerActions,
   maxWidthClassName,
   onRequestClose,
 
@@ -20,6 +21,7 @@ export function AdminModalFrame({
 }: {
   children: ReactNode;
   description?: string;
+  headerActions?: ReactNode;
   maxWidthClassName?: string;
   onRequestClose?: () => void;
   title: string;
@@ -91,9 +93,14 @@ export function AdminModalFrame({
         }`}
       >
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-primary" id={titleId}>
-            {title}
-          </h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold text-primary" id={titleId}>
+              {title}
+            </h2>
+            {headerActions ? (
+              <div className="shrink-0">{headerActions}</div>
+            ) : null}
+          </div>
           {description ? (
             <p className="mt-2 text-sm text-base-content/70" id={descriptionId}>
               {description}
