@@ -49,13 +49,6 @@ export function LocalRoleSwitcher({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const initials = userName
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
   const roleLabel = getUserRoleLabel(roles);
   const authLabel = `${roleLabel} · LOCAL DEV`;
 
@@ -93,9 +86,6 @@ export function LocalRoleSwitcher({
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-success text-sm font-bold text-white">
-          {initials || '?'}
-        </div>
         <div className="hidden min-w-0 sm:block">
           <div className="truncate text-sm font-semibold leading-tight">
             {userName}

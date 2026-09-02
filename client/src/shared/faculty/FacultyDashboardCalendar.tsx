@@ -42,8 +42,7 @@ export const calendarLegend = [
     label: 'FMLA',
   },
   {
-    className:
-      'border-dashed border-warning/70 bg-warning/15 text-warning',
+    className: 'border-dashed border-warning/70 bg-warning/15 text-warning',
     label: 'Pending',
   },
 ] as const;
@@ -52,9 +51,13 @@ export const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function LeaveCalendar({
   faculty,
+  focusDate,
+  onReportLeave,
   requests,
 }: {
   faculty: FacultyDashboardResponse['faculty'];
+  focusDate?: string;
+  onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
 }) {
   const visibleRequests = useMemo(
@@ -62,13 +65,17 @@ export function LeaveCalendar({
     [requests]
   );
   const initialMonth = useMemo(
-    () => getInitialCalendarMonth(visibleRequests),
-    [visibleRequests]
+    () => getInitialCalendarMonth(visibleRequests, focusDate),
+    [focusDate, visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
+  const [selectionStartDate, setSelectionStartDate] = useState<string | null>(
+    null
+  );
+  const [selectionEndDate, setSelectionEndDate] = useState<string | null>(null);
   const calendarDays = useMemo(
     () => buildCalendarDays(visibleMonth),
     [visibleMonth]
@@ -78,9 +85,35 @@ export function LeaveCalendar({
     [visibleRequests]
   );
 
+  const selectDate = (date: string) => {
+    setSelectedDate(date);
+    if (!onReportLeave) {
+      return;
+    }
+
+    if (!selectionStartDate || selectionEndDate || date < selectionStartDate) {
+      setSelectionStartDate(date);
+      setSelectionEndDate(null);
+      return;
+    }
+
+    setSelectionEndDate(date);
+  };
+
+  const selectToday = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    setVisibleMonth(startOfMonth(new Date()));
+    setSelectedDate(today);
+    setSelectionStartDate(today);
+    setSelectionEndDate(null);
+  };
+
+  const selectedEndDate = selectionEndDate ?? selectionStartDate;
+
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <button
           className="btn btn-ghost btn-sm"
           onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
@@ -92,15 +125,59 @@ export function LeaveCalendar({
         <h2 className="font-bold text-primary">
           {monthFormatter.format(visibleMonth)}
         </h2>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
-          type="button"
-        >
-          Next
-          <ArrowRightIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={selectToday}
+            type="button"
+          >
+            Today
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
+            type="button"
+          >
+            Next
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {onReportLeave ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-base-content/70">
+            {selectionStartDate
+              ? selectionEndDate
+                ? `Selected ${formatDateRange(selectionStartDate, selectionEndDate)}`
+                : 'Select an end date, or add a single-day request.'
+              : 'Select a date or date range to report leave.'}
+          </span>
+          <button
+            className="btn btn-primary btn-sm"
+            disabled={!selectionStartDate}
+            onClick={() =>
+              selectionStartDate &&
+              onReportLeave(selectionStartDate, selectedEndDate!)
+            }
+            type="button"
+          >
+            Report Leave
+          </button>
+          {selectionStartDate ? (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setSelectionStartDate(null);
+                setSelectionEndDate(null);
+              }}
+              type="button"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-7 border-l border-t border-base-300">
         {weekdayLabels.map((label) => (
@@ -124,7 +201,7 @@ export function LeaveCalendar({
                 day ? 'cursor-pointer' : ''
               }`}
               key={day?.isoDate ?? `blank-${index}`}
-              onClick={() => day && setSelectedDate(day.isoDate)}
+              onClick={() => day && selectDate(day.isoDate)}
               onKeyDown={(event) => {
                 if (!day) {
                   return;
@@ -132,7 +209,7 @@ export function LeaveCalendar({
 
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setSelectedDate(day.isoDate);
+                  selectDate(day.isoDate);
                 }
               }}
               role={day ? 'button' : undefined}
@@ -216,7 +293,13 @@ function buildCalendarDays(visibleMonth: Date) {
   );
 }
 
-function getInitialCalendarMonth(requests: FacultyLeaveRequest[]) {
+function getInitialCalendarMonth(
+  requests: FacultyLeaveRequest[],
+  focusDate?: string
+) {
+  if (focusDate) {
+    return startOfMonth(parseISO(focusDate));
+  }
   const firstRequest = requests[0];
   if (firstRequest) {
     return startOfMonth(parseISO(firstRequest.startDate));

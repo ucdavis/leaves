@@ -50,7 +50,15 @@ export function Toast({
         className={`flex items-start gap-3 rounded-lg px-5 py-4 text-sm font-semibold shadow-lg ${toneClasses[tone].panel}`}
       >
         <Icon className="mt-0.5 h-5 w-5 shrink-0" />
-        <span>{children}</span>
+        <span className="flex-1">{children}</span>
+        <button
+          aria-label="Dismiss notification"
+          className="btn btn-ghost btn-xs -mr-2 -mt-1 text-current hover:bg-black/10"
+          onClick={onDismiss}
+          type="button"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
     </div>
   );

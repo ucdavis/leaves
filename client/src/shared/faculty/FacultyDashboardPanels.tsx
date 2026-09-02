@@ -87,8 +87,8 @@ export function QuickActionsPanel({
         Report Leave
       </button>
       <div className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/70">
-        <span className="font-bold text-base-content">Department:</span>{' '}
-        {data.faculty.departmentName ?? 'No reporting department'}.
+        <span className="font-bold text-base-content">Approval type:</span>{' '}
+        {formatWorkflowModeLabel(data.faculty.workflowMode)}.
       </div>
     </section>
   );
@@ -96,9 +96,11 @@ export function QuickActionsPanel({
 
 export function RecentRequestsPanel({
   onSelectRequest,
+  onShowInCalendar,
   requests,
 }: {
   onSelectRequest: (request: FacultyLeaveRequest) => void;
+  onShowInCalendar?: (request: FacultyLeaveRequest) => void;
   requests: FacultyLeaveRequest[];
 }) {
   return (
@@ -110,6 +112,7 @@ export function RecentRequestsPanel({
             <RecentRequestRow
               key={request.id}
               onSelectRequest={onSelectRequest}
+              onShowInCalendar={onShowInCalendar}
               request={request}
             />
           ))
@@ -123,31 +126,48 @@ export function RecentRequestsPanel({
 
 function RecentRequestRow({
   onSelectRequest,
+  onShowInCalendar,
   request,
 }: {
   onSelectRequest: (request: FacultyLeaveRequest) => void;
+  onShowInCalendar?: (request: FacultyLeaveRequest) => void;
   request: FacultyLeaveRequest;
 }) {
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <button
-      className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 text-left transition first:pt-0 last:pb-0 hover:bg-base-200/60"
-      onClick={() => onSelectRequest(request)}
-      type="button"
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={`mt-1 h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-        <div className="min-w-0">
-          <div className="truncate text-sm font-bold">{request.leaveType}</div>
-          <div className="text-xs text-base-content/60">
-            {formatDateRange(request.startDate, request.endDate)}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <button
+        className="flex min-w-0 items-start gap-3 text-left transition hover:text-primary"
+        onClick={() => onSelectRequest(request)}
+        type="button"
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span className={`mt-1 h-2.5 w-2.5 rounded-full ${tone.dot}`} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold">
+              {request.leaveType}
+            </div>
+            <div className="text-xs text-base-content/60">
+              {formatDateRange(request.startDate, request.endDate)}
+            </div>
           </div>
         </div>
-      </div>
+      </button>
       <div className="text-sm font-bold">{formatHours(request.totalHours)}</div>
-      <RequestStatusBadge status={request.status} />
-    </button>
+      <div className="flex items-center gap-3">
+        <RequestStatusBadge status={request.status} />
+        {onShowInCalendar ? (
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => onShowInCalendar(request)}
+            type="button"
+          >
+            Show in calendar
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -163,7 +183,12 @@ export function FacultyToast({
   }
 
   return (
-    <Toast className="fixed right-6 top-6 z-50 max-w-xl" icon={EnvelopeIcon} onDismiss={onDismiss} tone="success">
+    <Toast
+      className="fixed right-6 top-6 z-50 max-w-xl"
+      icon={EnvelopeIcon}
+      onDismiss={onDismiss}
+      tone="success"
+    >
       {message}
     </Toast>
   );
@@ -290,7 +315,9 @@ export function formatHours(value: number) {
   return `${numberFormatter.format(value)} hrs`;
 }
 
-export function formatWorkflowModeLabel(workflowMode: string | null | undefined) {
+export function formatWorkflowModeLabel(
+  workflowMode: string | null | undefined
+) {
   if (workflowMode === 'ApprovalRequired') {
     return 'Approval required';
   }

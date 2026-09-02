@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import type {
   FacultyAccrualBalance,
@@ -20,13 +21,22 @@ import {
 } from '@/shared/faculty/FacultyDashboardModals.tsx';
 
 export function FacultyDashboardPage({
+  calendarDate,
+  calendarRequests,
   data,
   readOnly = false,
 }: {
+  calendarDate?: string;
+  calendarRequests?: FacultyLeaveRequest[];
   data: FacultyDashboardResponse;
   readOnly?: boolean;
 }) {
+  const navigate = useNavigate();
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [calendarDates, setCalendarDates] = useState<{
+    endDate: string;
+    startDate: string;
+  } | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
   const recentRequests = data.recentRequests.slice(0, 5);
@@ -50,6 +60,12 @@ export function FacultyDashboardPage({
             />
             <RecentRequestsPanel
               onSelectRequest={setSelectedRequest}
+              onShowInCalendar={(request) =>
+                void navigate({
+                  search: { calendarDate: request.startDate },
+                  to: '/',
+                })
+              }
               requests={recentRequests}
             />
           </div>
@@ -58,14 +74,35 @@ export function FacultyDashboardPage({
       )}
 
       <div className="mx-auto mt-6">
-        <LeaveCalendar faculty={data.faculty} requests={data.recentRequests} />
+        <LeaveCalendar
+          faculty={data.faculty}
+          focusDate={calendarDate}
+          key={calendarDate ?? 'dashboard-calendar'}
+          onReportLeave={
+            readOnly
+              ? undefined
+              : (startDate, endDate) => {
+                  setCalendarDates({ endDate, startDate });
+                  setReportModalOpen(true);
+                }
+          }
+          requests={calendarRequests ?? data.recentRequests}
+        />
       </div>
 
       {reportModalOpen ? (
         <ReportLeaveModal
           data={data}
-          onClose={() => setReportModalOpen(false)}
-          onSent={() => setReportModalOpen(false)}
+          initialEndDate={calendarDates?.endDate}
+          initialStartDate={calendarDates?.startDate}
+          onClose={() => {
+            setCalendarDates(null);
+            setReportModalOpen(false);
+          }}
+          onSent={() => {
+            setCalendarDates(null);
+            setReportModalOpen(false);
+          }}
         />
       ) : null}
 
@@ -87,29 +124,32 @@ function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
       getLeaveBalanceSortRank(right.typeLabel)
     );
   });
-  const initials = getInitials(data.faculty.name);
-
   return (
     <section className="rounded-[1.1rem] border border-[#d8d2c7] bg-white p-6 shadow-[0_2px_10px_rgba(33,24,14,0.08)]">
-      <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#123a73] text-sm font-bold text-white">
-          {initials}
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-[1.7rem] leading-tight font-bold text-[#123a73]">
-            {data.faculty.name}
-          </h1>
-          <p className="text-[0.98rem] text-[#625a4f]">
-            {data.faculty.jobTitle ?? 'Faculty'}
-            {data.faculty.email ? ` · ${data.faculty.email}` : ''}
-          </p>
-          <p className="text-sm text-[#756c61]">
-            {data.faculty.employeeClass ??
-              data.faculty.departmentCode ??
-              data.faculty.departmentName ??
-              'Faculty appointment'}
-          </p>
-        </div>
+      <div className="min-w-0">
+        <h1 className="text-[1.7rem] leading-tight font-bold text-[#123a73]">
+          {data.faculty.name}
+        </h1>
+        <p className="text-[0.98rem] text-[#625a4f]">
+          {data.faculty.jobTitle ?? 'Faculty'}
+          {data.faculty.email ? (
+            <>
+              {' · '}
+              <a
+                className="underline decoration-[#625a4f]/50 underline-offset-2 hover:text-[#123a73]"
+                href={`mailto:${data.faculty.email}`}
+              >
+                {data.faculty.email}
+              </a>
+            </>
+          ) : null}
+        </p>
+        <p className="text-sm text-[#756c61]">
+          {data.faculty.employeeClass ??
+            data.faculty.departmentCode ??
+            data.faculty.departmentName ??
+            'Faculty appointment'}
+        </p>
       </div>
 
       <div className="mt-5 space-y-5">
@@ -148,15 +188,4 @@ function ReadOnlyBalanceRow({ balance }: { balance: FacultyAccrualBalance }) {
       </div>
     </article>
   );
-}
-
-function getInitials(name: string) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-
-  return initials || 'F';
 }

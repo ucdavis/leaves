@@ -182,12 +182,19 @@ public class UserService : IUserService
         var isAdmin = await _dbContext.AppAdminAssignments
             .AsNoTracking()
             .AnyAsync(assignment => assignment.IamId.Trim() == iamId);
-        var isFaculty = await _dbContext.People
+        var hasCurrentAccrualBalance = await (
+                from person in _dbContext.People
+                join balance in _dbContext.EmployeeAccrualBalances
+                    on person.EmployeeId equals balance.EmployeeId
+                where person.IamId.Trim() == iamId
+                select balance.EmployeeId)
+            .AnyAsync();
+        var isFaculty = hasCurrentAccrualBalance && await _dbContext.People
             .AnyAsync(person =>
                 person.IamId.Trim() == iamId &&
                 person.IsEmployee == true &&
                 person.IsFaculty == true);
-        var isChair = await _dbContext.DepartmentChairAssignments
+        var isChair = hasCurrentAccrualBalance && await _dbContext.DepartmentChairAssignments
             .AsNoTracking()
             .AnyAsync(assignment =>
                 assignment.IamId.Trim() == iamId &&

@@ -6,10 +6,12 @@ import { Toast } from '@/shared/Toast.tsx';
 import type { ApprovalDecision } from './approvalTypes.ts';
 
 export type ApprovalToastMessage = {
-  decision: ApprovalDecision;
   facultyName: string;
   id: number;
-};
+} & (
+  | { decision: ApprovalDecision; kind: 'decision' }
+  | { kind: 'alreadyHandled' }
+);
 
 export function ApprovalToast({
   message,
@@ -22,7 +24,8 @@ export function ApprovalToast({
     return null;
   }
 
-  const isApproval = message.decision === 'approved';
+  const isAlreadyHandled = message.kind === 'alreadyHandled';
+  const isApproval = message.kind === 'decision' && message.decision === 'approved';
   const Icon = isApproval ? CheckCircleIcon : XCircleIcon;
 
   return (
@@ -30,9 +33,11 @@ export function ApprovalToast({
       autoDismissMs={3000}
       icon={Icon}
       onDismiss={onDismiss}
-      tone={isApproval ? 'success' : 'error'}
+      tone={isAlreadyHandled || isApproval ? 'success' : 'error'}
     >
-      {message.facultyName}&apos;s request was {message.decision}.
+      {isAlreadyHandled
+        ? `${message.facultyName}'s request was already handled by another approver.`
+        : `${message.facultyName}'s request was ${message.decision}.`}
     </Toast>
   );
 }

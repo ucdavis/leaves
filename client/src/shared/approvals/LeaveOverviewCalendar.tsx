@@ -55,7 +55,7 @@ export function LeaveOverviewCalendar({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="h2 text-primary">
-            {scope === 'cluster' ? 'BFTV Cluster' : 'Team'}: Leave Overview
+            {scope === 'cluster' ? 'Cluster' : 'Team'}: Leave Overview
           </h1>
         </div>
         <span className="rounded-full bg-secondary/70 px-4 py-1 text-sm font-bold text-primary">
@@ -97,7 +97,7 @@ export function LeaveOverviewCalendar({
                   className="w-9 border-r border-base-300 bg-base-200 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0"
                   key={day.isoDate}
                 >
-                  {day.dayOfMonth}
+                  <time dateTime={day.isoDate}>{day.dayOfMonth}</time>
                 </th>
               ))}
             </tr>
@@ -200,7 +200,7 @@ function CalendarDayCell({
   return (
     <td className="h-11 border-r border-t border-base-300 p-0 last:border-r-0">
       <button
-        aria-label={`View ${leave.leaveType} for ${facultyName}`}
+        aria-label={`View ${leave.status === 'PendingApproval' ? 'pending' : 'approved'} ${leave.leaveType} for ${facultyName}, ${formatDateRange(leave.startDate, leave.endDate)}; ${format(day.date, 'MMMM d, yyyy')}`}
         className={`block h-full w-full ${tone.background} text-left transition hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-inset ${
           startsOnDay ? `border-l-4 ${tone.border}` : ''
         } ${endsOnDay ? 'rounded-r-sm' : ''}`}

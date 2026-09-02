@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HttpError } from '@/lib/api.ts';
 import type { RouterContext } from '@/main.tsx';
-import { facultyDashboardQueryOptions } from '@/queries/faculty.ts';
+import {
+  facultyDashboardQueryOptions,
+  facultyHistoryQueryOptions,
+} from '@/queries/faculty.ts';
 import { meQueryOptions } from '@/queries/user.ts';
 import {
   canAccessApprovalWorkspace,
@@ -32,10 +35,16 @@ export const Route = createFileRoute('/(authenticated)/')({
     }
   },
   component: RouteComponent,
+  validateSearch: (search: Record<string, unknown>) => ({
+    calendarDate:
+      typeof search.calendarDate === 'string' ? search.calendarDate : undefined,
+  }),
 });
 
 function RouteComponent() {
   const dashboardQuery = useQuery(facultyDashboardQueryOptions());
+  const historyQuery = useQuery(facultyHistoryQueryOptions());
+  const { calendarDate } = Route.useSearch();
 
   if (dashboardQuery.isLoading) {
     return (
@@ -63,5 +72,11 @@ function RouteComponent() {
     );
   }
 
-  return <FacultyDashboardPage data={dashboardQuery.data} />;
+  return (
+    <FacultyDashboardPage
+      calendarDate={calendarDate}
+      calendarRequests={historyQuery.data?.recentRequests}
+      data={dashboardQuery.data}
+    />
+  );
 }

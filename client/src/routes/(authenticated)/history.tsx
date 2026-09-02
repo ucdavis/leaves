@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { HttpError } from '@/lib/api.ts';
 import { useState } from 'react';
 import { RouterContext } from '@/main.tsx';
@@ -114,16 +113,7 @@ function HistoryContent({
 
   return (
     <div className="container py-8 lg:py-10">
-      <button
-        className="btn btn-ghost mb-5"
-        onClick={() => void navigate({ to: '/' })}
-        type="button"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
-        Back to dashboard
-      </button>
-
-      <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm mt-10">
+      <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-lg font-bold text-primary">Request History</h1>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -152,6 +142,12 @@ function HistoryContent({
         <RequestHistoryTable
           key={selectedType}
           onSelectRequest={onRequestSelected}
+          onShowInCalendar={(request) =>
+            void navigate({
+              search: { calendarDate: request.startDate },
+              to: '/',
+            })
+          }
           requests={requests}
         />
       </section>

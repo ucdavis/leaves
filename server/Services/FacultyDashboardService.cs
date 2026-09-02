@@ -119,7 +119,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             normalizedTargetIamId,
             cancellationToken);
 
-        if (viewerEmployee == null || targetUser == null || targetEmployee == null)
+        if (viewerEmployee == null || targetEmployee == null)
         {
             return FacultyDashboardViewerResult.TargetNotFound();
         }
@@ -136,10 +136,13 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             return FacultyDashboardViewerResult.Forbidden();
         }
 
+        var assignedCaoClusterIds = await GetActiveCaoClusterIdsAsync(
+            viewer.IamId,
+            cancellationToken);
         var isCao = HasRole(principal, CaoRole);
         var canViewTarget = isCao
-            ? viewerDepartment.ClusterId.HasValue &&
-                viewerDepartment.ClusterId == targetDepartment.ClusterId
+            ? targetDepartment.ClusterId.HasValue &&
+                assignedCaoClusterIds.Contains(targetDepartment.ClusterId.Value)
             : string.Equals(
                 viewerDepartment.DepartmentCode,
                 targetDepartment.DepartmentCode,
@@ -156,15 +159,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(
             normalizedTargetIamId,
             cancellationToken);
-        var recentRequests = await GetLeaveRequestsAsync(
-            targetUser.Id,
-            RecentRequestsLimit,
-            cancellationToken);
+        var recentRequests = targetUser == null
+            ? []
+            : await GetLeaveRequestsAsync(
+                targetUser.Id,
+                RecentRequestsLimit,
+                cancellationToken);
         var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
 
         return FacultyDashboardViewerResult.Success(
             BuildDashboardResponse(
-                targetUser,
+                targetUser ?? new AppUser
+                {
+                    DisplayName = targetEmployee.DisplayName,
+                    EntraObjectId = Guid.Empty,
+                    FirstLoginUtc = DateTime.MinValue,
+                    IamId = normalizedTargetIamId,
+                    IsActive = true,
+                },
                 normalizedTargetIamId,
                 targetEmployee,
                 targetDepartment,
@@ -616,6 +628,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .SingleOrDefaultAsync(department => department.DepartmentCode == departmentCode, cancellationToken);
     }
 
+    private async Task<HashSet<int>> GetActiveCaoClusterIdsAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.ClusterCaoAssignments
+                .AsNoTracking()
+                .Where(assignment =>
+                    assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue ||
+                        assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.ClusterId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+    }
+
     private static Dictionary<string, string[]> ValidateRequestShape(
         CreateFacultyLeaveRequest request,
         LeaveType leaveType)
@@ -641,7 +671,11 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             errors["endDate"] = ["End date must be on or after the start date."];
         }
 
-        if (!allowsZeroHours && request.TotalHours <= 0)
+        if (request.TotalHours < 0)
+        {
+            errors["totalHours"] = ["Total hours cannot be negative."];
+        }
+        else if (!allowsZeroHours && request.TotalHours == 0)
         {
             errors["totalHours"] = ["Total hours must be greater than zero."];
         }

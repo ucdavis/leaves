@@ -85,9 +85,19 @@ function RouteComponent() {
           decision,
           facultyName: request.facultyName,
           id: request.id,
+          kind: 'decision',
         });
-      } catch {
-        // Let the panel remain visible so the user can retry.
+      } catch (error) {
+        if (error instanceof HttpError && (error.status === 404 || error.status === 409)) {
+          await queryClient.invalidateQueries({
+            queryKey: approvalWorkspaceQueryOptions().queryKey,
+          });
+          setToastMessage({
+            facultyName: request.facultyName,
+            id: request.id,
+            kind: 'alreadyHandled',
+          });
+        }
       }
     })();
 

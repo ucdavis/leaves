@@ -13,9 +13,11 @@ import {
 
 export function RequestHistoryTable({
   onSelectRequest,
+  onShowInCalendar,
   requests,
 }: {
   onSelectRequest: (request: FacultyLeaveRequest) => void;
+  onShowInCalendar?: (request: FacultyLeaveRequest) => void;
   requests: FacultyLeaveRequest[];
 }) {
   const columns = useMemo<ColumnDef<FacultyLeaveRequest>[]>(
@@ -80,8 +82,28 @@ export function RequestHistoryTable({
         ),
         header: 'Status',
       },
+      ...(onShowInCalendar
+        ? [
+            {
+              cell: ({ row }) => (
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onShowInCalendar(row.original);
+                  }}
+                  type="button"
+                >
+                  Show in calendar
+                </button>
+              ),
+              header: '',
+              id: 'showInCalendar',
+            } satisfies ColumnDef<FacultyLeaveRequest>,
+          ]
+        : []),
     ],
-    [onSelectRequest]
+    [onSelectRequest, onShowInCalendar]
   );
 
   if (requests.length === 0) {

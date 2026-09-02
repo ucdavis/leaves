@@ -249,10 +249,14 @@ function RequestNote({ note }: { note?: string | null }) {
 
 export function ReportLeaveModal({
   data,
+  initialEndDate,
+  initialStartDate,
   onClose,
   onSent,
 }: {
   data: FacultyDashboardResponse;
+  initialEndDate?: string;
+  initialStartDate?: string;
   onClose: () => void;
   onSent: (message: string) => void;
 }) {
@@ -262,6 +266,8 @@ export function ReportLeaveModal({
     <Modal onClose={onClose} title={title}>
       <LeaveRequestForm
         data={data}
+        initialEndDate={initialEndDate}
+        initialStartDate={initialStartDate}
         onClose={onClose}
         onSent={onSent}
         onSubmitted={onClose}
@@ -273,12 +279,16 @@ export function ReportLeaveModal({
 
 function LeaveRequestForm({
   data,
+  initialEndDate,
+  initialStartDate,
   onClose,
   onSent,
   onSubmitted,
   onTitleChange,
 }: {
   data: FacultyDashboardResponse;
+  initialEndDate?: string;
+  initialStartDate?: string;
   onClose: () => void;
   onSent: (message: string) => void;
   onSubmitted: () => void;
@@ -293,20 +303,28 @@ function LeaveRequestForm({
   const payTypeOptions = getFmlaPayTypeOptions(data);
   const defaultValues: LeaveRequestFormValues = {
     approvedInMyInfoVault: false,
-    dateSelection: 'single',
-    endDate: '',
+    dateSelection:
+      initialEndDate && initialEndDate !== initialStartDate
+        ? 'range'
+        : 'single',
+    endDate: initialEndDate ?? '',
     leaveTypeId: '',
     note: '',
     payLeaveTypeId: '',
-    startDate: '',
+    startDate: initialStartDate ?? '',
     totalHours: '',
   };
   const requestMutation = useMutation({
     mutationFn: createFacultyLeaveRequest,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['faculty'],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['approval-workspace'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['faculty'],
+        }),
+      ]);
     },
   });
 
@@ -416,8 +434,6 @@ function LeaveRequestForm({
 
                       field.handleChange(nextLeaveTypeId);
                       form.setFieldValue('approvedInMyInfoVault', false);
-                      form.setFieldValue('dateSelection', 'single');
-                      form.setFieldValue('endDate', '');
                       form.setFieldValue('payLeaveTypeId', '');
                       form.setFieldValue('totalHours', '');
 
@@ -880,9 +896,8 @@ function LeaveTypeNotice({ selectedLeaveType }: { selectedLeaveType: string }) {
           </a>{' '}
           before entering here.
         </span>{' '}
-        Enter your approved sabbatical dates below. This will automatically set
-        up a monthly debit of 16 hours from your vacation balance for the
-        duration of the sabbatical.
+        Enter your approved sabbatical dates below. This request records the
+        approved period; vacation debits are managed outside this application.
       </NoticePanel>
     );
   }
