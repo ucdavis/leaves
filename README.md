@@ -50,6 +50,8 @@ _Using the DevContainer is optional, but it will get you the right version of do
 
    `npm run db:up` starts the SQL Server container from the same Compose file used by the DevContainer. `npm start` starts the .NET backend on port `5165` with a CLI-specific launch profile, waits for health check, and then starts the Vite dev server on port `5173` which opens the browser.
 
+   Database migrations run whenever the backend starts. Development data is not seeded unless `DevelopmentData__SeedOnStartup=true` is explicitly configured. Only enable it for a disposable development database. The isolated `./dev/sandbox up` environment enables it automatically.
+
    **Visual Studio (Windows)**:
 
    Prerequisites:
