@@ -25,6 +25,7 @@ interface DataTableProps<TData extends object> {
   getRowProps?: (row: Row<TData>) => HTMLAttributes<HTMLTableRowElement>;
   globalFilter?: 'left' | 'right' | 'none'; // Controls the position of the search box
   initialState?: InitialTableState; // Optional initial state for the table, use for stuff like setting page size or sorting
+  showPageCount?: boolean;
   tableActions?: TableActionsRenderer<TData>;
   tableClassName?: string;
 }
@@ -36,6 +37,7 @@ export const DataTable = <TData extends object>({
   getRowProps,
   globalFilter = 'right',
   initialState,
+  showPageCount = false,
   tableActions,
   tableClassName,
 }: DataTableProps<TData>) => {
@@ -172,12 +174,17 @@ export const DataTable = <TData extends object>({
               return (
                 <tr
                   {...rowProps}
-                  className={['', rowProps?.className].filter(Boolean).join(' ')}
+                  className={['', rowProps?.className]
+                    .filter(Boolean)
+                    .join(' ')}
                   key={row.id}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -186,7 +193,13 @@ export const DataTable = <TData extends object>({
           </tbody>
         </table>
 
-        <div className="flex justify-end space-x-2 py-2">
+        <div className="flex items-center justify-end gap-3 py-2">
+          {showPageCount ? (
+            <span aria-live="polite" className="text-sm text-base-content/70">
+              Page {table.getState().pagination.pageIndex + 1} of{' '}
+              {table.getPageCount()}
+            </span>
+          ) : null}
           <button
             className="btn btn-xs"
             disabled={!table.getCanPreviousPage()}

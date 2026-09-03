@@ -122,9 +122,10 @@ export function RequestHistoryTable({
       globalFilter="none"
       initialState={{
         pagination: {
-          pageSize: 24,
+          pageSize: 10,
         },
       }}
+      showPageCount
       tableClassName="table-zebra"
     />
   );

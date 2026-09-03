@@ -168,7 +168,9 @@ function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
 }
 
 function ReadOnlyBalanceRow({ balance }: { balance: FacultyAccrualBalance }) {
-  const tone = getLeaveTone(balance.typeLabel);
+  const hasAccrualCap = balance.accrualLimit > 0;
+  const tone = hasAccrualCap ? getLeaveTone(balance.typeLabel) : undefined;
+  const percentage = hasAccrualCap ? getBalancePercentage(balance) : 0;
 
   return (
     <article>
@@ -176,16 +178,27 @@ function ReadOnlyBalanceRow({ balance }: { balance: FacultyAccrualBalance }) {
         <div className="text-lg font-semibold text-[#1f1a14]">
           {balance.typeLabel}
         </div>
-        <div className={`text-xl font-bold ${tone.text}`}>
+        <div className="text-xl font-bold text-[#123a73]">
           {formatHours(balance.calculatedBalance)}
         </div>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-[#d6e7df]">
-        <div
-          className={`h-full rounded-full ${tone.bar}`}
-          style={{ width: `${getBalancePercentage(balance)}%` }}
-        />
-      </div>
+      {hasAccrualCap && tone ? (
+        <>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#d6e7df]">
+            <div
+              className={`h-full rounded-full ${tone.bar}`}
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-[#756c61]">
+            {formatHours(balance.calculatedBalance)} of{' '}
+            {formatHours(balance.accrualLimit)} · {Math.round(percentage)}% of
+            cap
+          </div>
+        </>
+      ) : (
+        <div className="text-sm text-[#756c61]">No accrual cap</div>
+      )}
     </article>
   );
 }

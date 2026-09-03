@@ -21,15 +21,15 @@ export function AccrualBalancePanel({
   });
 
   return (
-    <section className="min-h-72 rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
-      <div className="mb-6 flex items-center justify-between gap-4">
+    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+      <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="font-bold text-primary">Leave Balances</h2>
         <span className="rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-base-content/50">
           Source: UCPath
         </span>
       </div>
 
-      <div className="space-y-7">
+      <div className="space-y-5">
         {orderedBalances.length > 0 ? (
           orderedBalances.map((balance) => (
             <AccrualBalanceBar balance={balance} key={balance.typeLabel} />
@@ -43,28 +43,35 @@ export function AccrualBalancePanel({
 }
 
 function AccrualBalanceBar({ balance }: { balance: FacultyAccrualBalance }) {
-  const percentage = getBalancePercentage(balance);
-  const tone = getLeaveTone(balance.typeLabel);
+  const hasAccrualCap = balance.accrualLimit > 0;
+  const tone = hasAccrualCap ? getLeaveTone(balance.typeLabel) : undefined;
+  const percentage = hasAccrualCap ? getBalancePercentage(balance) : 0;
 
   return (
     <article>
       <div className="mb-2 flex items-center justify-between gap-3 text-sm">
         <div className="font-bold">{balance.typeLabel}</div>
-        <div className={`font-bold ${tone.text}`}>
+        <div className="font-bold text-base-content">
           {formatHours(balance.calculatedBalance)}
         </div>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-base-200">
-        <div
-          className={`h-full rounded-full ${tone.bar}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      {balance.accrualLimit > 0 ? (
-        <div className="mt-2 text-right text-xs text-base-content/50">
-          Cap: {formatHours(balance.accrualLimit)}
-        </div>
-      ) : null}
+      {hasAccrualCap && tone ? (
+        <>
+          <div className="h-2 overflow-hidden rounded-full bg-base-200">
+            <div
+              className={`h-full rounded-full ${tone.bar}`}
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-base-content/60">
+            {formatHours(balance.calculatedBalance)} of{' '}
+            {formatHours(balance.accrualLimit)} · {Math.round(percentage)}% of
+            cap
+          </div>
+        </>
+      ) : (
+        <div className="text-xs text-base-content/60">No accrual cap</div>
+      )}
     </article>
   );
 }

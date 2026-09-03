@@ -28,6 +28,7 @@ import {
   reportLeaveButtonClass,
 } from './FacultyDashboardPanels.tsx';
 import { RequestStatusBadge } from './FacultyDashboardPanels.tsx';
+import { getLeaveDayCount } from '@/shared/calendar/universityHolidays.ts';
 import { getValidationErrorMessage } from '@/shared/forms/validationError.ts';
 
 const myInfoVaultUrl = 'https://myinfovault.ucdavis.edu/';
@@ -54,6 +55,8 @@ type LeaveRequestFormValues = {
   approvedInMyInfoVault: boolean;
   dateSelection: 'single' | 'range';
   endDate: string;
+  excludeUniversityHolidays: boolean;
+  excludeWeekends: boolean;
   leaveTypeId: string;
   note: string;
   payLeaveTypeId: string;
@@ -67,6 +70,8 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
       approvedInMyInfoVault: z.boolean(),
       dateSelection: z.enum(['single', 'range']),
       endDate: z.string(),
+      excludeUniversityHolidays: z.boolean(),
+      excludeWeekends: z.boolean(),
       leaveTypeId: z.string().min(1, 'Select a leave type.'),
       note: z.string().trim().max(1000, 'Note is too long.'),
       payLeaveTypeId: z.string(),
@@ -308,6 +313,8 @@ function LeaveRequestForm({
         ? 'range'
         : 'single',
     endDate: initialEndDate ?? '',
+    excludeUniversityHolidays: true,
+    excludeWeekends: true,
     leaveTypeId: '',
     note: '',
     payLeaveTypeId: '',
@@ -396,6 +403,12 @@ function LeaveRequestForm({
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
+  const leaveDayCount = getLeaveDayCount(
+    formValues.startDate,
+    usesDateRange ? formValues.endDate : formValues.startDate,
+    usesDateRange && formValues.excludeWeekends,
+    usesDateRange && formValues.excludeUniversityHolidays
+  );
 
   return (
     <>
@@ -542,34 +555,63 @@ function LeaveRequestForm({
             )}
 
             {usesDateRange ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <form.AppField name="startDate">
-                  {(field) => (
-                    <field.TextField
-                      label={
-                        selectedLeaveType === sabbaticalLeaveTypeLabel
-                          ? 'Start Date'
-                          : 'Range Start Date'
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.AppField name="startDate">
+                    {(field) => (
+                      <field.TextField
+                        label={
+                          selectedLeaveType === sabbaticalLeaveTypeLabel
+                            ? 'Start Date'
+                            : 'Range Start Date'
+                        }
+                        required
+                        type="date"
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="endDate">
+                    {(field) => (
+                      <field.TextField
+                        label={
+                          selectedLeaveType === sabbaticalLeaveTypeLabel
+                            ? 'End Date'
+                            : 'Range End Date'
+                        }
+                        required
+                        type="date"
+                      />
+                    )}
+                  </form.AppField>
+                </div>
+                {requiresHours ? (
+                  <>
+                    <form.AppField name="excludeWeekends">
+                      {(field) => (
+                        <field.CheckboxField
+                          description="Do not count Saturdays or Sundays in the range calculation."
+                          label="Exclude weekends"
+                        />
+                      )}
+                    </form.AppField>
+                    <form.AppField name="excludeUniversityHolidays">
+                      {(field) => (
+                        <field.CheckboxField
+                          description="Do not count UC Davis holidays or academic breaks in the range calculation."
+                          label="Exclude university holidays"
+                        />
+                      )}
+                    </form.AppField>
+                    <LeaveDayCalculation
+                      excludesUniversityHolidays={
+                        formValues.excludeUniversityHolidays
                       }
-                      required
-                      type="date"
+                      excludesWeekends={formValues.excludeWeekends}
+                      leaveDayCount={leaveDayCount}
                     />
-                  )}
-                </form.AppField>
-                <form.AppField name="endDate">
-                  {(field) => (
-                    <field.TextField
-                      label={
-                        selectedLeaveType === sabbaticalLeaveTypeLabel
-                          ? 'End Date'
-                          : 'Range End Date'
-                      }
-                      required
-                      type="date"
-                    />
-                  )}
-                </form.AppField>
-              </div>
+                  </>
+                ) : null}
+              </>
             ) : (
               <form.AppField name="startDate">
                 {(field) => (
@@ -631,6 +673,48 @@ function LeaveRequestForm({
       </form>
     </>
   );
+}
+
+function LeaveDayCalculation({
+  excludesUniversityHolidays,
+  excludesWeekends,
+  leaveDayCount,
+}: {
+  excludesUniversityHolidays: boolean;
+  excludesWeekends: boolean;
+  leaveDayCount: number;
+}) {
+  if (leaveDayCount === 0) {
+    return null;
+  }
+
+  return (
+    <p className="-mt-2 text-sm text-base-content/70">
+      {leaveDayCount} {leaveDayCount === 1 ? 'leave day' : 'leave days'} in this
+      range
+      {getExclusionDescription(excludesWeekends, excludesUniversityHolidays)}.
+      At 8 hours per day, that is {leaveDayCount * 8} suggested hours.
+    </p>
+  );
+}
+
+function getExclusionDescription(
+  excludesWeekends: boolean,
+  excludesUniversityHolidays: boolean
+) {
+  if (excludesWeekends && excludesUniversityHolidays) {
+    return ', excluding weekends and university holidays';
+  }
+
+  if (excludesWeekends) {
+    return ', excluding weekends';
+  }
+
+  if (excludesUniversityHolidays) {
+    return ', excluding university holidays';
+  }
+
+  return '';
 }
 
 function FacultySummary({

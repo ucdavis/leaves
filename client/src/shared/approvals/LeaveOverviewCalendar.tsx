@@ -1,7 +1,4 @@
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from '@tanstack/react-router';
 import {
   addMonths,
@@ -14,6 +11,7 @@ import {
   startOfMonth,
 } from 'date-fns';
 import { useMemo, useState } from 'react';
+import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
 import type {
   ApprovalScope,
   CalendarFaculty,
@@ -94,8 +92,9 @@ export function LeaveOverviewCalendar({
               </th>
               {days.map((day) => (
                 <th
-                  className="w-9 border-r border-base-300 bg-base-200 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0"
+                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0 ${getUniversityHoliday(day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
                   key={day.isoDate}
+                  title={getUniversityHoliday(day.isoDate)?.name}
                 >
                   <time dateTime={day.isoDate}>{day.dayOfMonth}</time>
                 </th>
@@ -187,9 +186,20 @@ function CalendarDayCell({
   leave?: CalendarLeave;
   onSelectFaculty: (facultyId: string) => void;
 }) {
+  const holiday = getUniversityHoliday(day.isoDate);
+  const dayClassName = holiday
+    ? 'bg-sky-100'
+    : isWeekend(day.date)
+      ? 'bg-base-300/50'
+      : 'bg-base-100';
+
   if (!leave) {
     return (
-      <td className="h-11 border-r border-t border-base-300 bg-base-100 p-0 last:border-r-0" />
+      <td
+        aria-label={holiday?.name}
+        className={`h-11 border-r border-t border-base-300 p-0 last:border-r-0 ${dayClassName}`}
+        title={holiday?.name}
+      />
     );
   }
 
@@ -198,7 +208,9 @@ function CalendarDayCell({
   const endsOnDay = leave.endDate === day.isoDate;
 
   return (
-    <td className="h-11 border-r border-t border-base-300 p-0 last:border-r-0">
+    <td
+      className={`h-11 border-r border-t border-base-300 p-0 last:border-r-0 ${dayClassName}`}
+    >
       <button
         aria-label={`View ${leave.status === 'PendingApproval' ? 'pending' : 'approved'} ${leave.leaveType} for ${facultyName}, ${formatDateRange(leave.startDate, leave.endDate)}; ${format(day.date, 'MMMM d, yyyy')}`}
         className={`block h-full w-full ${tone.background} text-left transition hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-inset ${
@@ -259,6 +271,10 @@ function buildMonthDays(month: Date) {
     dayOfMonth: format(day, 'd'),
     isoDate: format(day, 'yyyy-MM-dd'),
   }));
+}
+
+function isWeekend(date: Date) {
+  return date.getDay() === 0 || date.getDay() === 6;
 }
 
 function leaveIncludesDay(leave: CalendarLeave, day: MonthDay) {

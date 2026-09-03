@@ -15,6 +15,7 @@ import type {
   FacultyDashboardResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
+import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
 import { RequestDetailModal } from './FacultyDashboardModals.tsx';
 import { formatDateRange, getLeaveTone } from './FacultyDashboardPanels.tsx';
 
@@ -24,6 +25,14 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 export const calendarLegend = [
+  {
+    className: 'border-sky-300 bg-sky-100 text-sky-800',
+    label: 'University holiday or break',
+  },
+  {
+    className: 'border-base-300 bg-base-300/50 text-base-content/70',
+    label: 'Weekend',
+  },
   { className: 'border-blue-500 bg-blue-100 text-blue-800', label: 'Vacation' },
   {
     className: 'border-emerald-500 bg-emerald-100 text-emerald-800',
@@ -192,18 +201,27 @@ export function LeaveCalendar({
           const dayRequests = day
             ? (requestsByDate.get(day.isoDate) ?? [])
             : [];
+          const holiday = day && getUniversityHoliday(day.isoDate);
+          const isWeekend =
+            day && (day.date.getDay() === 0 || day.date.getDay() === 6);
 
           return (
             <div
-              className={`min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
-                day ? 'hover:bg-base-200' : 'bg-base-200/40'
+              className={`relative min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
+                holiday
+                  ? 'bg-sky-100 hover:bg-sky-200'
+                  : isWeekend
+                    ? 'bg-base-300/50 hover:bg-base-300/70'
+                    : day
+                      ? 'hover:bg-base-200'
+                      : 'bg-base-200/40'
               } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
                 day ? 'cursor-pointer' : ''
               }`}
               key={day?.isoDate ?? `blank-${index}`}
               onClick={() => day && selectDate(day.isoDate)}
               onKeyDown={(event) => {
-                if (!day) {
+                if (!day || event.target !== event.currentTarget) {
                   return;
                 }
 
@@ -218,6 +236,11 @@ export function LeaveCalendar({
               {day ? (
                 <>
                   <div className="text-xs font-semibold">{day.dayOfMonth}</div>
+                  {holiday ? (
+                    <span className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[10px] font-bold leading-tight text-sky-800">
+                      {holiday.name}
+                    </span>
+                  ) : null}
                   <div className="mt-3 space-y-1">
                     {dayRequests.map((request) => {
                       const tone = getLeaveTone(request.leaveType);
@@ -286,6 +309,7 @@ function buildCalendarDays(visibleMonth: Date) {
   return days.map((day) =>
     isSameMonth(day, visibleMonth)
       ? {
+          date: day,
           dayOfMonth: day.getDate(),
           isoDate: format(day, 'yyyy-MM-dd'),
         }
