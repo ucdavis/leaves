@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
+import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
 import type { RouterContext } from '@/main.tsx';
 import {
@@ -15,7 +16,17 @@ import {
 import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
 import { FacultyDashboardPage } from '@/shared/faculty/FacultyDashboardPage.tsx';
 
+const dashboardSearchSchema = z.object({
+  calendarDate: z.iso.date().optional(),
+});
+
 export const Route = createFileRoute('/(authenticated)/')({
+  validateSearch: (search: Record<string, unknown>) => {
+    const result = dashboardSearchSchema.safeParse(search);
+
+    return result.success ? result.data : {};
+  },
+  // TanStack Router requires URL validation before route lifecycle hooks.
   beforeLoad: async ({ context }: { context: RouterContext }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions());
 
@@ -35,10 +46,6 @@ export const Route = createFileRoute('/(authenticated)/')({
     }
   },
   component: RouteComponent,
-  validateSearch: (search: Record<string, unknown>) => ({
-    calendarDate:
-      typeof search.calendarDate === 'string' ? search.calendarDate : undefined,
-  }),
 });
 
 function RouteComponent() {

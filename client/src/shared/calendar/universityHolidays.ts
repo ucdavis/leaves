@@ -5,7 +5,7 @@ export type UniversityHoliday = {
 };
 
 /**
- * UC Davis closures and academic breaks published for 2025-26 and 2026-27.
+ * UC Davis closures published for 2025-26 through 2027-28.
  *
  * Add the next published academic year's dates here when it becomes available.
  */
@@ -19,10 +19,6 @@ export const universityHolidays: readonly UniversityHoliday[] = [
   { date: '2026-01-01', name: 'Winter Holiday' },
   { date: '2026-01-19', name: 'Martin Luther King, Jr. Day' },
   { date: '2026-02-16', name: 'Presidents’ Day' },
-  { date: '2026-03-23', name: 'Spring Break' },
-  { date: '2026-03-24', name: 'Spring Break' },
-  { date: '2026-03-25', name: 'Spring Break' },
-  { date: '2026-03-26', name: 'Spring Break' },
   { date: '2026-03-27', name: 'Farmworkers Day' },
   { date: '2026-05-25', name: 'Memorial Day' },
   { date: '2026-06-19', name: 'Juneteenth Holiday' },
@@ -37,15 +33,25 @@ export const universityHolidays: readonly UniversityHoliday[] = [
   { date: '2027-01-01', name: 'Winter Holiday' },
   { date: '2027-01-18', name: 'Martin Luther King, Jr. Day' },
   { date: '2027-02-15', name: 'Presidents’ Day' },
-  { date: '2027-03-22', name: 'Spring Break' },
-  { date: '2027-03-23', name: 'Spring Break' },
-  { date: '2027-03-24', name: 'Spring Break' },
-  { date: '2027-03-25', name: 'Spring Break' },
   { date: '2027-03-26', name: 'Farmworkers Day' },
   { date: '2027-05-31', name: 'Memorial Day' },
   { date: '2027-06-18', name: 'Juneteenth Holiday' },
   { date: '2027-07-05', name: 'Independence Day' },
   { date: '2027-09-06', name: 'Labor Day' },
+  { date: '2027-11-11', name: 'Veterans Day' },
+  { date: '2027-11-25', name: 'Thanksgiving Holiday' },
+  { date: '2027-11-26', name: 'Thanksgiving Holiday' },
+  { date: '2027-12-24', name: 'Winter Holiday' },
+  { date: '2027-12-27', name: 'Winter Holiday' },
+  { date: '2027-12-31', name: 'Winter Holiday' },
+  { date: '2028-01-03', name: 'Winter Holiday' },
+  { date: '2028-01-17', name: 'Martin Luther King, Jr. Day' },
+  { date: '2028-02-21', name: 'Presidents’ Day' },
+  { date: '2028-03-31', name: 'Farmworkers Day' },
+  { date: '2028-05-29', name: 'Memorial Day' },
+  { date: '2028-06-19', name: 'Juneteenth Holiday' },
+  { date: '2028-07-04', name: 'Independence Day' },
+  { date: '2028-09-04', name: 'Labor Day' },
 ];
 
 const holidaysByDate = new Map(
