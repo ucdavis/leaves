@@ -162,12 +162,17 @@ public sealed class AdminRolesService
             {
                 var chairDepartmentCode = assignment.DepartmentCode.Trim();
                 departmentsByCode.TryGetValue(chairDepartmentCode, out var department);
+                currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee);
                 return CreateAssignmentResponse(
                     active: IsRoleAssignmentActive(
                         currentEmployeesByIamId,
                         assignment.IamId,
                         true,
-                        department?.IsActive ?? false,
+                        (department?.IsActive ?? false) &&
+                            string.Equals(
+                                currentEmployee?.ResolvedReportingDepartmentCode?.Trim(),
+                                chairDepartmentCode,
+                                StringComparison.OrdinalIgnoreCase),
                         assignment.EffectiveStartDate,
                         assignment.EffectiveEndDateExclusive,
                         today,

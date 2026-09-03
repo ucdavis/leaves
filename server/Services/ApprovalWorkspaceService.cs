@@ -120,7 +120,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
         var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
         var departmentByCode = directoryData.Departments.ToDictionary(
-            department => NormalizeKey(department.DepartmentCode),
+            department => department.DepartmentCode.Trim(),
             department => department,
             StringComparer.OrdinalIgnoreCase);
 
@@ -253,7 +253,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             .Where(employee => !nonFacultyIamIds.Contains(employee.IamId.Trim()))
             .Where(employee =>
             {
-                var departmentCode = NormalizeKey(employee.ResolvedReportingDepartmentCode);
+                var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(departmentCode))
                 {
                     return false;
@@ -270,7 +270,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             })
             .Select(employee =>
             {
-                var departmentCode = NormalizeKey(employee.ResolvedReportingDepartmentCode);
+                var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim() ?? string.Empty;
                 departmentByCode.TryGetValue(departmentCode, out var department);
 
                 return new ApprovalWorkspaceFacultyResponse(
@@ -320,7 +320,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
         return HasRole(principal, ChairRole) &&
             (await LoadActiveChairDepartmentCodesAsync(iamId, cancellationToken))
-                .Contains(NormalizeKey(leaveRequest.ReportingDepartmentCodeSnapshot));
+                .Contains(leaveRequest.ReportingDepartmentCodeSnapshot.Trim());
     }
 
     private async Task<HashSet<int>> LoadActiveCaoClusterIdsAsync(
@@ -352,7 +352,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                     (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive > today))
                 .Select(assignment => assignment.DepartmentCode)
                 .ToListAsync(cancellationToken))
-            .Select(NormalizeKey)
+            .Select(code => code.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 

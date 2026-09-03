@@ -1082,7 +1082,8 @@ public class DbInitializer : IDbInitializer
             person.Email == seededPerson.Email &&
             person.IsEmployee == seededPerson.IsEmployee &&
             person.IsFaculty == seededPerson.IsFaculty &&
-            person.IsStaff == seededPerson.IsStaff)
+            person.IsStaff == seededPerson.IsStaff &&
+            person.SourceEndpoint == seededPerson.SourceEndpoint)
         {
             return false;
         }
@@ -1093,6 +1094,7 @@ public class DbInitializer : IDbInitializer
         person.IsEmployee = seededPerson.IsEmployee;
         person.IsFaculty = seededPerson.IsFaculty;
         person.IsStaff = seededPerson.IsStaff;
+        person.SourceEndpoint = seededPerson.SourceEndpoint;
         return true;
     }
 

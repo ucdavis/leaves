@@ -10,6 +10,7 @@ export type ApprovalToastMessage = {
   id: number;
 } & (
   | { decision: ApprovalDecision; kind: 'decision' }
+  | { kind: 'error' }
   | { kind: 'alreadyHandled' }
 );
 
@@ -37,7 +38,9 @@ export function ApprovalToast({
     >
       {isAlreadyHandled
         ? `${message.facultyName}'s request was already handled by another approver.`
-        : `${message.facultyName}'s request was ${message.decision}.`}
+        : message.kind === 'error'
+          ? `We could not update ${message.facultyName}'s request. Please try again.`
+          : `${message.facultyName}'s request was ${message.decision}.`}
     </Toast>
   );
 }

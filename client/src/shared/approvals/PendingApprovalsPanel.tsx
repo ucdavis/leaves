@@ -10,11 +10,11 @@ import {
 } from './approvalDisplay.ts';
 
 export function PendingApprovalsPanel({
-  disabledRequestId,
+  isSubmitting = false,
   onDecision,
   requests,
 }: {
-  disabledRequestId?: number | null;
+  isSubmitting?: boolean;
   onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
   requests: ApprovalRequest[];
 }) {
@@ -25,7 +25,7 @@ export function PendingApprovalsPanel({
         <div className="space-y-4">
           {requests.map((request) => (
             <ApprovalRequestCard
-              disabled={disabledRequestId === request.id}
+              disabled={isSubmitting}
               key={request.id}
               onDecision={onDecision}
               request={request}

@@ -82,6 +82,7 @@ export function LocalRoleSwitcher({
     <div className="dropdown dropdown-end" ref={containerRef}>
       <button
         aria-expanded={isOpen}
+        aria-label={`Open local role switcher for ${userName}`}
         className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
@@ -94,6 +95,9 @@ export function LocalRoleSwitcher({
             {authLabel}
           </div>
         </div>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary sm:hidden">
+          {getInitials(userName)}
+        </span>
         <span className="hidden shrink-0 text-primary-content/70 sm:block">
           ▾
         </span>
@@ -142,6 +146,18 @@ export function LocalRoleSwitcher({
       ) : null}
     </div>
   );
+}
+
+function getInitials(name: string) {
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || '?';
 }
 
 function getUserRoleLabel(roles: readonly string[]) {

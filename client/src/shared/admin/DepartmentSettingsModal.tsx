@@ -143,16 +143,6 @@ export function DepartmentSettingsModal({
   return (
     <>
       <AdminModalFrame
-        headerActions={
-          <button
-            className={`btn btn-outline btn-sm border-rose-300 text-rose-800 hover:border-rose-400 hover:bg-rose-100 ${statusTextColors.danger}`}
-            disabled={isDeleting}
-            onClick={() => setIsDeleteConfirmOpen(true)}
-            type="button"
-          >
-            Deactivate department
-          </button>
-        }
         maxWidthClassName="max-w-3xl"
         onRequestClose={onClose}
         title="Department settings"
@@ -302,6 +292,14 @@ export function DepartmentSettingsModal({
             ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
+              <button
+                className={`btn btn-outline border-rose-300 text-rose-800 hover:border-rose-400 hover:bg-rose-100 ${statusTextColors.danger}`}
+                disabled={isDeleting}
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                type="button"
+              >
+                Deactivate department
+              </button>
               <button className="btn btn-ghost" onClick={onClose} type="button">
                 Cancel
               </button>

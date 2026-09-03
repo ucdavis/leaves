@@ -34,6 +34,9 @@ function RouteComponent() {
   const [toastMessage, setToastMessage] = useState<ApprovalToastMessage | null>(
     null
   );
+  const [pendingRequestIds, setPendingRequestIds] = useState<Set<number>>(
+    new Set()
+  );
   const decisionMutation = useMutation({
     mutationFn: submitApprovalDecision,
     onSuccess: async () => {
@@ -76,6 +79,7 @@ function RouteComponent() {
     decision: ApprovalDecision
   ) =>
     void (async () => {
+      setPendingRequestIds((requestIds) => new Set(requestIds).add(request.id));
       try {
         await decisionMutation.mutateAsync({
           decision,
@@ -88,7 +92,10 @@ function RouteComponent() {
           kind: 'decision',
         });
       } catch (error) {
-        if (error instanceof HttpError && (error.status === 404 || error.status === 409)) {
+        if (
+          error instanceof HttpError &&
+          (error.status === 404 || error.status === 409)
+        ) {
           await queryClient.invalidateQueries({
             queryKey: approvalWorkspaceQueryOptions().queryKey,
           });
@@ -97,7 +104,19 @@ function RouteComponent() {
             id: request.id,
             kind: 'alreadyHandled',
           });
+        } else {
+          setToastMessage({
+            facultyName: request.facultyName,
+            id: request.id,
+            kind: 'error',
+          });
         }
+      } finally {
+        setPendingRequestIds((requestIds) => {
+          const nextRequestIds = new Set(requestIds);
+          nextRequestIds.delete(request.id);
+          return nextRequestIds;
+        });
       }
     })();
 
@@ -105,7 +124,7 @@ function RouteComponent() {
     <div className="container py-8 lg:py-10">
       <div className="mx-auto max-w-5xl">
         <PendingApprovalsPanel
-          disabledRequestId={decisionMutation.variables?.requestId ?? null}
+          isSubmitting={pendingRequestIds.size > 0}
           onDecision={handleDecision}
           requests={workspaceQuery.data.pendingRequests}
         />

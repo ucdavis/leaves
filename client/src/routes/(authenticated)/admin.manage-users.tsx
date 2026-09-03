@@ -108,7 +108,9 @@ function AdminUsersRoute() {
     () =>
       new Set(
         data.assignments
-          .filter((assignment) => assignment.type === 'admin')
+          .filter(
+            (assignment) => assignment.active && assignment.type === 'admin'
+          )
           .map((assignment) => assignment.iamId.toLowerCase())
       ),
     [data.assignments]
