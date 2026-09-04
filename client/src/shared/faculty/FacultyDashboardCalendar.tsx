@@ -15,11 +15,9 @@ import type {
   FacultyDashboardResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
+import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
 import { RequestDetailModal } from './FacultyDashboardModals.tsx';
-import {
-  formatDateRange,
-  getLeaveTone,
-} from './FacultyDashboardPanels.tsx';
+import { formatDateRange, getLeaveTone } from './FacultyDashboardPanels.tsx';
 
 const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'long',
@@ -27,6 +25,14 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 export const calendarLegend = [
+  {
+    className: 'border-sky-300 bg-sky-100 text-sky-800',
+    label: 'University holiday or break',
+  },
+  {
+    className: 'border-base-300 bg-base-300/50 text-base-content/70',
+    label: 'Weekend',
+  },
   { className: 'border-blue-500 bg-blue-100 text-blue-800', label: 'Vacation' },
   {
     className: 'border-emerald-500 bg-emerald-100 text-emerald-800',
@@ -45,8 +51,7 @@ export const calendarLegend = [
     label: 'FMLA',
   },
   {
-    className:
-      'border-dashed border-base-content/50 bg-base-200 text-base-content/70',
+    className: 'border-dashed border-warning/70 bg-warning/15 text-warning',
     label: 'Pending',
   },
 ] as const;
@@ -54,31 +59,70 @@ export const calendarLegend = [
 export const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function LeaveCalendar({
-  allowEmailPreview = true,
   faculty,
+  focusDate,
+  onReportLeave,
   requests,
 }: {
-  allowEmailPreview?: boolean;
   faculty: FacultyDashboardResponse['faculty'];
+  focusDate?: string;
+  onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
 }) {
-  const initialMonth = useMemo(
-    () => getInitialCalendarMonth(requests),
+  const visibleRequests = useMemo(
+    () => requests.filter((request) => !isDeniedRequest(request.status)),
     [requests]
+  );
+  const initialMonth = useMemo(
+    () => getInitialCalendarMonth(visibleRequests, focusDate),
+    [focusDate, visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
+  const [selectionStartDate, setSelectionStartDate] = useState<string | null>(
+    null
+  );
+  const [selectionEndDate, setSelectionEndDate] = useState<string | null>(null);
   const calendarDays = useMemo(
     () => buildCalendarDays(visibleMonth),
     [visibleMonth]
   );
-  const requestsByDate = useMemo(() => mapRequestsByDate(requests), [requests]);
+  const requestsByDate = useMemo(
+    () => mapRequestsByDate(visibleRequests),
+    [visibleRequests]
+  );
+
+  const selectDate = (date: string) => {
+    setSelectedDate(date);
+    if (!onReportLeave) {
+      return;
+    }
+
+    if (!selectionStartDate || selectionEndDate || date < selectionStartDate) {
+      setSelectionStartDate(date);
+      setSelectionEndDate(null);
+      return;
+    }
+
+    setSelectionEndDate(date);
+  };
+
+  const selectToday = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    setVisibleMonth(startOfMonth(new Date()));
+    setSelectedDate(today);
+    setSelectionStartDate(today);
+    setSelectionEndDate(null);
+  };
+
+  const selectedEndDate = selectionEndDate ?? selectionStartDate;
 
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <button
           className="btn btn-ghost btn-sm"
           onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
@@ -90,15 +134,59 @@ export function LeaveCalendar({
         <h2 className="font-bold text-primary">
           {monthFormatter.format(visibleMonth)}
         </h2>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
-          type="button"
-        >
-          Next
-          <ArrowRightIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={selectToday}
+            type="button"
+          >
+            Today
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
+            type="button"
+          >
+            Next
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {onReportLeave ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-base-content/70">
+            {selectionStartDate
+              ? selectionEndDate
+                ? `Selected ${formatDateRange(selectionStartDate, selectionEndDate)}`
+                : 'Select an end date, or add a single-day request.'
+              : 'Select a date or date range to report leave.'}
+          </span>
+          <button
+            className="btn btn-primary btn-sm"
+            disabled={!selectionStartDate}
+            onClick={() =>
+              selectionStartDate &&
+              onReportLeave(selectionStartDate, selectedEndDate!)
+            }
+            type="button"
+          >
+            Report Leave
+          </button>
+          {selectionStartDate ? (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setSelectionStartDate(null);
+                setSelectionEndDate(null);
+              }}
+              type="button"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-7 border-l border-t border-base-300">
         {weekdayLabels.map((label) => (
@@ -113,24 +201,33 @@ export function LeaveCalendar({
           const dayRequests = day
             ? (requestsByDate.get(day.isoDate) ?? [])
             : [];
+          const holiday = day && getUniversityHoliday(day.isoDate);
+          const isWeekend =
+            day && (day.date.getDay() === 0 || day.date.getDay() === 6);
 
           return (
             <div
-              className={`min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
-                day ? 'hover:bg-base-200' : 'bg-base-200/40'
+              className={`relative min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
+                holiday
+                  ? 'bg-sky-100 hover:bg-sky-200'
+                  : isWeekend
+                    ? 'bg-base-300/50 hover:bg-base-300/70'
+                    : day
+                      ? 'hover:bg-base-200'
+                      : 'bg-base-200/40'
               } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
                 day ? 'cursor-pointer' : ''
               }`}
               key={day?.isoDate ?? `blank-${index}`}
-              onClick={() => day && setSelectedDate(day.isoDate)}
+              onClick={() => day && selectDate(day.isoDate)}
               onKeyDown={(event) => {
-                if (!day) {
+                if (!day || event.target !== event.currentTarget) {
                   return;
                 }
 
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setSelectedDate(day.isoDate);
+                  selectDate(day.isoDate);
                 }
               }}
               role={day ? 'button' : undefined}
@@ -139,9 +236,15 @@ export function LeaveCalendar({
               {day ? (
                 <>
                   <div className="text-xs font-semibold">{day.dayOfMonth}</div>
+                  {holiday ? (
+                    <span className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[10px] font-bold leading-tight text-sky-800">
+                      {holiday.name}
+                    </span>
+                  ) : null}
                   <div className="mt-3 space-y-1">
                     {dayRequests.map((request) => {
                       const tone = getLeaveTone(request.leaveType);
+                      const pending = isPendingRequest(request.status);
 
                       return (
                         <button
@@ -155,6 +258,14 @@ export function LeaveCalendar({
                             event.stopPropagation();
                             setSelectedRequest(request);
                           }}
+                          style={
+                            pending
+                              ? {
+                                  backgroundImage:
+                                    'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 4px, transparent 4px 8px)',
+                                }
+                              : undefined
+                          }
                           type="button"
                         >
                           {request.leaveType}
@@ -180,7 +291,6 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
-          allowEmailPreview={allowEmailPreview}
           faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
@@ -199,6 +309,7 @@ function buildCalendarDays(visibleMonth: Date) {
   return days.map((day) =>
     isSameMonth(day, visibleMonth)
       ? {
+          date: day,
           dayOfMonth: day.getDate(),
           isoDate: format(day, 'yyyy-MM-dd'),
         }
@@ -206,7 +317,13 @@ function buildCalendarDays(visibleMonth: Date) {
   );
 }
 
-function getInitialCalendarMonth(requests: FacultyLeaveRequest[]) {
+function getInitialCalendarMonth(
+  requests: FacultyLeaveRequest[],
+  focusDate?: string
+) {
+  if (focusDate) {
+    return startOfMonth(parseISO(focusDate));
+  }
   const firstRequest = requests[0];
   if (firstRequest) {
     return startOfMonth(parseISO(firstRequest.startDate));
@@ -232,4 +349,12 @@ function mapRequestsByDate(requests: FacultyLeaveRequest[]) {
   }
 
   return map;
+}
+
+function isDeniedRequest(status: string) {
+  return status.toLowerCase().includes('denied');
+}
+
+function isPendingRequest(status: string) {
+  return status.toLowerCase().includes('pending');
 }

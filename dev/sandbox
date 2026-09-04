@@ -256,7 +256,7 @@ emit_json_status() {
   fi
 
   if [[ -n "${app_url}" ]]; then
-    auth_json="{\"admin\":\"${app_url}/login?as=admin&returnUrl=/\",\"requester\":\"${app_url}/login?as=requester&returnUrl=/\",\"unauthorized\":\"${app_url}/login?as=unauthorized&returnUrl=/\"}"
+    auth_json="{\"admin\":\"${app_url}/login?as=admin&returnUrl=/\",\"faculty\":\"${app_url}/login?as=faculty&returnUrl=/\",\"chair\":\"${app_url}/login?as=chair&returnUrl=/\",\"cao\":\"${app_url}/login?as=cao&returnUrl=/\",\"self\":\"${app_url}/login?as=self&returnUrl=/\"}"
   fi
 
   printf '{\n'
@@ -282,6 +282,9 @@ emit_human_status() {
     echo "Health: ${health_url}"
     echo "API: ${api_url}"
     echo "Admin login: ${app_url}/login?as=admin&returnUrl=/"
+    echo "Faculty login: ${app_url}/login?as=faculty&returnUrl=/"
+    echo "Chair login: ${app_url}/login?as=chair&returnUrl=/"
+    echo "CAO login: ${app_url}/login?as=cao&returnUrl=/"
   fi
 
   if [[ -n "${sql_port}" ]]; then

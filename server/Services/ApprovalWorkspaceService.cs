@@ -17,11 +17,18 @@ public interface IApprovalWorkspaceService
         int requestId,
         SubmitApprovalDecisionRequest request,
         CancellationToken cancellationToken);
+
+    Task<bool> DecideRequestAsync(
+        ClaimsPrincipal principal,
+        int requestId,
+        LeaveRequestActionType decision,
+        CancellationToken cancellationToken);
 }
 
 public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 {
     private const string CaoRole = "CAO";
+    private const string ChairRole = "Chair";
 
     private readonly IAdminDirectoryDataService _directoryDataService;
     private readonly AppDbContext _db;
@@ -38,70 +45,16 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         ClaimsPrincipal principal,
         CancellationToken cancellationToken)
     {
-        var appUser = await ResolveAppUserAsync(principal, cancellationToken);
-        if (appUser == null)
+        var context = await ResolveWorkspaceContextAsync(principal, cancellationToken);
+        if (context == null)
         {
             return null;
         }
-
-        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
-        var currentEmployee = directoryData.CurrentEmployees.FirstOrDefault(employee =>
-            NormalizeKey(employee.IamId) == NormalizeKey(appUser.IamId));
-        if (currentEmployee == null)
-        {
-            return null;
-        }
-
-        var currentDepartmentCode = NormalizeKey(currentEmployee.ResolvedReportingDepartmentCode);
-        if (string.IsNullOrWhiteSpace(currentDepartmentCode))
-        {
-            return null;
-        }
-
-        var departmentByCode = directoryData.Departments.ToDictionary(
-            department => NormalizeKey(department.DepartmentCode),
-            department => department,
-            StringComparer.OrdinalIgnoreCase);
-
-        if (!departmentByCode.TryGetValue(currentDepartmentCode, out var currentDepartment))
-        {
-            return null;
-        }
-
-        var normalizedIamId = NormalizeKey(appUser.IamId);
-        var clusterId = currentDepartment.ClusterId;
-
-        var hasCurrentCaoAssignment = clusterId.HasValue &&
-            directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(clusterId.Value, out var currentCaoAssignment) &&
-            NormalizeKey(currentCaoAssignment.IamId) == normalizedIamId;
-        var hasCurrentChairAssignment =
-            directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(currentDepartmentCode, out var currentChairAssignment) &&
-            NormalizeKey(currentChairAssignment.IamId) == normalizedIamId;
-
-        string scope;
-        if (HasRole(principal, CaoRole) && hasCurrentCaoAssignment)
-        {
-            scope = "cluster";
-        }
-        else if (hasCurrentChairAssignment)
-        {
-            scope = "team";
-        }
-        else
-        {
-            return null;
-        }
-
-        var faculty = BuildFacultyRoster(
-            directoryData.CurrentEmployees,
-            departmentByCode,
-            scope,
-            currentDepartmentCode,
-            clusterId);
-        var facultyIds = faculty.Select(item => item.Id).ToArray();
 
         var scopedLeaveRequests = await LoadScopedLeaveRequestsAsync(
-            facultyIds,
+            context.FacultyIds,
+            context.ReportingDepartmentCodes,
+            context.ClusterIds,
             cancellationToken);
 
         var leaveTypeIds = scopedLeaveRequests
@@ -135,12 +88,12 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),
                 FacultyInitials: BuildInitials(GetFacultyDisplayName(
                     request.IamId,
-                    directoryData.CurrentEmployees,
-                    directoryData.AppUsers)),
+                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.AppUsers)),
                 FacultyName: GetFacultyDisplayName(
                     request.IamId,
-                    directoryData.CurrentEmployees,
-                    directoryData.AppUsers),
+                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.AppUsers),
                 Id: request.Id,
                 LeaveType: GetLeaveTypeName(request, leaveTypesById),
                 Note: request.Note,
@@ -149,10 +102,69 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             .ToList();
 
         return new ApprovalWorkspaceResponse(
-            Scope: scope,
-            Faculty: faculty,
+            Scope: context.Scope,
+            Faculty: context.Faculty,
             Leaves: leaves,
             PendingRequests: pendingRequests);
+    }
+
+    private async Task<ApprovalWorkspaceContext?> ResolveWorkspaceContextAsync(
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken)
+    {
+        var appUser = await ResolveAppUserAsync(principal, cancellationToken);
+        if (appUser == null)
+        {
+            return null;
+        }
+
+        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
+        var departmentByCode = directoryData.Departments.ToDictionary(
+            department => department.DepartmentCode.Trim(),
+            department => department,
+            StringComparer.OrdinalIgnoreCase);
+
+        string scope;
+        HashSet<string> reportingDepartmentCodes;
+        HashSet<int> clusterIds;
+        if (HasRole(principal, CaoRole))
+        {
+            scope = "cluster";
+            clusterIds = await LoadActiveCaoClusterIdsAsync(appUser.IamId, cancellationToken);
+            reportingDepartmentCodes = [];
+        }
+        else if (HasRole(principal, ChairRole))
+        {
+            scope = "team";
+            reportingDepartmentCodes = await LoadActiveChairDepartmentCodesAsync(appUser.IamId, cancellationToken);
+            clusterIds = [];
+        }
+        else
+        {
+            return null;
+        }
+
+        if (reportingDepartmentCodes.Count == 0 && clusterIds.Count == 0)
+        {
+            return null;
+        }
+
+        var faculty = BuildFacultyRoster(
+            directoryData.CurrentEmployees,
+            departmentByCode,
+            directoryData.NonFacultyIamIds,
+            scope,
+            reportingDepartmentCodes,
+            clusterIds);
+
+        return new ApprovalWorkspaceContext(
+            AppUser: appUser,
+            DirectoryData: directoryData,
+            Faculty: faculty,
+            FacultyIds: faculty.Select(item => item.Id).ToArray(),
+            ReportingDepartmentCodes: reportingDepartmentCodes,
+            ClusterIds: clusterIds,
+            Scope: scope);
     }
 
     public async Task<ApprovalDecisionResult> SubmitDecisionAsync(
@@ -179,20 +191,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return ApprovalDecisionResult.NotFound();
         }
 
-        var scopedFacultyIds = await LoadScopedFacultyIdsAsync(principal, appUser, cancellationToken);
-        if (scopedFacultyIds == null)
-        {
-            return ApprovalDecisionResult.NotFound();
-        }
-
         var leaveRequest = await _db.LeaveRequests
             .SingleOrDefaultAsync(item =>
                 item.Id == requestId &&
-                item.Status == LeaveRequestStatus.PendingApproval &&
-                scopedFacultyIds.Contains(item.IamId.Trim()),
+                item.Status == LeaveRequestStatus.PendingApproval,
                 cancellationToken);
 
-        if (leaveRequest == null)
+        if (leaveRequest == null || !await CanDecideRequestAsync(principal, appUser.IamId, leaveRequest, cancellationToken))
         {
             return ApprovalDecisionResult.NotFound();
         }
@@ -217,18 +222,38 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         return ApprovalDecisionResult.Success();
     }
 
+    public async Task<bool> DecideRequestAsync(
+        ClaimsPrincipal principal,
+        int requestId,
+        LeaveRequestActionType decision,
+        CancellationToken cancellationToken)
+    {
+        var decisionText = decision == LeaveRequestActionType.Approved
+            ? "approved"
+            : "denied";
+        var result = await SubmitDecisionAsync(
+            principal,
+            requestId,
+            new SubmitApprovalDecisionRequest(decisionText, null),
+            cancellationToken);
+
+        return result.Succeeded;
+    }
+
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
         IReadOnlyList<CurrentEmployee> currentEmployees,
         IReadOnlyDictionary<string, Department> departmentByCode,
+        IReadOnlySet<string> nonFacultyIamIds,
         string scope,
-        string currentDepartmentCode,
-        int? currentClusterId)
+        IReadOnlySet<string> reportingDepartmentCodes,
+        IReadOnlySet<int> clusterIds)
     {
         var faculty = currentEmployees
             .Where(employee => employee.HasCurrentAccrualRecord)
+            .Where(employee => !nonFacultyIamIds.Contains(employee.IamId.Trim()))
             .Where(employee =>
             {
-                var departmentCode = NormalizeKey(employee.ResolvedReportingDepartmentCode);
+                var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(departmentCode))
                 {
                     return false;
@@ -240,12 +265,12 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                 }
 
                 return scope == "cluster"
-                    ? department.ClusterId == currentClusterId
-                    : departmentCode == currentDepartmentCode;
+                    ? department.ClusterId.HasValue && clusterIds.Contains(department.ClusterId.Value)
+                    : reportingDepartmentCodes.Contains(departmentCode);
             })
             .Select(employee =>
             {
-                var departmentCode = NormalizeKey(employee.ResolvedReportingDepartmentCode);
+                var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim() ?? string.Empty;
                 departmentByCode.TryGetValue(departmentCode, out var department);
 
                 return new ApprovalWorkspaceFacultyResponse(
@@ -262,15 +287,18 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
     private async Task<List<LeaveRequest>> LoadScopedLeaveRequestsAsync(
         IReadOnlyCollection<string> scopedFacultyIds,
+        IReadOnlySet<string> reportingDepartmentCodes,
+        IReadOnlySet<int> clusterIds,
         CancellationToken cancellationToken)
     {
         var facultyIds = scopedFacultyIds.ToArray();
         var query = _db.LeaveRequests
             .AsNoTracking()
             .Where(request =>
-                request.Status == LeaveRequestStatus.PendingApproval ||
-                request.Status == LeaveRequestStatus.Approved)
-            .Where(request => facultyIds.Contains(request.IamId));
+                (request.Status == LeaveRequestStatus.Approved && facultyIds.Contains(request.IamId)) ||
+                (request.Status == LeaveRequestStatus.PendingApproval &&
+                    (reportingDepartmentCodes.Contains(request.ReportingDepartmentCodeSnapshot) ||
+                        (request.ClusterIdSnapshot.HasValue && clusterIds.Contains(request.ClusterIdSnapshot.Value)))));
 
         return await query
             .OrderByDescending(request => request.SubmittedAt)
@@ -278,65 +306,53 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlySet<string>?> LoadScopedFacultyIdsAsync(
+    private async Task<bool> CanDecideRequestAsync(
         ClaimsPrincipal principal,
-        AppUser appUser,
+        string iamId,
+        LeaveRequest leaveRequest,
         CancellationToken cancellationToken)
     {
-        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
-        var currentEmployee = directoryData.CurrentEmployees.FirstOrDefault(employee =>
-            NormalizeKey(employee.IamId) == NormalizeKey(appUser.IamId));
-        if (currentEmployee == null)
+        if (HasRole(principal, CaoRole) && leaveRequest.ClusterIdSnapshot.HasValue)
         {
-            return null;
+            return (await LoadActiveCaoClusterIdsAsync(iamId, cancellationToken))
+                .Contains(leaveRequest.ClusterIdSnapshot.Value);
         }
 
-        var currentDepartmentCode = NormalizeKey(currentEmployee.ResolvedReportingDepartmentCode);
-        if (string.IsNullOrWhiteSpace(currentDepartmentCode))
-        {
-            return null;
-        }
+        return HasRole(principal, ChairRole) &&
+            (await LoadActiveChairDepartmentCodesAsync(iamId, cancellationToken))
+                .Contains(leaveRequest.ReportingDepartmentCodeSnapshot.Trim());
+    }
 
-        var departmentByCode = directoryData.Departments.ToDictionary(
-            department => NormalizeKey(department.DepartmentCode),
-            department => department,
-            StringComparer.OrdinalIgnoreCase);
+    private async Task<HashSet<int>> LoadActiveCaoClusterIdsAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.ClusterCaoAssignments
+                .AsNoTracking()
+                .Where(assignment => assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.ClusterId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+    }
 
-        if (!departmentByCode.TryGetValue(currentDepartmentCode, out var currentDepartment))
-        {
-            return null;
-        }
-
-        var normalizedIamId = NormalizeKey(appUser.IamId);
-        var clusterId = currentDepartment.ClusterId;
-        var hasCurrentCaoAssignment = clusterId.HasValue &&
-            directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(clusterId.Value, out var currentCaoAssignment) &&
-            NormalizeKey(currentCaoAssignment.IamId) == normalizedIamId;
-        var hasCurrentChairAssignment =
-            directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(currentDepartmentCode, out var currentChairAssignment) &&
-            NormalizeKey(currentChairAssignment.IamId) == normalizedIamId;
-
-        string scope;
-        if (HasRole(principal, CaoRole) && hasCurrentCaoAssignment)
-        {
-            scope = "cluster";
-        }
-        else if (hasCurrentChairAssignment)
-        {
-            scope = "team";
-        }
-        else
-        {
-            return null;
-        }
-
-        return BuildFacultyRoster(
-                directoryData.CurrentEmployees,
-                departmentByCode,
-                scope,
-                currentDepartmentCode,
-                clusterId)
-            .Select(faculty => faculty.Id)
+    private async Task<HashSet<string>> LoadActiveChairDepartmentCodesAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.DepartmentChairAssignments
+                .AsNoTracking()
+                .Where(assignment => assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.DepartmentCode)
+                .ToListAsync(cancellationToken))
+            .Select(code => code.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -425,6 +441,15 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
     {
         return value?.Trim().ToLowerInvariant() ?? string.Empty;
     }
+
+    private sealed record ApprovalWorkspaceContext(
+        AppUser AppUser,
+        AdminDirectoryData DirectoryData,
+        IReadOnlyList<ApprovalWorkspaceFacultyResponse> Faculty,
+        IReadOnlyCollection<string> FacultyIds,
+        IReadOnlySet<string> ReportingDepartmentCodes,
+        IReadOnlySet<int> ClusterIds,
+        string Scope);
 }
 
 public sealed record ApprovalWorkspaceResponse(

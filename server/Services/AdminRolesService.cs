@@ -61,7 +61,11 @@ public sealed class AdminRolesService
             .Where(assignment =>
                 !currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee) ||
                 !currentEmployee.HasCurrentAccrualRecord ||
-                !activeDepartmentCodes.Contains(assignment.DepartmentCode.Trim()))
+                !activeDepartmentCodes.Contains(assignment.DepartmentCode.Trim()) ||
+                !string.Equals(
+                    currentEmployee.ResolvedReportingDepartmentCode?.Trim(),
+                    assignment.DepartmentCode.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         return new InactiveRoleAssignmentChanges(
@@ -120,7 +124,10 @@ public sealed class AdminRolesService
 
         var assignments = roleAssignmentsData.AdminAssignments
             .Select(assignment => CreateAssignmentResponse(
-                active: IsRoleAssignmentActive(currentEmployeesByIamId, assignment.IamId, true),
+                active: IsRoleAssignmentActive(
+                    currentEmployeesByIamId,
+                    assignment.IamId,
+                    true),
                 effectiveEndDate: null,
                 effectiveStartDate: null,
                 id: assignment.Id.ToString(),
@@ -155,12 +162,17 @@ public sealed class AdminRolesService
             {
                 var chairDepartmentCode = assignment.DepartmentCode.Trim();
                 departmentsByCode.TryGetValue(chairDepartmentCode, out var department);
+                currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee);
                 return CreateAssignmentResponse(
                     active: IsRoleAssignmentActive(
                         currentEmployeesByIamId,
                         assignment.IamId,
                         true,
-                        department?.IsActive ?? false,
+                        (department?.IsActive ?? false) &&
+                            string.Equals(
+                                currentEmployee?.ResolvedReportingDepartmentCode?.Trim(),
+                                chairDepartmentCode,
+                                StringComparison.OrdinalIgnoreCase),
                         assignment.EffectiveStartDate,
                         assignment.EffectiveEndDateExclusive,
                         today,

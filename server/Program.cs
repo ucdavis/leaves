@@ -149,7 +149,7 @@ try
     app.UseResponseCaching();
 
     // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Local"))
     {
         // swagger only in development
         app.UseSwagger();

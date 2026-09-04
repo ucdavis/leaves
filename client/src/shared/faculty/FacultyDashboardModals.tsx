@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useStore } from '@tanstack/react-form';
 import { useState, type ReactNode } from 'react';
 import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
@@ -26,11 +27,9 @@ import {
   isIsoDate,
   reportLeaveButtonClass,
 } from './FacultyDashboardPanels.tsx';
-import {
-  DraftEmailPreviewModal,
-  ExistingRequestEmailPreviewModal,
-} from './FacultyDashboardEmailPreviews.tsx';
 import { RequestStatusBadge } from './FacultyDashboardPanels.tsx';
+import { getLeaveDayCount } from '@/shared/calendar/universityHolidays.ts';
+import { getValidationErrorMessage } from '@/shared/forms/validationError.ts';
 
 const myInfoVaultUrl = 'https://myinfovault.ucdavis.edu/';
 const noPayOptionValue = 'none';
@@ -39,9 +38,7 @@ export function getReportLeaveTypeOptions(
   leaveTypes: FacultyDashboardResponse['leaveTypes']
 ) {
   return facultyLeaveTypeLabels.flatMap((label) => {
-    const matchingType = leaveTypes.find(
-      (type) => type.displayName === label
-    );
+    const matchingType = leaveTypes.find((type) => type.displayName === label);
 
     return matchingType
       ? [
@@ -58,32 +55,13 @@ type LeaveRequestFormValues = {
   approvedInMyInfoVault: boolean;
   dateSelection: 'single' | 'range';
   endDate: string;
+  excludeUniversityHolidays: boolean;
+  excludeWeekends: boolean;
   leaveTypeId: string;
   note: string;
   payLeaveTypeId: string;
   startDate: string;
   totalHours: string;
-};
-
-const leaveRequestFormFieldNames = new Set<string>([
-  'approvedInMyInfoVault',
-  'dateSelection',
-  'endDate',
-  'leaveTypeId',
-  'note',
-  'payLeaveTypeId',
-  'startDate',
-  'totalHours',
-] satisfies (keyof LeaveRequestFormValues)[]);
-
-type LeaveRequestDraft = {
-  endDate: string;
-  leaveTypeId: number;
-  leaveTypeLabel: string;
-  note: string | null;
-  payLeaveTypeId: number | null;
-  startDate: string;
-  totalHours: number;
 };
 
 function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
@@ -92,6 +70,8 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
       approvedInMyInfoVault: z.boolean(),
       dateSelection: z.enum(['single', 'range']),
       endDate: z.string(),
+      excludeUniversityHolidays: z.boolean(),
+      excludeWeekends: z.boolean(),
       leaveTypeId: z.string().min(1, 'Select a leave type.'),
       note: z.string().trim().max(1000, 'Note is too long.'),
       payLeaveTypeId: z.string(),
@@ -184,53 +164,27 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
 }
 
 export function RequestDetailModal({
-  allowEmailPreview = true,
   faculty,
   onClose,
   request,
 }: {
-  allowEmailPreview?: boolean;
   faculty: FacultyDashboardResponse['faculty'];
   onClose: () => void;
   request: FacultyLeaveRequest;
 }) {
-  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
-
   return (
-    <>
-      <Modal onClose={onClose} title="Request Detail">
-        <div className="space-y-5">
-          <RequestDetailHeader request={request} />
-          <RequestDetailGrid faculty={faculty} request={request} />
-          <RequestNote note={request.note} />
-          <div className="flex justify-end gap-3">
-            {allowEmailPreview ? (
-              <button
-                className="btn btn-outline btn-primary"
-                onClick={() => setEmailPreviewOpen(true)}
-                type="button"
-              >
-                View Email
-              </button>
-            ) : null}
-            <button className="btn btn-ghost" onClick={onClose} type="button">
-              Close
-            </button>
-          </div>
+    <Modal onClose={onClose} title="Request Detail">
+      <div className="space-y-5">
+        <RequestDetailHeader request={request} />
+        <RequestDetailGrid faculty={faculty} request={request} />
+        <RequestNote note={request.note} />
+        <div className="flex justify-end gap-3">
+          <button className="btn btn-ghost" onClick={onClose} type="button">
+            Close
+          </button>
         </div>
-      </Modal>
-
-      {allowEmailPreview && emailPreviewOpen ? (
-        <ExistingRequestEmailPreviewModal
-          faculty={faculty}
-          onClose={() => setEmailPreviewOpen(false)}
-          onPrimaryAction={() => setEmailPreviewOpen(false)}
-          primaryLabel="Close"
-          request={request}
-          secondaryLabel={null}
-        />
-      ) : null}
-    </>
+      </div>
+    </Modal>
   );
 }
 
@@ -300,10 +254,14 @@ function RequestNote({ note }: { note?: string | null }) {
 
 export function ReportLeaveModal({
   data,
+  initialEndDate,
+  initialStartDate,
   onClose,
   onSent,
 }: {
   data: FacultyDashboardResponse;
+  initialEndDate?: string;
+  initialStartDate?: string;
   onClose: () => void;
   onSent: (message: string) => void;
 }) {
@@ -313,6 +271,8 @@ export function ReportLeaveModal({
     <Modal onClose={onClose} title={title}>
       <LeaveRequestForm
         data={data}
+        initialEndDate={initialEndDate}
+        initialStartDate={initialStartDate}
         onClose={onClose}
         onSent={onSent}
         onSubmitted={onClose}
@@ -324,21 +284,23 @@ export function ReportLeaveModal({
 
 function LeaveRequestForm({
   data,
+  initialEndDate,
+  initialStartDate,
   onClose,
   onSent,
   onSubmitted,
   onTitleChange,
 }: {
   data: FacultyDashboardResponse;
+  initialEndDate?: string;
+  initialStartDate?: string;
   onClose: () => void;
   onSent: (message: string) => void;
   onSubmitted: () => void;
   onTitleChange: (title: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [pendingDraft, setPendingDraft] = useState<LeaveRequestDraft | null>(
-    null
-  );
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const leaveTypeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const leaveTypeLabelById = new Map(
     leaveTypeOptions.map((option) => [option.value, option.label])
@@ -346,27 +308,48 @@ function LeaveRequestForm({
   const payTypeOptions = getFmlaPayTypeOptions(data);
   const defaultValues: LeaveRequestFormValues = {
     approvedInMyInfoVault: false,
-    dateSelection: 'single',
-    endDate: '',
+    dateSelection:
+      initialEndDate && initialEndDate !== initialStartDate
+        ? 'range'
+        : 'single',
+    endDate: initialEndDate ?? '',
+    excludeUniversityHolidays: true,
+    excludeWeekends: true,
     leaveTypeId: '',
     note: '',
     payLeaveTypeId: '',
-    startDate: '',
+    startDate: initialStartDate ?? '',
     totalHours: '',
   };
   const requestMutation = useMutation({
     mutationFn: createFacultyLeaveRequest,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['faculty'],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['approval-workspace'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['faculty'],
+        }),
+      ]);
     },
   });
 
   const form = useAppForm({
     defaultValues,
     onSubmit: async ({ value }) => {
-      form.setErrorMap({ onSubmit: undefined });
+      const overlapError = getOverlapValidationError(
+        value,
+        data.recentRequests,
+        leaveTypeLabelById
+      );
+
+      if (overlapError) {
+        setSubmitError(overlapError.form);
+        return;
+      }
+
+      setSubmitError(null);
 
       const selectedLeaveType = getSelectedLeaveTypeLabel(
         value.leaveTypeId,
@@ -384,67 +367,48 @@ function LeaveRequestForm({
         value.payLeaveTypeId && value.payLeaveTypeId !== noPayOptionValue
           ? Number(value.payLeaveTypeId)
           : null;
-
-      setPendingDraft({
-        endDate: usesDateRange ? value.endDate : value.startDate,
-        leaveTypeId: Number(value.leaveTypeId),
-        leaveTypeLabel: selectedLeaveType,
-        note: value.note.trim() || null,
-        payLeaveTypeId,
-        startDate: value.startDate,
-        totalHours,
-      });
+      try {
+        await requestMutation.mutateAsync({
+          coveragePlan: null,
+          endDate: usesDateRange ? value.endDate : value.startDate,
+          leaveTypeId: Number(value.leaveTypeId),
+          note: value.note.trim() || null,
+          payLeaveTypeId,
+          startDate: value.startDate,
+          totalHours,
+        });
+        form.reset();
+        onTitleChange('Report Leave Taken');
+        onSent(getSuccessMessage(selectedLeaveType));
+        onSubmitted();
+      } catch (error) {
+        const errorMap = getSubmitErrorMap(error);
+        form.setErrorMap({ onSubmit: errorMap });
+        setSubmitError(errorMap.form ?? null);
+      }
     },
     validators: {
       onChange: createLeaveRequestSchema(leaveTypeLabelById),
     },
   });
 
+  const formValues = useStore(form.store, (state) => state.values);
   const selectedLeaveType = getSelectedLeaveTypeLabel(
-    form.state.values.leaveTypeId,
+    formValues.leaveTypeId,
     leaveTypeLabelById
   );
   const usesDateRange =
     selectedLeaveType === sabbaticalLeaveTypeLabel ||
-    form.state.values.dateSelection === 'range';
+    formValues.dateSelection === 'range';
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
-  const submitError = getSubmitErrorMessage(form.state.errorMap.onSubmit);
-
-  const handleCloseDraftPreview = () => {
-    form.setErrorMap({ onSubmit: undefined });
-    setPendingDraft(null);
-  };
-
-  const handleSimulateSend = async () => {
-    if (!pendingDraft) {
-      return;
-    }
-
-    form.setErrorMap({ onSubmit: undefined });
-
-    try {
-      await requestMutation.mutateAsync({
-        coveragePlan: null,
-        endDate: pendingDraft.endDate,
-        leaveTypeId: pendingDraft.leaveTypeId,
-        note: pendingDraft.note,
-        payLeaveTypeId: pendingDraft.payLeaveTypeId,
-        startDate: pendingDraft.startDate,
-        totalHours: pendingDraft.totalHours,
-      });
-      setPendingDraft(null);
-      form.reset();
-      onTitleChange('Report Leave Taken');
-      onSent(getSuccessMessage(pendingDraft.leaveTypeLabel));
-      onSubmitted();
-    } catch (error) {
-      form.setErrorMap({
-        onSubmit: getSubmitErrorMap(error),
-      });
-    }
-  };
+  const leaveDayCount = getLeaveDayCount(
+    formValues.startDate,
+    usesDateRange ? formValues.endDate : formValues.startDate,
+    usesDateRange && formValues.excludeWeekends,
+    usesDateRange && formValues.excludeUniversityHolidays
+  );
 
   return (
     <>
@@ -459,198 +423,223 @@ function LeaveRequestForm({
           <FacultySummary faculty={data.faculty} />
 
           <div className="grid gap-4">
-          <form.AppField name="leaveTypeId">
-            {(field) => (
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text font-medium">
-                    Type of Leave
-                    <span className="text-error"> *</span>
-                  </span>
-                </label>
-                <select
-                  aria-required
-                  className={`select select-bordered w-full ${
-                    field.state.meta.isTouched && !field.state.meta.isValid
-                      ? 'select-error'
-                      : ''
-                  }`}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    const nextLeaveTypeId = event.target.value;
-                    const nextLeaveType = getSelectedLeaveTypeLabel(
-                      nextLeaveTypeId,
-                      leaveTypeLabelById
-                    );
-
-                    field.handleChange(nextLeaveTypeId);
-                    form.setFieldValue('approvedInMyInfoVault', false);
-                    form.setFieldValue('dateSelection', 'single');
-                    form.setFieldValue('endDate', '');
-                    form.setFieldValue('payLeaveTypeId', '');
-                    form.setFieldValue('totalHours', '');
-
-                    if (nextLeaveType === sabbaticalLeaveTypeLabel) {
-                      form.setFieldValue('dateSelection', 'range');
-                    }
-
-                    onTitleChange(getModalTitle(nextLeaveType));
-                  }}
-                  value={field.state.value}
-                >
-                  <option value="">Select...</option>
-                  {leaveTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {field.state.meta.isTouched && !field.state.meta.isValid ? (
+            <form.AppField name="leaveTypeId">
+              {(field) => (
+                <div className="form-control w-full">
                   <label className="label">
-                    <span className="label-text-alt text-error" role="alert">
-                      {field.state.meta.errors
-                        .map((error) => error?.message ?? '')
-                        .join(', ')}
+                    <span className="label-text font-medium">
+                      Type of Leave
+                      <span className="text-error"> *</span>
                     </span>
                   </label>
-                ) : null}
+                  <select
+                    aria-required
+                    className={`select select-bordered w-full ${
+                      field.state.meta.errors.length > 0 ? 'select-error' : ''
+                    }`}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => {
+                      const nextLeaveTypeId = event.target.value;
+                      const nextLeaveType = getSelectedLeaveTypeLabel(
+                        nextLeaveTypeId,
+                        leaveTypeLabelById
+                      );
+
+                      field.handleChange(nextLeaveTypeId);
+                      form.setFieldValue('approvedInMyInfoVault', false);
+                      form.setFieldValue('payLeaveTypeId', '');
+                      form.setFieldValue('totalHours', '');
+
+                      if (nextLeaveType === sabbaticalLeaveTypeLabel) {
+                        form.setFieldValue('dateSelection', 'range');
+                      }
+
+                      onTitleChange(getModalTitle(nextLeaveType));
+                    }}
+                    value={field.state.value}
+                  >
+                    <option value="">Select...</option>
+                    {leaveTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {field.state.meta.errors.length > 0 ? (
+                    <label className="label">
+                      <span className="label-text-alt text-error" role="alert">
+                        {field.state.meta.errors
+                          .map(getValidationErrorMessage)
+                          .join(', ')}
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
+              )}
+            </form.AppField>
+
+            {selectedLeaveType ? (
+              <LeaveTypeNotice selectedLeaveType={selectedLeaveType} />
+            ) : null}
+
+            {selectedLeaveType === sabbaticalLeaveTypeLabel ||
+            selectedLeaveType === fmlaLeaveTypeLabel ? (
+              <form.AppField name="approvedInMyInfoVault">
+                {(field) => (
+                  <field.CheckboxField
+                    label={`I confirm this ${getMyInfoVaultSubject(
+                      selectedLeaveType
+                    )} has been approved in MyInfoVault`}
+                  />
+                )}
+              </form.AppField>
+            ) : null}
+
+            {selectedLeaveType === fmlaLeaveTypeLabel ? (
+              <form.AppField name="payLeaveTypeId">
+                {(field) => (
+                  <field.SelectField
+                    label="Pay Type (optional)"
+                    options={payTypeOptions}
+                    placeholder="Select..."
+                  />
+                )}
+              </form.AppField>
+            ) : null}
+
+            {selectedLeaveType === sabbaticalLeaveTypeLabel ? (
+              <div className="text-sm font-medium text-base-content">
+                Sabbatical Period
               </div>
+            ) : (
+              <form.AppField name="dateSelection">
+                {(field) => (
+                  <fieldset className="form-control">
+                    <legend className="label pb-1">
+                      <span className="label-text font-medium">
+                        Date Selection
+                      </span>
+                    </legend>
+                    <div className="flex flex-wrap gap-5">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          checked={field.state.value === 'single'}
+                          className="radio radio-primary radio-sm"
+                          name={field.name}
+                          onBlur={field.handleBlur}
+                          onChange={() => {
+                            field.handleChange('single');
+                            form.setFieldValue('endDate', '');
+                          }}
+                          type="radio"
+                          value="single"
+                        />
+                        <span>Single Day</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          checked={field.state.value === 'range'}
+                          className="radio radio-primary radio-sm"
+                          name={field.name}
+                          onBlur={field.handleBlur}
+                          onChange={() => field.handleChange('range')}
+                          type="radio"
+                          value="range"
+                        />
+                        <span>Date Range</span>
+                      </label>
+                    </div>
+                  </fieldset>
+                )}
+              </form.AppField>
             )}
-          </form.AppField>
 
-          {selectedLeaveType ? (
-            <LeaveTypeNotice selectedLeaveType={selectedLeaveType} />
-          ) : null}
-
-          {selectedLeaveType === sabbaticalLeaveTypeLabel ||
-          selectedLeaveType === fmlaLeaveTypeLabel ? (
-            <form.AppField name="approvedInMyInfoVault">
-              {(field) => (
-                <field.CheckboxField
-                  label={`I confirm this ${getMyInfoVaultSubject(
-                    selectedLeaveType
-                  )} has been approved in MyInfoVault`}
-                />
-              )}
-            </form.AppField>
-          ) : null}
-
-          {selectedLeaveType === fmlaLeaveTypeLabel ? (
-            <form.AppField name="payLeaveTypeId">
-              {(field) => (
-                <field.SelectField
-                  label="Pay Type (optional)"
-                  options={payTypeOptions}
-                  placeholder="Select..."
-                />
-              )}
-            </form.AppField>
-          ) : null}
-
-          {selectedLeaveType === sabbaticalLeaveTypeLabel ? (
-            <div className="text-sm font-medium text-base-content">
-              Sabbatical Period
-            </div>
-          ) : (
-            <form.AppField name="dateSelection">
-              {(field) => (
-                <fieldset className="form-control">
-                  <legend className="label pb-1">
-                    <span className="label-text font-medium">
-                      Date Selection
-                    </span>
-                  </legend>
-                  <div className="flex flex-wrap gap-5">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        checked={field.state.value === 'single'}
-                        className="radio radio-primary radio-sm"
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={() => {
-                          field.handleChange('single');
-                          form.setFieldValue('endDate', '');
-                        }}
-                        type="radio"
-                        value="single"
+            {usesDateRange ? (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.AppField name="startDate">
+                    {(field) => (
+                      <field.TextField
+                        label={
+                          selectedLeaveType === sabbaticalLeaveTypeLabel
+                            ? 'Start Date'
+                            : 'Range Start Date'
+                        }
+                        required
+                        type="date"
                       />
-                      <span>Single Day</span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        checked={field.state.value === 'range'}
-                        className="radio radio-primary radio-sm"
-                        name={field.name}
-                        onBlur={field.handleBlur}
-                        onChange={() => field.handleChange('range')}
-                        type="radio"
-                        value="range"
+                    )}
+                  </form.AppField>
+                  <form.AppField name="endDate">
+                    {(field) => (
+                      <field.TextField
+                        label={
+                          selectedLeaveType === sabbaticalLeaveTypeLabel
+                            ? 'End Date'
+                            : 'Range End Date'
+                        }
+                        required
+                        type="date"
                       />
-                      <span>Date Range</span>
-                    </label>
-                  </div>
-                </fieldset>
-              )}
-            </form.AppField>
-          )}
-
-          {usesDateRange ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+                    )}
+                  </form.AppField>
+                </div>
+                {requiresHours ? (
+                  <>
+                    <form.AppField name="excludeWeekends">
+                      {(field) => (
+                        <field.CheckboxField
+                          description="Do not count Saturdays or Sundays in the range calculation."
+                          label="Exclude weekends"
+                        />
+                      )}
+                    </form.AppField>
+                    <form.AppField name="excludeUniversityHolidays">
+                      {(field) => (
+                        <field.CheckboxField
+                          description="Do not count UC Davis holidays or academic breaks in the range calculation."
+                          label="Exclude university holidays"
+                        />
+                      )}
+                    </form.AppField>
+                    <LeaveDayCalculation
+                      excludesUniversityHolidays={
+                        formValues.excludeUniversityHolidays
+                      }
+                      excludesWeekends={formValues.excludeWeekends}
+                      leaveDayCount={leaveDayCount}
+                    />
+                  </>
+                ) : null}
+              </>
+            ) : (
               <form.AppField name="startDate">
                 {(field) => (
-                  <field.TextField
-                    label={
-                      selectedLeaveType === sabbaticalLeaveTypeLabel
-                        ? 'Start Date'
-                        : 'Range Start Date'
-                    }
-                    required
-                    type="date"
-                  />
+                  <field.TextField label="Leave Date" required type="date" />
                 )}
               </form.AppField>
-              <form.AppField name="endDate">
+            )}
+
+            {requiresHours ? (
+              <form.AppField name="totalHours">
                 {(field) => (
                   <field.TextField
-                    label={
-                      selectedLeaveType === sabbaticalLeaveTypeLabel
-                        ? 'End Date'
-                        : 'Range End Date'
-                    }
+                    label="Total Hours"
+                    placeholder="e.g., 8"
                     required
-                    type="date"
                   />
                 )}
               </form.AppField>
-            </div>
-          ) : (
-            <form.AppField name="startDate">
-              {(field) => (
-                <field.TextField label="Leave Date" required type="date" />
-              )}
-            </form.AppField>
-          )}
+            ) : null}
 
-          {requiresHours ? (
-            <form.AppField name="totalHours">
+            <form.AppField name="note">
               {(field) => (
-                <field.TextField
-                  label="Total Hours"
-                  placeholder="e.g., 8"
-                  required
+                <field.TextAreaField
+                  label="Note (optional)"
+                  placeholder="Any additional context..."
                 />
               )}
             </form.AppField>
-          ) : null}
-
-          <form.AppField name="note">
-            {(field) => (
-              <field.TextAreaField
-                label="Note (optional)"
-                placeholder="Any additional context..."
-              />
-            )}
-          </form.AppField>
           </div>
 
           {submitError ? (
@@ -682,22 +671,50 @@ function LeaveRequestForm({
           </div>
         </form.AppForm>
       </form>
-
-      {pendingDraft ? (
-        <DraftEmailPreviewModal
-          draft={pendingDraft}
-          faculty={data.faculty}
-          onClose={handleCloseDraftPreview}
-          onPrimaryAction={() => void handleSimulateSend()}
-          onSecondaryAction={handleCloseDraftPreview}
-          primaryLabel={getPreviewPrimaryLabel(selectedLeaveType)}
-          primaryLoading={requestMutation.isPending}
-          secondaryLabel="Cancel"
-          statusMessage={submitError}
-        />
-      ) : null}
     </>
   );
+}
+
+function LeaveDayCalculation({
+  excludesUniversityHolidays,
+  excludesWeekends,
+  leaveDayCount,
+}: {
+  excludesUniversityHolidays: boolean;
+  excludesWeekends: boolean;
+  leaveDayCount: number;
+}) {
+  if (leaveDayCount === 0) {
+    return null;
+  }
+
+  return (
+    <p className="-mt-2 text-sm text-base-content/70">
+      {leaveDayCount} {leaveDayCount === 1 ? 'leave day' : 'leave days'} in this
+      range
+      {getExclusionDescription(excludesWeekends, excludesUniversityHolidays)}.
+      At 8 hours per day, that is {leaveDayCount * 8} suggested hours.
+    </p>
+  );
+}
+
+function getExclusionDescription(
+  excludesWeekends: boolean,
+  excludesUniversityHolidays: boolean
+) {
+  if (excludesWeekends && excludesUniversityHolidays) {
+    return ', excluding weekends and university holidays';
+  }
+
+  if (excludesWeekends) {
+    return ', excluding weekends';
+  }
+
+  if (excludesUniversityHolidays) {
+    return ', excluding university holidays';
+  }
+
+  return '';
 }
 
 function FacultySummary({
@@ -756,19 +773,31 @@ function getSubmitLabel(selectedLeaveType: string) {
   return 'Submit Leave Report';
 }
 
-function getPreviewPrimaryLabel(selectedLeaveType: string) {
-  if (selectedLeaveType === professionalDevelopmentLeaveTypeLabel) {
-    return 'Simulate Send Notification';
-  }
-
-  if (
+function getOverlapValidationError(
+  value: LeaveRequestFormValues,
+  requests: FacultyLeaveRequest[],
+  leaveTypeLabelById: Map<string, string>
+): { form: string } | undefined {
+  const selectedLeaveType = getSelectedLeaveTypeLabel(
+    value.leaveTypeId,
+    leaveTypeLabelById
+  );
+  const usesDateRange =
     selectedLeaveType === sabbaticalLeaveTypeLabel ||
-    selectedLeaveType === fmlaLeaveTypeLabel
-  ) {
-    return 'Simulate Record Approved Leave';
+    value.dateSelection === 'range';
+  const overlapRequest = findOverlappingActiveRequest(
+    requests,
+    value.startDate,
+    usesDateRange ? value.endDate : value.startDate
+  );
+
+  if (!overlapRequest) {
+    return undefined;
   }
 
-  return 'Simulate Send';
+  return {
+    form: buildOverlapMessage(overlapRequest),
+  };
 }
 
 function getSuccessMessage(selectedLeaveType: string) {
@@ -827,7 +856,10 @@ function getFmlaPayTypeOptions(data: FacultyDashboardResponse) {
 function createPayTypeOption(
   leaveTypeLabel: string,
   leaveTypeIdByLabel: Map<string, number>,
-  balancesByLabel: Map<string, FacultyDashboardResponse['accrualBalances'][number]>
+  balancesByLabel: Map<
+    string,
+    FacultyDashboardResponse['accrualBalances'][number]
+  >
 ) {
   const leaveTypeKey = getFacultyLeaveTypeKey(leaveTypeLabel);
   const leaveTypeId = leaveTypeIdByLabel.get(leaveTypeKey);
@@ -855,24 +887,16 @@ function getSubmitErrorMap(error: unknown) {
     error.status === 400 &&
     isValidationProblemDetails(error.body)
   ) {
-    const entries = Object.entries(error.body.errors).map(
-      ([fieldName, messages]) =>
-        [toClientFieldName(fieldName), messages.join(', ')] as const
-    );
-    const unmappedEntries = entries.filter(
-      ([fieldName]) => !leaveRequestFormFieldNames.has(fieldName)
+    const fields = Object.fromEntries(
+      Object.entries(error.body.errors).map(([fieldName, messages]) => [
+        toClientFieldName(fieldName),
+        messages.join(', '),
+      ])
     );
 
     return {
-      fields: Object.fromEntries(
-        entries.filter(([fieldName]) =>
-          leaveRequestFormFieldNames.has(fieldName)
-        )
-      ),
-      form:
-        unmappedEntries.length > 0
-          ? unmappedEntries.map(([, message]) => message).join(' ')
-          : undefined,
+      fields,
+      form: getFirstValidationMessage(error.body.errors),
     };
   }
 
@@ -880,15 +904,6 @@ function getSubmitErrorMap(error: unknown) {
     fields: {},
     form: 'The leave request could not be submitted. Please review the form and try again.',
   };
-}
-
-function getSubmitErrorMessage(error: unknown) {
-  if (!error || typeof error !== 'object') {
-    return null;
-  }
-
-  const formError = (error as { form?: unknown }).form;
-  return typeof formError === 'string' ? formError : null;
 }
 
 function isValidationProblemDetails(
@@ -901,17 +916,46 @@ function isValidationProblemDetails(
   return typeof value.errors === 'object' && value.errors !== null;
 }
 
+function getFirstValidationMessage(errors: Record<string, string[]>) {
+  return (
+    Object.values(errors)
+      .flat()
+      .find((message) => message.length > 0) ?? null
+  );
+}
+
+function findOverlappingActiveRequest(
+  requests: FacultyLeaveRequest[],
+  startDate: string,
+  endDate: string
+) {
+  return requests.find(
+    (request) =>
+      isActiveRequestStatus(request.status) &&
+      request.startDate <= endDate &&
+      request.endDate >= startDate
+  );
+}
+
+function buildOverlapMessage(request: FacultyLeaveRequest) {
+  return `This overlaps with your ${request.leaveType} request (${formatDateRange(
+    request.startDate,
+    request.endDate
+  )}, ${formatCompactHours(request.totalHours)}, request r${request.id}).`;
+}
+
+function isActiveRequestStatus(status: string) {
+  const normalized = status.toLowerCase();
+  return normalized.includes('approved') || normalized.includes('pending');
+}
+
 function toClientFieldName(fieldName: string) {
   return fieldName.length > 0
     ? `${fieldName[0]!.toLowerCase()}${fieldName.slice(1)}`
     : fieldName;
 }
 
-function LeaveTypeNotice({
-  selectedLeaveType,
-}: {
-  selectedLeaveType: string;
-}) {
+function LeaveTypeNotice({ selectedLeaveType }: { selectedLeaveType: string }) {
   if (selectedLeaveType === professionalDevelopmentLeaveTypeLabel) {
     return (
       <NoticePanel tone="info">
@@ -936,9 +980,8 @@ function LeaveTypeNotice({
           </a>{' '}
           before entering here.
         </span>{' '}
-        Enter your approved sabbatical dates below. This will automatically set
-        up a monthly debit of 16 hours from your vacation balance for the
-        duration of the sabbatical.
+        Enter your approved sabbatical dates below. This request records the
+        approved period; vacation debits are managed outside this application.
       </NoticePanel>
     );
   }

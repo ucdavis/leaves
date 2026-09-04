@@ -1,5 +1,6 @@
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useLockBodyScroll } from '@/shared/modalScrollLock.ts';
 
 const focusableSelector = [
   'a[href]',
@@ -9,26 +10,6 @@ const focusableSelector = [
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
-
-let bodyScrollLockCount = 0;
-let bodyOverflowBeforeScrollLock = '';
-
-function lockBodyScroll() {
-  if (bodyScrollLockCount === 0) {
-    bodyOverflowBeforeScrollLock = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-  }
-
-  bodyScrollLockCount += 1;
-}
-
-function unlockBodyScroll() {
-  bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
-
-  if (bodyScrollLockCount === 0) {
-    document.body.style.overflow = bodyOverflowBeforeScrollLock;
-  }
-}
 
 export function Modal({
   children,
@@ -42,6 +23,7 @@ export function Modal({
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const previouslyFocusedElementRef = useRef<Element | null>(null);
+  useLockBodyScroll(true);
 
   useEffect(() => {
     previouslyFocusedElementRef.current = document.activeElement;
@@ -58,10 +40,7 @@ export function Modal({
     const focusableElements = getFocusableElements(dialogElement);
     (focusableElements[0] ?? dialogElement).focus({ preventScroll: true });
 
-    lockBodyScroll();
-
     return () => {
-      unlockBodyScroll();
       if (dialogElement.open) {
         dialogElement.close();
       }
@@ -128,8 +107,6 @@ function getFocusableElements(container: HTMLElement) {
     .filter((element) => !element.hasAttribute('disabled'));
 }
 
-function isFocusableElement(
-  element: Element | null
-): element is HTMLElement {
+function isFocusableElement(element: Element | null): element is HTMLElement {
   return element !== null && 'focus' in element;
 }

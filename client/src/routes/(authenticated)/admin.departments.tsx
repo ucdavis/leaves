@@ -142,7 +142,10 @@ function AdminDepartmentsRoute() {
 
     if (selectedDepartment) {
       const departmentUsers = users.filter(
-        (user) => user.departmentId === selectedDepartment.id
+        (user) =>
+          user.departmentId === selectedDepartment.id &&
+          user.designation !== 'nfa' &&
+          user.role !== 'cao'
       );
 
       return (
@@ -192,7 +195,7 @@ function AdminDepartmentsRoute() {
                             </span>
                           )}
                         </td>
-                        <td>{user.role === 'admin' ? 'Admin' : 'Faculty'}</td>
+                        <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
                         <td className="font-mono text-xs">{user.iamId}</td>
                         <td>
                           {selectedDepartment.chairUserId === user.id ? (
@@ -369,7 +372,7 @@ function AdminDepartmentsRoute() {
                   }}
                   query={clusterCaoQuery}
                   selectedUserId={selectedClusterCaoUserId}
-                  users={getAccrualAssignableUsers(users)}
+                  users={getNonFacultyAssignableUsers(users)}
                 />
               </div>
 
@@ -561,17 +564,18 @@ function AdminDepartmentsRoute() {
   );
 }
 
-function getAccrualAssignableUsers(
+function getNonFacultyAssignableUsers(
   users: Array<{
     active: boolean;
     departmentId: string;
+    designation: string;
     email: string;
     id: string;
     name: string;
   }>
 ) {
   return users
-    .filter((user) => user.active)
+    .filter((user) => user.active && user.designation === 'nfa')
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useLockBodyScroll } from '@/shared/modalScrollLock.ts';
 
 const focusableSelector = [
   'a[href]',
@@ -12,6 +13,7 @@ const focusableSelector = [
 export function AdminModalFrame({
   children,
   description,
+  headerActions,
   maxWidthClassName,
   onRequestClose,
 
@@ -19,6 +21,7 @@ export function AdminModalFrame({
 }: {
   children: ReactNode;
   description?: string;
+  headerActions?: ReactNode;
   maxWidthClassName?: string;
   onRequestClose?: () => void;
   title: string;
@@ -27,6 +30,7 @@ export function AdminModalFrame({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const previouslyFocusedElementRef = useRef<Element | null>(null);
+  useLockBodyScroll(true);
 
   useEffect(() => {
     previouslyFocusedElementRef.current = document.activeElement;
@@ -43,11 +47,7 @@ export function AdminModalFrame({
     const focusableElements = getFocusableElements(dialogElement);
     (focusableElements[0] ?? dialogElement).focus({ preventScroll: true });
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
     return () => {
-      document.body.style.overflow = previousOverflow;
       if (dialogElement.open) {
         dialogElement.close();
       }
@@ -93,9 +93,14 @@ export function AdminModalFrame({
         }`}
       >
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-primary" id={titleId}>
-            {title}
-          </h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold text-primary" id={titleId}>
+              {title}
+            </h2>
+            {headerActions ? (
+              <div className="shrink-0">{headerActions}</div>
+            ) : null}
+          </div>
           {description ? (
             <p className="mt-2 text-sm text-base-content/70" id={descriptionId}>
               {description}

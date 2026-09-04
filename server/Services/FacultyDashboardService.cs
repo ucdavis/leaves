@@ -28,6 +28,7 @@ public interface IFacultyDashboardService
 public sealed class FacultyDashboardService : IFacultyDashboardService
 {
     private const string CaoRole = "CAO";
+    private const string ChairRole = "Chair";
     private const int RecentRequestsLimit = 24;
     private const string FamilyCareLeaveTypeKey = "FamilyCare";
     private const string ProfessionalDevelopmentLeaveTypeLabel = "Professional Development";
@@ -107,9 +108,6 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 : FacultyDashboardViewerResult.Success(ownDashboard);
         }
 
-        var viewerEmployee = await GetCurrentEmployeeAsync(
-            NormalizeIamId(viewer.IamId),
-            cancellationToken);
         var targetUser = await _db.AppUsers
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -119,31 +117,30 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             normalizedTargetIamId,
             cancellationToken);
 
-        if (viewerEmployee == null || targetUser == null || targetEmployee == null)
+        if (targetEmployee == null)
         {
             return FacultyDashboardViewerResult.TargetNotFound();
         }
 
-        var viewerDepartment = await ResolveReportingDepartmentAsync(
-            viewerEmployee,
-            cancellationToken);
         var targetDepartment = await ResolveReportingDepartmentAsync(
             targetEmployee,
             cancellationToken);
 
-        if (viewerDepartment == null || targetDepartment == null)
+        if (targetDepartment == null)
         {
             return FacultyDashboardViewerResult.Forbidden();
         }
 
+        var assignedCaoClusterIds = await GetActiveCaoClusterIdsAsync(
+            viewer.IamId,
+            cancellationToken);
         var isCao = HasRole(principal, CaoRole);
         var canViewTarget = isCao
-            ? viewerDepartment.ClusterId.HasValue &&
-                viewerDepartment.ClusterId == targetDepartment.ClusterId
-            : string.Equals(
-                viewerDepartment.DepartmentCode,
-                targetDepartment.DepartmentCode,
-                StringComparison.OrdinalIgnoreCase);
+            ? targetDepartment.ClusterId.HasValue &&
+                assignedCaoClusterIds.Contains(targetDepartment.ClusterId.Value)
+            : HasRole(principal, ChairRole) &&
+                (await GetActiveChairDepartmentCodesAsync(viewer.IamId, cancellationToken))
+                    .Contains(targetDepartment.DepartmentCode);
 
         if (!canViewTarget)
         {
@@ -156,15 +153,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(
             normalizedTargetIamId,
             cancellationToken);
-        var recentRequests = await GetLeaveRequestsAsync(
-            targetUser.Id,
-            RecentRequestsLimit,
-            cancellationToken);
+        var recentRequests = targetUser == null
+            ? []
+            : await GetLeaveRequestsAsync(
+                targetUser.Id,
+                RecentRequestsLimit,
+                cancellationToken);
         var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
 
         return FacultyDashboardViewerResult.Success(
             BuildDashboardResponse(
-                targetUser,
+                targetUser ?? new AppUser
+                {
+                    DisplayName = targetEmployee.DisplayName,
+                    EntraObjectId = Guid.Empty,
+                    FirstLoginUtc = DateTime.MinValue,
+                    IamId = normalizedTargetIamId,
+                    IsActive = true,
+                },
                 normalizedTargetIamId,
                 targetEmployee,
                 targetDepartment,
@@ -281,7 +287,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         {
             return CreateLeaveRequestResult.Invalid(
                 "startDate",
-                "A leave request already exists for these dates.");
+                "You already have a leave request that includes one or more of these dates.");
         }
 
         var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
@@ -616,6 +622,42 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .SingleOrDefaultAsync(department => department.DepartmentCode == departmentCode, cancellationToken);
     }
 
+    private async Task<HashSet<int>> GetActiveCaoClusterIdsAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.ClusterCaoAssignments
+                .AsNoTracking()
+                .Where(assignment =>
+                    assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue ||
+                        assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.ClusterId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+    }
+
+    private async Task<HashSet<string>> GetActiveChairDepartmentCodesAsync(
+        string iamId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await _db.DepartmentChairAssignments
+                .AsNoTracking()
+                .Where(assignment =>
+                    assignment.IamId.Trim() == iamId.Trim() &&
+                    assignment.ClosedUtc == null &&
+                    assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue ||
+                        assignment.EffectiveEndDateExclusive > today))
+                .Select(assignment => assignment.DepartmentCode)
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     private static Dictionary<string, string[]> ValidateRequestShape(
         CreateFacultyLeaveRequest request,
         LeaveType leaveType)
@@ -641,7 +683,11 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             errors["endDate"] = ["End date must be on or after the start date."];
         }
 
-        if (!allowsZeroHours && request.TotalHours <= 0)
+        if (request.TotalHours < 0)
+        {
+            errors["totalHours"] = ["Total hours cannot be negative."];
+        }
+        else if (!allowsZeroHours && request.TotalHours == 0)
         {
             errors["totalHours"] = ["Total hours must be greater than zero."];
         }

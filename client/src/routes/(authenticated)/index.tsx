@@ -1,8 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
+import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
 import type { RouterContext } from '@/main.tsx';
-import { facultyDashboardQueryOptions } from '@/queries/faculty.ts';
+import {
+  facultyDashboardQueryOptions,
+  facultyHistoryQueryOptions,
+} from '@/queries/faculty.ts';
 import { meQueryOptions } from '@/queries/user.ts';
 import {
   canAccessApprovalWorkspace,
@@ -12,7 +16,17 @@ import {
 import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
 import { FacultyDashboardPage } from '@/shared/faculty/FacultyDashboardPage.tsx';
 
+const dashboardSearchSchema = z.object({
+  calendarDate: z.iso.date().optional(),
+});
+
 export const Route = createFileRoute('/(authenticated)/')({
+  validateSearch: (search: Record<string, unknown>) => {
+    const result = dashboardSearchSchema.safeParse(search);
+
+    return result.success ? result.data : {};
+  },
+  // TanStack Router requires URL validation before route lifecycle hooks.
   beforeLoad: async ({ context }: { context: RouterContext }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions());
 
@@ -36,6 +50,8 @@ export const Route = createFileRoute('/(authenticated)/')({
 
 function RouteComponent() {
   const dashboardQuery = useQuery(facultyDashboardQueryOptions());
+  const historyQuery = useQuery(facultyHistoryQueryOptions());
+  const { calendarDate } = Route.useSearch();
 
   if (dashboardQuery.isLoading) {
     return (
@@ -63,5 +79,11 @@ function RouteComponent() {
     );
   }
 
-  return <FacultyDashboardPage data={dashboardQuery.data} />;
+  return (
+    <FacultyDashboardPage
+      calendarDate={calendarDate}
+      calendarRequests={historyQuery.data?.recentRequests}
+      data={dashboardQuery.data}
+    />
+  );
 }

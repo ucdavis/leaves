@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { HttpError } from '@/lib/api.ts';
 import { useState } from 'react';
 import { RouterContext } from '@/main.tsx';
@@ -21,7 +20,6 @@ import {
   RequestDetailModal,
   getReportLeaveTypeOptions,
 } from '@/shared/faculty/FacultyDashboardModals.tsx';
-import { ExistingRequestEmailPreviewModal } from '@/shared/faculty/FacultyDashboardEmailPreviews.tsx';
 import { RequestHistoryTable } from '@/shared/faculty/RequestHistoryTable.tsx';
 
 export const Route = createFileRoute('/(authenticated)/history')({
@@ -40,8 +38,6 @@ function RouteComponent() {
   const [selectedType, setSelectedType] = useState('');
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
-    useState<FacultyLeaveRequest | null>(null);
-  const [emailPreviewRequest, setEmailPreviewRequest] =
     useState<FacultyLeaveRequest | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -74,8 +70,6 @@ function RouteComponent() {
   return (
     <HistoryContent
       data={dashboardQuery.data}
-      emailPreviewRequest={emailPreviewRequest}
-      onEmailPreviewRequest={setEmailPreviewRequest}
       onReportModalOpen={setReportModalOpen}
       onRequestSelected={setSelectedRequest}
       onSelectedTypeChange={setSelectedType}
@@ -90,8 +84,6 @@ function RouteComponent() {
 
 function HistoryContent({
   data,
-  emailPreviewRequest,
-  onEmailPreviewRequest,
   onReportModalOpen,
   onRequestSelected,
   onSelectedTypeChange,
@@ -102,8 +94,6 @@ function HistoryContent({
   toastMessage,
 }: {
   data: FacultyDashboardResponse;
-  emailPreviewRequest: FacultyLeaveRequest | null;
-  onEmailPreviewRequest: (request: FacultyLeaveRequest | null) => void;
   onReportModalOpen: (value: boolean) => void;
   onRequestSelected: (request: FacultyLeaveRequest | null) => void;
   onSelectedTypeChange: (value: string) => void;
@@ -123,16 +113,7 @@ function HistoryContent({
 
   return (
     <div className="container py-8 lg:py-10">
-      <button
-        className="btn btn-ghost mb-5"
-        onClick={() => void navigate({ to: '/' })}
-        type="button"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
-        Back to dashboard
-      </button>
-
-      <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm mt-10">
+      <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-lg font-bold text-primary">Request History</h1>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -161,7 +142,12 @@ function HistoryContent({
         <RequestHistoryTable
           key={selectedType}
           onSelectRequest={onRequestSelected}
-          onViewEmail={onEmailPreviewRequest}
+          onShowInCalendar={(request) =>
+            void navigate({
+              search: { calendarDate: request.startDate },
+              to: '/',
+            })
+          }
           requests={requests}
         />
       </section>
@@ -178,16 +164,6 @@ function HistoryContent({
           faculty={data.faculty}
           onClose={() => onRequestSelected(null)}
           request={selectedRequest}
-        />
-      ) : null}
-      {emailPreviewRequest ? (
-        <ExistingRequestEmailPreviewModal
-          faculty={data.faculty}
-          onClose={() => onEmailPreviewRequest(null)}
-          onPrimaryAction={() => onEmailPreviewRequest(null)}
-          primaryLabel="Close"
-          request={emailPreviewRequest}
-          secondaryLabel={null}
         />
       ) : null}
       <FacultyToast

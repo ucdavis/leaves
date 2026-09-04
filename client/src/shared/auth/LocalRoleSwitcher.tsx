@@ -49,13 +49,6 @@ export function LocalRoleSwitcher({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const initials = userName
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
   const roleLabel = getUserRoleLabel(roles);
   const authLabel = `${roleLabel} · LOCAL DEV`;
 
@@ -89,20 +82,25 @@ export function LocalRoleSwitcher({
     <div className="dropdown dropdown-end" ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-right transition hover:bg-primary-content/10"
+        aria-label={`Open local role switcher for ${userName}`}
+        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
-        <div className="hidden sm:block">
-          <div className="text-sm font-semibold">{userName}</div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+        <div className="hidden min-w-0 sm:block">
+          <div className="truncate text-sm font-semibold leading-tight">
+            {userName}
+          </div>
+          <div className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
             {authLabel}
           </div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
-          {initials || '?'}
-        </div>
-        <span className="hidden text-primary-content/70 sm:block">▾</span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary sm:hidden">
+          {getInitials(userName)}
+        </span>
+        <span className="hidden shrink-0 text-primary-content/70 sm:block">
+          ▾
+        </span>
       </button>
 
       {isOpen ? (
@@ -148,6 +146,18 @@ export function LocalRoleSwitcher({
       ) : null}
     </div>
   );
+}
+
+function getInitials(name: string) {
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || '?';
 }
 
 function getUserRoleLabel(roles: readonly string[]) {

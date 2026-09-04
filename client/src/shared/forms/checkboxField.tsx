@@ -1,4 +1,5 @@
 import { useFieldContext } from './formContext.tsx';
+import { getValidationErrorMessage } from './validationError.ts';
 
 interface CheckboxFieldProps {
   description?: string;
@@ -7,7 +8,7 @@ interface CheckboxFieldProps {
 
 export function CheckboxField({ description, label }: CheckboxFieldProps) {
   const field = useFieldContext<boolean>();
-  const hasError = field.state.meta.isTouched && !field.state.meta.isValid;
+  const hasError = field.state.meta.errors.length > 0;
 
   return (
     <div className="form-control w-full">
@@ -32,7 +33,9 @@ export function CheckboxField({ description, label }: CheckboxFieldProps) {
       {hasError ? (
         <label className="label">
           <span className="label-text-alt text-error" role="alert">
-            {field.state.meta.errors.map((error) => error.message).join(', ')}
+            {field.state.meta.errors
+              .map(getValidationErrorMessage)
+              .join(', ')}
           </span>
         </label>
       ) : null}

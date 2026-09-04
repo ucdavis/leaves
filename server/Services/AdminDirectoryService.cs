@@ -26,8 +26,14 @@ public sealed class AdminDirectoryService
     internal static AdminFacultyResponse BuildFacultyResponse(AdminDirectoryData directoryData)
     {
         var departmentResponse = BuildDepartmentsResponse(directoryData);
+        var currentCaoIamIds = directoryData.CurrentCaoAssignmentsByCluster.Values
+            .Select(assignment => NormalizeKey(assignment.IamId))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var facultyIamIds = directoryData.CurrentEmployees
             .Where(employee => employee.HasCurrentAccrualRecord)
+            .Where(employee =>
+                !directoryData.NonFacultyIamIds.Contains(NormalizeKey(employee.IamId)) &&
+                !currentCaoIamIds.Contains(NormalizeKey(employee.IamId)))
             .Select(employee => NormalizeKey(employee.IamId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

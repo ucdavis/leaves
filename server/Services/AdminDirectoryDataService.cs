@@ -103,7 +103,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .AnyAsync(employee => employee.IamId.Trim() == normalizedIamId, cancellationToken);
     }
 
-    public async Task<bool> UserBelongsToDepartmentAsync(
+    public async Task<bool> IsCurrentFacultyInDepartmentAsync(
         string iamId,
         string departmentCode,
         CancellationToken cancellationToken)
@@ -115,12 +115,16 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return false;
         }
 
-        return await _db.CurrentEmployees
-            .AnyAsync(employee =>
-                employee.IamId.Trim() == normalizedIamId &&
-                employee.ResolvedReportingDepartmentCode != null &&
-                employee.ResolvedReportingDepartmentCode.Trim() == normalizedDepartmentCode,
-                cancellationToken);
+        return await (
+                from employee in _db.CurrentEmployees
+                join person in _db.People on employee.IamId equals person.IamId
+                where employee.IamId.Trim() == normalizedIamId &&
+                      employee.ResolvedReportingDepartmentCode != null &&
+                      employee.ResolvedReportingDepartmentCode.Trim() == normalizedDepartmentCode &&
+                      person.IsEmployee == true &&
+                      person.IsFaculty == true
+                select employee.IamId)
+            .AnyAsync(cancellationToken);
     }
 
     private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(CancellationToken cancellationToken)
