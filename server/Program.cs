@@ -104,8 +104,8 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-        await init.InitializeAsync(
-            app.Environment.IsEnvironment("Local") || app.Environment.IsDevelopment());
+        var seedDevelopmentData = builder.Configuration.GetValue<bool>("DevelopmentData:SeedOnStartup");
+        await init.InitializeAsync(seedDevelopmentData);
     }
 
     app.UseForwardedHeaders();
