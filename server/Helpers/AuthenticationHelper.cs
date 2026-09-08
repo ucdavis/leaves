@@ -8,6 +8,8 @@ namespace Server.Helpers;
 
 public static class AuthenticationHelper
 {
+    public const string EmulatingUserClaimType = "emulating_user";
+
     /// <summary>
     /// Configures Microsoft Identity Web authentication with Azure AD/Entra ID
     /// </summary>

@@ -46,6 +46,14 @@ export default defineConfig({
         secure: false,
         target,
       },
+      '^/[Aa]ccount/[Ee]nd[Ee]mulate(?:/|$)': {
+        secure: false,
+        target,
+      },
+      '^/[Aa]dmin/[Ee]mulate(?:/|$)': {
+        secure: false,
+        target,
+      },
       '^/api': {
         secure: false,
         target,

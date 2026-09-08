@@ -1,7 +1,11 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Web;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Helpers;
@@ -39,6 +43,106 @@ public sealed class AdminController : ApiControllerBase
     public async Task<IActionResult> GetFaculty(CancellationToken cancellationToken)
     {
         return Ok(await _adminDirectoryService.GetFacultyAsync(cancellationToken));
+    }
+
+    [HttpGet("/Admin/Emulate/{identifier}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Emulate([FromRoute] string? identifier, CancellationToken cancellationToken)
+    {
+        var normalizedIdentifier = NullIfWhiteSpace(identifier)?.ToLowerInvariant();
+        if (normalizedIdentifier == null)
+        {
+            return Content("A user identifier is required.");
+        }
+
+        if (User.HasClaim(claim => claim.Type == AuthenticationHelper.EmulatingUserClaimType))
+        {
+            return Content("You are already emulating a user.");
+        }
+
+        var people = await _db.People
+            .Where(person => person.IamId.Trim().ToLower() == normalizedIdentifier ||
+                (person.EmployeeId != null && person.EmployeeId.Trim().ToLower() == normalizedIdentifier) ||
+                (person.Email != null && person.Email.Trim().ToLower() == normalizedIdentifier) ||
+                (person.UserId != null && person.UserId.Trim().ToLower() == normalizedIdentifier))
+            .Take(2)
+            .ToListAsync(cancellationToken);
+        if (people.Count == 0)
+        {
+            return Content("User not found in the People table.");
+        }
+
+        if (people.Count > 1)
+        {
+            return Content("Multiple people match that identifier. Use the user's IAM ID.");
+        }
+
+        var person = people[0];
+        var iamId = person.IamId.Trim();
+        var matchingUsers = _db.AppUsers
+            .Where(user => user.IamId.Trim() == iamId)
+            .OrderByDescending(user => user.UpdatedUtc)
+            .ThenByDescending(user => user.Id);
+        var user = await matchingUsers.FirstOrDefaultAsync(cancellationToken);
+        if (user == null)
+        {
+            var now = DateTime.UtcNow;
+            user = new AppUser
+            {
+                EntraObjectId = Guid.NewGuid(),
+                IamId = iamId,
+                EmployeeId = NullIfWhiteSpace(person.EmployeeId),
+                DisplayName = NullIfWhiteSpace(person.FullName) ?? NullIfWhiteSpace(person.UserId)
+                    ?? NullIfWhiteSpace(person.Email) ?? iamId,
+                Email = NullIfWhiteSpace(person.Email),
+                FirstLoginUtc = now,
+                CreatedUtc = now,
+                UpdatedUtc = now,
+            };
+            _db.AppUsers.Add(user);
+
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (IsDuplicateAppUser(ex))
+            {
+                _db.Entry(user).State = EntityState.Detached;
+                user = await matchingUsers.FirstOrDefaultAsync(cancellationToken);
+                if (user == null)
+                {
+                    return Conflict("An AppUser with that employee ID or identity already exists for another person.");
+                }
+            }
+        }
+
+        var userId = user.EntraObjectId.ToString();
+        var displayName = NullIfWhiteSpace(user.DisplayName) ?? NullIfWhiteSpace(person.FullName)
+            ?? NullIfWhiteSpace(person.UserId) ?? iamId;
+        var claims = new List<Claim>
+        {
+            new(ClaimConstants.ObjectId, userId),
+            new(ClaimTypes.NameIdentifier, userId),
+            new(ClaimTypes.Name, displayName),
+            new("name", displayName),
+            new("ucdPersonIAMID", user.IamId.Trim()),
+            new(AuthenticationHelper.EmulatingUserClaimType, User.GetUserId()),
+        };
+        var email = NullIfWhiteSpace(person.Email) ?? NullIfWhiteSpace(user.Email);
+        if (email != null)
+        {
+            claims.Add(new Claim(ClaimTypes.Email, email));
+            claims.Add(new Claim("preferred_username", email));
+        }
+
+        var roles = await _userService.GetRolesForUser(userId);
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity));
+
+        return LocalRedirect("/");
     }
 
     [HttpPost("users")]

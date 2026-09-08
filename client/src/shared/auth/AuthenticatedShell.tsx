@@ -19,6 +19,7 @@ export const AuthenticatedShell = ({
   children: ReactNode;
 }) => {
   const user = useUser();
+  const userName = user.isEmulating ? `Emulating (${user.name})` : user.name;
   const location = useRouterState({
     select: (state) => state.location,
   });
@@ -81,14 +82,15 @@ export const AuthenticatedShell = ({
             {isLocalDevelopment ? (
               <LocalRoleSwitcher
                 currentReturnUrl={currentReturnUrl}
+                isEmulating={user.isEmulating}
                 roles={user.roles}
                 userName={user.name}
               />
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-3 text-right">
-                  <div className="hidden sm:block">
-                    <div className="text-sm font-semibold">{user.name}</div>
+                  <div className={user.isEmulating ? 'min-w-0' : 'hidden sm:block'}>
+                    <div className="text-sm font-semibold">{userName}</div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
                       SIGNED IN
                     </div>

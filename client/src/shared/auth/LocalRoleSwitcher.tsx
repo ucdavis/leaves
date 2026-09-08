@@ -40,10 +40,12 @@ const DEV_ROLE_SWITCH_OPTIONS = [
 
 export function LocalRoleSwitcher({
   currentReturnUrl,
+  isEmulating,
   roles,
   userName,
 }: {
   currentReturnUrl: string;
+  isEmulating: boolean;
   roles: readonly string[];
   userName: string;
 }) {
@@ -51,6 +53,7 @@ export function LocalRoleSwitcher({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const roleLabel = getUserRoleLabel(roles);
   const authLabel = `${roleLabel} · LOCAL DEV`;
+  const displayName = isEmulating ? `Emulating (${userName})` : userName;
 
   useEffect(() => {
     if (!isOpen) {
@@ -82,14 +85,14 @@ export function LocalRoleSwitcher({
     <div className="dropdown dropdown-end" ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        aria-label={`Open local role switcher for ${userName}`}
+        aria-label={`Open local role switcher for ${displayName}`}
         className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
-        <div className="hidden min-w-0 sm:block">
+        <div className={isEmulating ? 'min-w-0' : 'hidden min-w-0 sm:block'}>
           <div className="truncate text-sm font-semibold leading-tight">
-            {userName}
+            {displayName}
           </div>
           <div className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
             {authLabel}
