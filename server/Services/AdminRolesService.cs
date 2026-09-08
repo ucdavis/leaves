@@ -45,15 +45,13 @@ public sealed class AdminRolesService
             .Where(assignment =>
             {
                 var trimmedIamId = assignment.IamId.Trim();
-                return !currentEmployeesByIamId.TryGetValue(trimmedIamId, out var currentEmployee) ||
-                    !currentEmployee.HasCurrentAccrualRecord;
+                return !currentEmployeesByIamId.ContainsKey(trimmedIamId);
             })
             .ToList();
 
         var inactiveCaoAssignments = caoAssignments
             .Where(assignment =>
                 !currentEmployeesByIamId.TryGetValue(assignment.IamId.Trim(), out var currentEmployee) ||
-                !currentEmployee.HasCurrentAccrualRecord ||
                 !activeClusterIds.Contains(assignment.ClusterId))
             .ToList();
 
@@ -127,7 +125,7 @@ public sealed class AdminRolesService
                 active: IsRoleAssignmentActive(
                     currentEmployeesByIamId,
                     assignment.IamId,
-                    true),
+                    requiresCurrentAccrualRecord: false),
                 effectiveEndDate: null,
                 effectiveStartDate: null,
                 id: assignment.Id.ToString(),
@@ -143,12 +141,12 @@ public sealed class AdminRolesService
                     active: IsRoleAssignmentActive(
                         currentEmployeesByIamId,
                         assignment.IamId,
-                        true,
-                        cluster?.IsActive ?? false,
-                        assignment.EffectiveStartDate,
-                        assignment.EffectiveEndDateExclusive,
-                        today,
-                        assignment.ClosedUtc),
+                        requiresCurrentAccrualRecord: false,
+                        targetIsActive: cluster?.IsActive ?? false,
+                        startDate: assignment.EffectiveStartDate,
+                        endDate: assignment.EffectiveEndDateExclusive,
+                        today: today,
+                        closedUtc: assignment.ClosedUtc),
                     effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
@@ -167,16 +165,16 @@ public sealed class AdminRolesService
                     active: IsRoleAssignmentActive(
                         currentEmployeesByIamId,
                         assignment.IamId,
-                        true,
-                        (department?.IsActive ?? false) &&
+                        requiresCurrentAccrualRecord: true,
+                        targetIsActive: (department?.IsActive ?? false) &&
                             string.Equals(
                                 currentEmployee?.ResolvedReportingDepartmentCode?.Trim(),
                                 chairDepartmentCode,
                                 StringComparison.OrdinalIgnoreCase),
-                        assignment.EffectiveStartDate,
-                        assignment.EffectiveEndDateExclusive,
-                        today,
-                        assignment.ClosedUtc),
+                        startDate: assignment.EffectiveStartDate,
+                        endDate: assignment.EffectiveEndDateExclusive,
+                        today: today,
+                        closedUtc: assignment.ClosedUtc),
                     effectiveEndDate: assignment.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     effectiveStartDate: assignment.EffectiveStartDate.ToString("yyyy-MM-dd"),
                     id: assignment.Id.ToString(),
@@ -193,7 +191,6 @@ public sealed class AdminRolesService
             .ToList();
 
         var users = roleOptionsData.CurrentEmployees
-            .Where(employee => employee.HasCurrentAccrualRecord)
             .Select(employee =>
             {
                 var iamId = employee.IamId.Trim();
@@ -250,25 +247,20 @@ public sealed class AdminRolesService
     private static bool IsRoleAssignmentActive(
         IReadOnlyDictionary<string, CurrentEmployee> currentEmployeesByIamId,
         string iamId,
-        bool activeByAssignmentState,
+        bool requiresCurrentAccrualRecord,
         bool targetIsActive = true,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         DateOnly? today = null,
         DateTime? closedUtc = null)
     {
-        if (!activeByAssignmentState)
-        {
-            return false;
-        }
-
         var trimmedIamId = iamId.Trim();
         if (!currentEmployeesByIamId.TryGetValue(trimmedIamId, out var currentEmployee))
         {
             return false;
         }
 
-        if (!currentEmployee.HasCurrentAccrualRecord)
+        if (requiresCurrentAccrualRecord && !currentEmployee.HasCurrentAccrualRecord)
         {
             return false;
         }

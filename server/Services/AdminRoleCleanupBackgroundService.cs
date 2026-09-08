@@ -8,7 +8,7 @@ namespace Server.Services;
 
 public sealed class AdminRoleCleanupBackgroundService : BackgroundService
 {
-    private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromDays(7);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AdminRoleCleanupBackgroundService> _logger;
