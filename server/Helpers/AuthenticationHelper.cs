@@ -43,8 +43,9 @@ public static class AuthenticationHelper
                 OnValidatePrincipal = OnValidatePrincipal,
                 OnRedirectToAccessDenied = ctx =>
                 {
-                    // If the request is for an API endpoint, don't redirect to the access denied page
-                    if (ctx.Request.Path.StartsWithSegments("/api"))
+                    // API and system endpoints report denied access directly.
+                    if (ctx.Request.Path.StartsWithSegments("/api") ||
+                        ctx.Request.Path.StartsWithSegments("/system"))
                     {
                         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
                     }

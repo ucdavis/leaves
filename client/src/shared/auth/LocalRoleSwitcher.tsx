@@ -108,6 +108,17 @@ export function LocalRoleSwitcher({
 
       {isOpen ? (
         <ul className="menu dropdown-content z-30 mt-3 w-80 rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
+          {isEmulating ? (
+            <li>
+              <a
+                className="rounded-xl px-3 py-3 font-semibold"
+                href="/system/endemulate"
+                onClick={() => setIsOpen(false)}
+              >
+                End emulation
+              </a>
+            </li>
+          ) : null}
           <li className="menu-title px-3 pt-2 pb-1 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-base-content/50">
             Switch local role
           </li>

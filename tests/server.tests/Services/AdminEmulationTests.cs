@@ -1,7 +1,9 @@
+using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -17,23 +19,55 @@ using Server.Services;
 
 namespace Server.Tests.Services;
 
-public class AdminEmulationTests
+public class SystemEmulationTests
 {
     [Fact]
-    public void Emulate_requires_the_admin_policy_and_accepts_a_route_identifier_without_caching()
+    public void Emulate_requires_the_admin_policy_for_get_and_post_without_caching()
     {
-        typeof(AdminController).GetCustomAttributes<AuthorizeAttribute>()
-            .Should().Contain(attribute => attribute.Policy == "AdminOnly");
-        var action = typeof(AdminController).GetMethod(nameof(AdminController.Emulate))!;
+        var controllerType = typeof(SystemController);
+        controllerType.GetCustomAttribute<AllowAnonymousAttribute>().Should().BeNull();
+        controllerType.GetCustomAttributes<AuthorizeAttribute>().Should().BeEmpty();
+        var get = controllerType.GetMethod(nameof(SystemController.Emulate), Type.EmptyTypes)!;
+        var post = controllerType.GetMethod(nameof(SystemController.Emulate), [typeof(string), typeof(CancellationToken)])!;
 
-        action.GetCustomAttribute<HttpGetAttribute>()!.Template.Should().Be("/Admin/Emulate/{identifier}");
-        action.GetCustomAttribute<HttpPostAttribute>().Should().BeNull();
-        action.GetParameters().Single(parameter => parameter.Name == "identifier")
-            .GetCustomAttribute<FromRouteAttribute>().Should().NotBeNull();
-        var cache = action.GetCustomAttribute<ResponseCacheAttribute>()!;
-        cache.NoStore.Should().BeTrue();
-        cache.Location.Should().Be(ResponseCacheLocation.None);
-        action.GetCustomAttribute<AllowAnonymousAttribute>().Should().BeNull();
+        get.GetCustomAttribute<HttpGetAttribute>()!.Template.Should().Be("/system/emulate");
+        get.GetCustomAttribute<HttpPostAttribute>().Should().BeNull();
+        post.GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("/system/emulate");
+        post.GetCustomAttribute<HttpGetAttribute>().Should().BeNull();
+        post.GetParameters().Single(parameter => parameter.Name == "identifier")
+            .GetCustomAttribute<FromFormAttribute>().Should().NotBeNull();
+        post.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>().Should().NotBeNull();
+        foreach (var action in new[] { get, post })
+        {
+            action.GetCustomAttributes<AuthorizeAttribute>()
+                .Should().Contain(attribute => attribute.Policy == "AdminOnly");
+            action.GetCustomAttribute<AllowAnonymousAttribute>().Should().BeNull();
+            var cache = action.GetCustomAttribute<ResponseCacheAttribute>()!;
+            cache.NoStore.Should().BeTrue();
+            cache.Location.Should().Be(ResponseCacheLocation.None);
+        }
+    }
+
+    [Fact]
+    public void Emulate_get_renders_a_post_form_with_antiforgery_without_creating_or_signing_in_a_user()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        AddPerson(db);
+        var antiforgery = new RecordingAntiforgery();
+        var (controller, authentication) = CreateController(db, antiforgery: antiforgery);
+
+        var result = controller.Emulate();
+
+        var page = result.Should().BeOfType<ContentResult>().Which;
+        page.ContentType.Should().StartWith("text/html");
+        page.Content.Should().MatchRegex("<form\\b[^>]*action=\"/system/emulate\"");
+        page.Content.Should().MatchRegex("<form\\b[^>]*method=\"post\"");
+        page.Content.Should().MatchRegex("<input\\b[^>]*name=\"identifier\"");
+        page.Content.Should().MatchRegex("<input\\b(?=[^>]*type=\"hidden\")(?=[^>]*name=\"__RequestVerificationToken\")[^>]*value=\"request-token\"");
+        antiforgery.TokenContext.Should().BeSameAs(controller.HttpContext);
+        db.AppUsers.Should().BeEmpty();
+        authentication.Principal.Should().BeNull();
+        authentication.SignOutScheme.Should().BeNull();
     }
 
     [Theory]
@@ -70,7 +104,9 @@ public class AdminEmulationTests
 
         var result = await controller.Emulate(identifier, default);
 
-        result.Should().BeOfType<ContentResult>().Which.Content.Should().Be(expectedContent);
+        var page = result.Should().BeOfType<ContentResult>().Which;
+        page.ContentType.Should().StartWith("text/html");
+        WebUtility.HtmlDecode(page.Content).Should().Contain(expectedContent);
         db.AppUsers.Should().BeEmpty();
         authentication.Principal.Should().BeNull();
     }
@@ -86,8 +122,9 @@ public class AdminEmulationTests
 
         var result = await controller.Emulate("target", default);
 
-        result.Should().BeOfType<ContentResult>().Which.Content
-            .Should().Be("Multiple people match that identifier. Use the user's IAM ID.");
+        var page = result.Should().BeOfType<ContentResult>().Which;
+        WebUtility.HtmlDecode(page.Content)
+            .Should().Contain("Multiple people match that identifier. Use the user's IAM ID.");
         db.AppUsers.Should().BeEmpty();
         authentication.Principal.Should().BeNull();
     }
@@ -105,7 +142,31 @@ public class AdminEmulationTests
 
         var result = await controller.Emulate("iam123", default);
 
-        result.Should().BeOfType<ContentResult>().Which.Content.Should().Be("You are already emulating a user.");
+        var page = result.Should().BeOfType<ContentResult>().Which;
+        WebUtility.HtmlDecode(page.Content).Should().Contain("You are already emulating a user.");
+        db.AppUsers.Should().BeEmpty();
+        authentication.Principal.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Emulate_post_preserves_an_encoded_search_value_and_antiforgery_token_for_retry()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var antiforgery = new RecordingAntiforgery();
+        var (controller, authentication) = CreateController(db, antiforgery: antiforgery);
+        const string identifier = "\"><script>alert(\"x\")</script>&";
+
+        var result = await controller.Emulate(identifier, default);
+
+        var page = result.Should().BeOfType<ContentResult>().Which;
+        page.ContentType.Should().StartWith("text/html");
+        page.Content.Should().Contain("User not found in the People table.");
+        page.Content.Should().MatchRegex("<form\\b[^>]*action=\"/system/emulate\"");
+        page.Content.Should().MatchRegex("<form\\b[^>]*method=\"post\"");
+        page.Content.Should().Contain("value=\"&quot;&gt;&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;&amp;\"");
+        page.Content.Should().NotContain(identifier);
+        page.Content.Should().MatchRegex("<input\\b(?=[^>]*type=\"hidden\")(?=[^>]*name=\"__RequestVerificationToken\")[^>]*value=\"request-token\"");
+        antiforgery.TokenContext.Should().BeSameAs(controller.HttpContext);
         db.AppUsers.Should().BeEmpty();
         authentication.Principal.Should().BeNull();
     }
@@ -334,11 +395,11 @@ public class AdminEmulationTests
     [Fact]
     public void EndEmulate_is_accessible_without_admin_access_and_does_not_cache()
     {
-        var controllerType = typeof(AccountController);
-        var action = controllerType.GetMethod(nameof(AccountController.EndEmulate))!;
+        var controllerType = typeof(SystemController);
+        var action = controllerType.GetMethod(nameof(SystemController.EndEmulate))!;
 
-        action.GetCustomAttribute<HttpGetAttribute>()!.Template.Should().Be("/Account/EndEmulate");
-        controllerType.GetCustomAttribute<AllowAnonymousAttribute>().Should().NotBeNull();
+        action.GetCustomAttribute<HttpGetAttribute>()!.Template.Should().Be("/system/endemulate");
+        action.GetCustomAttribute<AllowAnonymousAttribute>().Should().NotBeNull();
         controllerType.GetCustomAttributes<AuthorizeAttribute>()
             .Concat(action.GetCustomAttributes<AuthorizeAttribute>())
             .Should().NotContain(attribute => attribute.Policy == "AdminOnly");
@@ -367,18 +428,8 @@ public class AdminEmulationTests
         {
             identity.AddClaim(new Claim(ClaimTypes.Role, role));
         }
-        var authentication = new RecordingAuthenticationService();
-        var controller = new AccountController(null!, null!)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    RequestServices = authentication,
-                    User = principal,
-                },
-            },
-        };
+        using var db = TestDbContextFactory.CreateInMemory();
+        var (controller, authentication) = CreateController(db, principal);
 
         var result = await controller.EndEmulate();
 
@@ -435,12 +486,13 @@ public class AdminEmulationTests
             new Claim("name", "Original Name"),
         ], CookieAuthenticationDefaults.AuthenticationScheme));
 
-    private static (AdminController Controller, RecordingAuthenticationService Authentication) CreateController(
+    private static (SystemController Controller, RecordingAuthenticationService Authentication) CreateController(
         AppDbContext db,
-        ClaimsPrincipal? principal = null)
+        ClaimsPrincipal? principal = null,
+        RecordingAntiforgery? antiforgery = null)
     {
         var authentication = new RecordingAuthenticationService();
-        var controller = new AdminController(db, null!, null!, CreateUserService(db))
+        var controller = new SystemController(db, CreateUserService(db), antiforgery ?? new RecordingAntiforgery())
         {
             ControllerContext = new ControllerContext
             {
@@ -452,6 +504,29 @@ public class AdminEmulationTests
             },
         };
         return (controller, authentication);
+    }
+
+    private sealed class RecordingAntiforgery : IAntiforgery
+    {
+        public HttpContext? TokenContext { get; private set; }
+
+        public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext)
+        {
+            TokenContext = httpContext;
+            return new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "RequestVerificationToken");
+        }
+
+        public AntiforgeryTokenSet GetTokens(HttpContext httpContext) =>
+            throw new NotSupportedException();
+
+        public Task<bool> IsRequestValidAsync(HttpContext httpContext) =>
+            throw new NotSupportedException();
+
+        public Task ValidateRequestAsync(HttpContext httpContext) =>
+            throw new NotSupportedException();
+
+        public void SetCookieTokenAndHeader(HttpContext httpContext) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingAuthenticationService : IAuthenticationService, IServiceProvider

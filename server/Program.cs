@@ -35,7 +35,7 @@ try
     // Add auth config (entra)
     builder.Services.AddAuthenticationServices(builder.Configuration);
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllersWithViews();
     builder.Services.AddNotificationServices(builder.Configuration);
     builder.Services.AddAuthorization(options =>
     {

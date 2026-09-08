@@ -87,14 +87,6 @@ public class AccountController : Controller
         };
     }
 
-    [HttpGet("/Account/EndEmulate")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> EndEmulate()
-    {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return LocalRedirect("/login");
-    }
-
     private static string NormalizeReturnUrl(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
