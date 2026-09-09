@@ -44,11 +44,11 @@ public sealed class AdminRolesController : ApiControllerBase
 
         var isEligibleForAdminAssignment = await _db.CurrentEmployees
             .AnyAsync(
-                employee => employee.IamId.Trim() == iamId && employee.HasCurrentAccrualRecord,
+                employee => employee.IamId.Trim() == iamId,
                 cancellationToken);
         if (!isEligibleForAdminAssignment)
         {
-            return ValidationProblem("Selected user must have both a People record and a current accrual record.");
+            return ValidationProblem("Selected user must be a current directory user.");
         }
 
         var createdByAppUserId = await GetAuthenticatedAppUserId(cancellationToken);
