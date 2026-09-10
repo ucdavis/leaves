@@ -19,6 +19,7 @@ export const AuthenticatedShell = ({
   children: ReactNode;
 }) => {
   const user = useUser();
+  const userName = user.isEmulating ? `Emulating (${user.name})` : user.name;
   const location = useRouterState({
     select: (state) => state.location,
   });
@@ -60,6 +61,19 @@ export const AuthenticatedShell = ({
     .slice(0, 2)
     .toUpperCase();
   const currentReturnUrl = `${location.pathname}${location.search}`;
+  const userIdentity = (
+    <>
+      <span className={user.isEmulating ? 'min-w-0' : 'hidden sm:block'}>
+        <span className="block text-sm font-semibold">{userName}</span>
+        <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+          SIGNED IN
+        </span>
+      </span>
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
+        {initials || '?'}
+      </span>
+    </>
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-base-200">
@@ -81,22 +95,29 @@ export const AuthenticatedShell = ({
             {isLocalDevelopment ? (
               <LocalRoleSwitcher
                 currentReturnUrl={currentReturnUrl}
+                isEmulating={user.isEmulating}
                 roles={user.roles}
                 userName={user.name}
               />
+            ) : user.isEmulating ? (
+              <details className="dropdown dropdown-end">
+                <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg text-right focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary [&::-webkit-details-marker]:hidden">
+                  {userIdentity}
+                  <span aria-hidden="true" className="text-primary-content/70">
+                    ▾
+                  </span>
+                </summary>
+                <ul className="menu dropdown-content z-30 mt-3 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
+                  <li>
+                    <a className="rounded-xl px-3 py-3" href="/system/endemulate">
+                      End emulation
+                    </a>
+                  </li>
+                </ul>
+              </details>
             ) : (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-3 text-right">
-                  <div className="hidden sm:block">
-                    <div className="text-sm font-semibold">{user.name}</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
-                      SIGNED IN
-                    </div>
-                  </div>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
-                    {initials || '?'}
-                  </div>
-                </div>
+              <div className="flex items-center gap-3 text-right">
+                {userIdentity}
               </div>
             )}
           </div>

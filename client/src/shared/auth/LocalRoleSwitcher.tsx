@@ -40,10 +40,12 @@ const DEV_ROLE_SWITCH_OPTIONS = [
 
 export function LocalRoleSwitcher({
   currentReturnUrl,
+  isEmulating,
   roles,
   userName,
 }: {
   currentReturnUrl: string;
+  isEmulating: boolean;
   roles: readonly string[];
   userName: string;
 }) {
@@ -51,6 +53,7 @@ export function LocalRoleSwitcher({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const roleLabel = getUserRoleLabel(roles);
   const authLabel = `${roleLabel} · LOCAL DEV`;
+  const displayName = isEmulating ? `Emulating (${userName})` : userName;
 
   useEffect(() => {
     if (!isOpen) {
@@ -82,14 +85,14 @@ export function LocalRoleSwitcher({
     <div className="dropdown dropdown-end" ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        aria-label={`Open local role switcher for ${userName}`}
+        aria-label={`Open local role switcher for ${displayName}`}
         className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
-        <div className="hidden min-w-0 sm:block">
+        <div className={isEmulating ? 'min-w-0' : 'hidden min-w-0 sm:block'}>
           <div className="truncate text-sm font-semibold leading-tight">
-            {userName}
+            {displayName}
           </div>
           <div className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
             {authLabel}
@@ -105,6 +108,17 @@ export function LocalRoleSwitcher({
 
       {isOpen ? (
         <ul className="menu dropdown-content z-30 mt-3 w-80 rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
+          {isEmulating ? (
+            <li>
+              <a
+                className="rounded-xl px-3 py-3 font-semibold"
+                href="/system/endemulate"
+                onClick={() => setIsOpen(false)}
+              >
+                End emulation
+              </a>
+            </li>
+          ) : null}
           <li className="menu-title px-3 pt-2 pb-1 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-base-content/50">
             Switch local role
           </li>

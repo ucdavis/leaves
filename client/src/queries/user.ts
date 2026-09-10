@@ -5,6 +5,7 @@ export type User = {
   email: string;
   entraObjectId?: string;
   id: string;
+  isEmulating: boolean;
   name: string;
   roles: string[];
 };

@@ -36,7 +36,8 @@ public class UserController : ApiControllerBase
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var response = new UserResponse(userId, entraObjectId, userName, userEmail, userRoles);
+        var isEmulating = User.HasClaim(claim => claim.Type == AuthenticationHelper.EmulatingUserClaimType);
+        var response = new UserResponse(userId, entraObjectId, userName, userEmail, userRoles, isEmulating);
         return Ok(response);
     }
 
@@ -47,5 +48,6 @@ public class UserController : ApiControllerBase
         string? EntraObjectId,
         string Name,
         string Email,
-        IReadOnlyCollection<string> Roles);
+        IReadOnlyCollection<string> Roles,
+        bool IsEmulating);
 }

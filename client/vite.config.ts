@@ -46,6 +46,10 @@ export default defineConfig({
         secure: false,
         target,
       },
+      '^/[Ss]ystem(?:/|$)': {
+        secure: false,
+        target,
+      },
       '^/api': {
         secure: false,
         target,

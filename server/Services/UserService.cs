@@ -55,6 +55,15 @@ public class UserService : IUserService
             return false;
         }
 
+        if (principal.HasClaim(claim => claim.Type == AuthenticationHelper.EmulatingUserClaimType))
+        {
+            // Keep emulation tied to the selected AppUser instead of resolving it again by email.
+            var emulatedIamId = principal.FindFirstValue("ucdPersonIAMID");
+            return await _dbContext.AppUsers.AnyAsync(
+                appUser => appUser.EntraObjectId == entraObjectId && appUser.IamId.Trim() == emulatedIamId,
+                cancellationToken);
+        }
+
         var email =
             principal.FindFirst("preferred_username")?.Value
             ?? principal.FindFirst(ClaimTypes.Email)?.Value;
@@ -78,6 +87,17 @@ public class UserService : IUserService
                 entraObjectId);
             return false;
         }
+
+        if (existingUser == null && recordSignIn)
+        {
+            // A profile created for emulation has a temporary object ID and no real sign-in yet.
+            existingUser = await FindUnusedProfileByIamIdAsync(iamId, cancellationToken);
+            if (existingUser != null)
+            {
+                existingUser.EntraObjectId = entraObjectId;
+            }
+        }
+
         var matchedPersonByIamId = await FindPersonByIamIdAsync(iamId, cancellationToken);
         var resolvedEmployeeId =
             NormalizeEmployeeId(matchedPerson?.EmployeeId)
@@ -136,7 +156,20 @@ public class UserService : IUserService
                 _dbContext.Entry(existingUser!).State = EntityState.Detached;
 
                 var concurrentUser = await _dbContext.AppUsers
-                    .SingleAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
+                    .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
+                if (concurrentUser == null && recordSignIn)
+                {
+                    concurrentUser = await FindUnusedProfileByIamIdAsync(iamId, cancellationToken);
+                    if (concurrentUser != null)
+                    {
+                        concurrentUser.EntraObjectId = entraObjectId;
+                    }
+                }
+
+                if (concurrentUser == null)
+                {
+                    throw;
+                }
 
                 if (ApplyExistingUserUpdates(
                     concurrentUser,
@@ -374,6 +407,15 @@ public class UserService : IUserService
 
         var normalized = compact.Trim().ToLowerInvariant();
         return normalized.Length <= 10 ? normalized : null;
+    }
+
+    private Task<AppUser?> FindUnusedProfileByIamIdAsync(string iamId, CancellationToken cancellationToken)
+    {
+        return _dbContext.AppUsers
+            .Where(appUser => appUser.IamId.Trim().ToLower() == iamId && appUser.LastLoginUtc == null)
+            .OrderByDescending(appUser => appUser.UpdatedUtc)
+            .ThenByDescending(appUser => appUser.Id)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<Person?> FindPersonByEmailAsync(string? email, CancellationToken cancellationToken)

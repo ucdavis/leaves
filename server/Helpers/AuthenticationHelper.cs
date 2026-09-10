@@ -8,6 +8,8 @@ namespace Server.Helpers;
 
 public static class AuthenticationHelper
 {
+    public const string EmulatingUserClaimType = "emulating_user";
+
     /// <summary>
     /// Configures Microsoft Identity Web authentication with Azure AD/Entra ID
     /// </summary>
@@ -41,8 +43,9 @@ public static class AuthenticationHelper
                 OnValidatePrincipal = OnValidatePrincipal,
                 OnRedirectToAccessDenied = ctx =>
                 {
-                    // If the request is for an API endpoint, don't redirect to the access denied page
-                    if (ctx.Request.Path.StartsWithSegments("/api"))
+                    // API and system endpoints report denied access directly.
+                    if (ctx.Request.Path.StartsWithSegments("/api") ||
+                        ctx.Request.Path.StartsWithSegments("/system"))
                     {
                         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
                     }
