@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+
 namespace Server.Core.Notification;
 
 public sealed class EmailDeliveryOptions
@@ -16,4 +18,32 @@ public sealed class EmailDeliveryOptions
     public int MaxAttempts { get; init; } = 5;
 
     public int LockDurationMinutes { get; init; } = 15;
+}
+
+public sealed class EmailDeliveryOptionsValidator : IValidateOptions<EmailDeliveryOptions>
+{
+    public ValidateOptionsResult Validate(string? name, EmailDeliveryOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (!options.Enabled)
+        {
+            return ValidateOptionsResult.Success;
+        }
+
+        var failures = new List<string>();
+        if (options.BatchSize <= 0)
+        {
+            failures.Add("EmailDelivery:BatchSize must be greater than zero when email delivery is enabled.");
+        }
+
+        if (options.LockDurationMinutes <= 0)
+        {
+            failures.Add("EmailDelivery:LockDurationMinutes must be greater than zero when email delivery is enabled.");
+        }
+
+        return failures.Count == 0
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(failures);
+    }
 }
