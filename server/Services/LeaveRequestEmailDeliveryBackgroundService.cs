@@ -44,7 +44,9 @@ public sealed class LeaveRequestEmailDeliveryBackgroundService : BackgroundServi
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await ProcessDueAsync(stoppingToken);
+            while (await ProcessDueAsync(stoppingToken))
+            {
+            }
 
             using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             var signaled = _wakeSignal.WaitAsync(waitCancellation.Token).AsTask();
@@ -62,7 +64,7 @@ public sealed class LeaveRequestEmailDeliveryBackgroundService : BackgroundServi
         }
     }
 
-    private async Task ProcessDueAsync(CancellationToken cancellationToken)
+    private async Task<bool> ProcessDueAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -79,13 +81,17 @@ public sealed class LeaveRequestEmailDeliveryBackgroundService : BackgroundServi
                     result.RetryCount,
                     result.DeadLetterCount);
             }
+
+            return result.ClaimedCount > 0;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            return false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Leave-request email delivery batch failed.");
+            return false;
         }
     }
 }

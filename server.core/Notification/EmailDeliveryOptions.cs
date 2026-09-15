@@ -18,6 +18,10 @@ public sealed class EmailDeliveryOptions
     public int MaxAttempts { get; init; } = 5;
 
     public int LockDurationMinutes { get; init; } = 15;
+
+    // A delivery can take longer than a single SMTP socket operation. Renew its
+    // database lease while rendering and sending so another worker cannot reclaim it.
+    public int LeaseRenewalIntervalSeconds { get; init; } = 30;
 }
 
 public sealed class EmailDeliveryOptionsValidator : IValidateOptions<EmailDeliveryOptions>
@@ -40,6 +44,16 @@ public sealed class EmailDeliveryOptionsValidator : IValidateOptions<EmailDelive
         if (options.LockDurationMinutes <= 0)
         {
             failures.Add("EmailDelivery:LockDurationMinutes must be greater than zero when email delivery is enabled.");
+        }
+
+        if (options.LeaseRenewalIntervalSeconds <= 0)
+        {
+            failures.Add("EmailDelivery:LeaseRenewalIntervalSeconds must be greater than zero when email delivery is enabled.");
+        }
+        else if (options.LockDurationMinutes > 0 &&
+                 options.LeaseRenewalIntervalSeconds >= TimeSpan.FromMinutes(options.LockDurationMinutes).TotalSeconds)
+        {
+            failures.Add("EmailDelivery:LeaseRenewalIntervalSeconds must be shorter than EmailDelivery:LockDurationMinutes when email delivery is enabled.");
         }
 
         return failures.Count == 0

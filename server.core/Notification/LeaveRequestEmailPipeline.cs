@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Server.Core.Data;
@@ -146,36 +147,63 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
     private readonly AppDbContext _db;
     private readonly INotificationService _notificationService;
     private readonly EmailDeliveryOptions _options;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<LeaveRequestEmailDeliveryService> _logger;
 
     public LeaveRequestEmailDeliveryService(
         AppDbContext db,
         INotificationService notificationService,
         IOptions<EmailDeliveryOptions> options,
+        IServiceScopeFactory scopeFactory,
         ILogger<LeaveRequestEmailDeliveryService> logger)
     {
         _db = db;
         _notificationService = notificationService;
         _options = options.Value;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
     public async Task<LeaveRequestEmailDeliveryResult> ProcessDueAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
-        var claimed = await ClaimDueAsync(nowUtc, cancellationToken);
+        ValidateOptions();
+
+        var claimed = 0;
         var sent = 0;
         var retry = 0;
         var deadLetter = 0;
 
-        foreach (var message in claimed)
+        while (claimed < _options.BatchSize)
         {
+            var message = await ClaimNextDueAsync(nowUtc, cancellationToken);
+            if (message is null)
+            {
+                break;
+            }
+
+            claimed++;
+
+            await using var lease = await TryStartLeaseAsync(message, cancellationToken);
+            if (lease is null)
+            {
+                LogOwnershipLost(message);
+                continue;
+            }
+
             try
             {
                 var notification = await CreateNotificationAsync(message, cancellationToken);
                 if (notification is null)
                 {
-                    await MarkDeadLetterAsync(message, "The related leave request could not be loaded.", cancellationToken);
-                    deadLetter++;
+                    if (await MarkDeadLetterAsync(message, "The related leave request could not be loaded.", cancellationToken))
+                    {
+                        deadLetter++;
+                    }
+                    else
+                    {
+                        LogOwnershipLost(message);
+                    }
+
                     continue;
                 }
 
@@ -184,21 +212,47 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                     notification.Subject,
                     notification.Header,
                     notification.Message,
-                    cancellationToken);
+                    lease.CancellationToken);
 
-                if (await MarkSentAsync(message, nowUtc, cancellationToken))
+                if (lease.HasLostOwnership)
+                {
+                    LogOwnershipLost(message);
+                    continue;
+                }
+
+                if (await MarkSentAsync(message, DateTime.UtcNow, cancellationToken))
                 {
                     sent++;
+                }
+                else
+                {
+                    LogOwnershipLost(message);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
+            catch (OperationCanceledException) when (lease.HasLostOwnership)
+            {
+                LogOwnershipLost(message);
+            }
             catch (Exception ex)
             {
-                var isDeadLetter = await MarkFailureAsync(message, nowUtc, ex, cancellationToken);
-                if (isDeadLetter)
+                if (lease.HasLostOwnership)
+                {
+                    LogOwnershipLost(message);
+                    continue;
+                }
+
+                var failure = await MarkFailureAsync(message, nowUtc, ex, cancellationToken);
+                if (!failure.Updated)
+                {
+                    LogOwnershipLost(message);
+                    continue;
+                }
+
+                if (failure.IsDeadLetter)
                 {
                     deadLetter++;
                 }
@@ -209,16 +263,25 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
             }
         }
 
-        return new LeaveRequestEmailDeliveryResult(claimed.Count, sent, retry, deadLetter);
+        return new LeaveRequestEmailDeliveryResult(claimed, sent, retry, deadLetter);
     }
 
-    private async Task<List<ClaimedOutboundMessage>> ClaimDueAsync(DateTime nowUtc, CancellationToken cancellationToken)
+    private void ValidateOptions()
     {
         if (_options.BatchSize <= 0 || _options.LockDurationMinutes <= 0)
         {
             throw new InvalidOperationException("EmailDelivery:BatchSize and EmailDelivery:LockDurationMinutes must be greater than zero.");
         }
 
+        if (_options.LeaseRenewalIntervalSeconds <= 0 ||
+            _options.LeaseRenewalIntervalSeconds >= TimeSpan.FromMinutes(_options.LockDurationMinutes).TotalSeconds)
+        {
+            throw new InvalidOperationException("EmailDelivery:LeaseRenewalIntervalSeconds must be greater than zero and shorter than EmailDelivery:LockDurationMinutes.");
+        }
+    }
+
+    private async Task<ClaimedOutboundMessage?> ClaimNextDueAsync(DateTime nowUtc, CancellationToken cancellationToken)
+    {
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var lockedUntilUtc = nowUtc.AddMinutes(_options.LockDurationMinutes);
         var messages = await _db.OutboundMessages
@@ -228,22 +291,54 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                 (message.LockedUntilUtc == null || message.LockedUntilUtc <= nowUtc))
             .OrderBy(message => message.NotBeforeUtc)
             .ThenBy(message => message.Id)
-            .Take(_options.BatchSize)
+            .Take(1)
             .ToListAsync(cancellationToken);
 
-        foreach (var message in messages)
+        var message = messages.SingleOrDefault();
+        if (message is not null)
         {
             message.LockId = Guid.NewGuid();
             message.LockedUntilUtc = lockedUntilUtc;
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         _db.ChangeTracker.Clear();
 
-        return messages
-            .Select(message => new ClaimedOutboundMessage(message.Id, message.LeaveRequestId, message.NotificationType, message.RecipientEmail, message.LockId!.Value, message.AttemptCount))
-            .ToList();
+        return message is null
+            ? null
+            : new ClaimedOutboundMessage(message.Id, message.LeaveRequestId, message.NotificationType, message.RecipientEmail, message.LockId!.Value, message.AttemptCount);
+    }
+
+    private async Task<DeliveryLease?> TryStartLeaseAsync(ClaimedOutboundMessage message, CancellationToken cancellationToken)
+    {
+        if (!await RenewLeaseAsync(message, cancellationToken))
+        {
+            return null;
+        }
+
+        return new DeliveryLease(this, message, cancellationToken);
+    }
+
+    private async Task<bool> RenewLeaseAsync(ClaimedOutboundMessage message, CancellationToken cancellationToken)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var nowUtc = DateTime.UtcNow;
+        var row = await db.OutboundMessages.SingleOrDefaultAsync(
+            row => row.Id == message.Id &&
+                   row.LockId == message.LockId &&
+                   row.LockedUntilUtc != null &&
+                   row.LockedUntilUtc > nowUtc,
+            cancellationToken);
+        if (row is null)
+        {
+            return false;
+        }
+
+        row.LockedUntilUtc = nowUtc.AddMinutes(_options.LockDurationMinutes);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private async Task<LeaveRequestEmailNotification?> CreateNotificationAsync(ClaimedOutboundMessage message, CancellationToken cancellationToken)
@@ -305,7 +400,7 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
             cancellationToken);
     }
 
-    private async Task<bool> MarkFailureAsync(ClaimedOutboundMessage message, DateTime nowUtc, Exception exception, CancellationToken cancellationToken)
+    private async Task<FailureResult> MarkFailureAsync(ClaimedOutboundMessage message, DateTime nowUtc, Exception exception, CancellationToken cancellationToken)
     {
         var nextAttempt = message.AttemptCount + 1;
         var deadLetter = nextAttempt >= _options.MaxAttempts;
@@ -335,12 +430,12 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                 message.NotificationType);
         }
 
-        return deadLetter;
+        return new FailureResult(updated, deadLetter);
     }
 
-    private async Task MarkDeadLetterAsync(ClaimedOutboundMessage message, string error, CancellationToken cancellationToken)
+    private Task<bool> MarkDeadLetterAsync(ClaimedOutboundMessage message, string error, CancellationToken cancellationToken)
     {
-        await UpdateClaimAsync(
+        return UpdateClaimAsync(
             message,
             row =>
             {
@@ -358,8 +453,12 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         Action<OutboundMessage> update,
         CancellationToken cancellationToken)
     {
+        var nowUtc = DateTime.UtcNow;
         var row = await _db.OutboundMessages.SingleOrDefaultAsync(
-            row => row.Id == message.Id && row.LockId == message.LockId,
+            row => row.Id == message.Id &&
+                   row.LockId == message.LockId &&
+                   row.LockedUntilUtc != null &&
+                   row.LockedUntilUtc > nowUtc,
             cancellationToken);
         if (row is null)
         {
@@ -371,6 +470,88 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         return true;
     }
 
+    private void LogOwnershipLost(ClaimedOutboundMessage message)
+    {
+        _logger.LogWarning(
+            "Stopped leave-request email delivery because its lease was lost. OutboundMessageId={OutboundMessageId} NotificationType={NotificationType}",
+            message.Id,
+            message.NotificationType);
+    }
+
+    private sealed class DeliveryLease : IAsyncDisposable
+    {
+        private readonly LeaveRequestEmailDeliveryService _owner;
+        private readonly ClaimedOutboundMessage _message;
+        private readonly CancellationTokenSource _cancellation;
+        private readonly Task _renewal;
+
+        public DeliveryLease(
+            LeaveRequestEmailDeliveryService owner,
+            ClaimedOutboundMessage message,
+            CancellationToken cancellationToken)
+        {
+            _owner = owner;
+            _message = message;
+            _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _renewal = RenewAsync();
+        }
+
+        public CancellationToken CancellationToken => _cancellation.Token;
+
+        public bool HasLostOwnership { get; private set; }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _cancellation.CancelAsync();
+
+            try
+            {
+                await _renewal;
+            }
+            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+            {
+                // Expected when the delivery path finishes before the next renewal.
+            }
+            finally
+            {
+                _cancellation.Dispose();
+            }
+        }
+
+        private async Task RenewAsync()
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_owner._options.LeaseRenewalIntervalSeconds));
+
+            try
+            {
+                while (await timer.WaitForNextTickAsync(_cancellation.Token))
+                {
+                    if (await _owner.RenewLeaseAsync(_message, _cancellation.Token))
+                    {
+                        continue;
+                    }
+
+                    HasLostOwnership = true;
+                    await _cancellation.CancelAsync();
+                    return;
+                }
+            }
+            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+            {
+                // The active delivery completed or was canceled.
+            }
+            catch (Exception ex)
+            {
+                HasLostOwnership = true;
+                _owner._logger.LogError(
+                    ex,
+                    "Stopped leave-request email delivery because its lease could not be renewed. OutboundMessageId={OutboundMessageId}",
+                    _message.Id);
+                await _cancellation.CancelAsync();
+            }
+        }
+    }
+
     private sealed record ClaimedOutboundMessage(
         int Id,
         int LeaveRequestId,
@@ -378,6 +559,8 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         string RecipientEmail,
         Guid LockId,
         int AttemptCount);
+
+    private sealed record FailureResult(bool Updated, bool IsDeadLetter);
 
     private sealed record LeaveRequestEmailNotification(string Subject, string Header, string Message);
 }
