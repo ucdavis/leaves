@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Core.Notification;
 using Server.Helpers;
 
 namespace Server.Services;
@@ -32,13 +33,19 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
     private readonly IAdminDirectoryDataService _directoryDataService;
     private readonly AppDbContext _db;
+    private readonly ILeaveRequestNotificationQueue _notificationQueue;
+    private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
 
     public ApprovalWorkspaceService(
         IAdminDirectoryDataService directoryDataService,
-        AppDbContext db)
+        AppDbContext db,
+        ILeaveRequestNotificationQueue notificationQueue,
+        IEmailDeliveryWakeSignal emailDeliveryWakeSignal)
     {
         _directoryDataService = directoryDataService;
         _db = db;
+        _notificationQueue = notificationQueue;
+        _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
     }
 
     public async Task<ApprovalWorkspaceResponse?> GetWorkspaceAsync(
@@ -202,6 +209,14 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return ApprovalDecisionResult.NotFound();
         }
 
+        var requester = await _db.AppUsers.SingleOrDefaultAsync(
+            user => user.Id == leaveRequest.AppUserId,
+            cancellationToken);
+        if (requester == null)
+        {
+            return ApprovalDecisionResult.NotFound();
+        }
+
         var nowUtc = DateTime.UtcNow;
         leaveRequest.Status = status.Value;
         leaveRequest.UpdatedUtc = nowUtc;
@@ -217,8 +232,10 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             Comment = request.Comment,
             IsSelfAction = false,
         });
+        _notificationQueue.QueueDecision(leaveRequest, requester);
 
         await _db.SaveChangesAsync(cancellationToken);
+        _emailDeliveryWakeSignal.Signal();
         return ApprovalDecisionResult.Success();
     }
 
