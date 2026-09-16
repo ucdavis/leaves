@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -12,8 +13,9 @@ namespace Server.Tests.Notification;
 public sealed class LeaveRequestEmailDeliveryServiceTests
 {
     [Fact]
-    public async Task ProcessDueAsync_allows_another_worker_to_process_unclaimed_and_expired_messages_while_a_delivery_is_slow()
+    public async Task ProcessDueAsync_renews_a_slow_delivery_while_another_worker_processes_unclaimed_and_expired_messages()
     {
+        const int BatchSize = 50;
         var databasePath = Path.Combine(Path.GetTempPath(), $"leaves-email-delivery-{Guid.NewGuid():N}.db");
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite($"Data Source={databasePath}")
@@ -23,21 +25,23 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         {
             var nowUtc = DateTime.UtcNow;
             await SeedAsync(options, nowUtc);
+            var leaseRenewal = new LeaseRenewalObserver("first@example.test");
 
             using var services = new ServiceCollection()
-                .AddScoped<AppDbContext>(_ => new SqliteAppDbContext(options))
+                .AddScoped<AppDbContext>(_ => new SqliteAppDbContext(options, leaseRenewal))
                 .BuildServiceProvider();
             var scopeFactory = services.GetRequiredService<IServiceScopeFactory>();
             var slowDelivery = new ControlledNotificationService("first@example.test");
             var otherDelivery = new ControlledNotificationService();
 
-            await using var firstDb = new SqliteAppDbContext(options);
-            await using var secondDb = new SqliteAppDbContext(options);
-            var firstWorker = CreateService(firstDb, slowDelivery, scopeFactory);
-            var secondWorker = CreateService(secondDb, otherDelivery, scopeFactory);
+            await using var firstDb = new SqliteAppDbContext(options, leaseRenewal);
+            await using var secondDb = new SqliteAppDbContext(options, leaseRenewal);
+            var firstWorker = CreateService(firstDb, slowDelivery, scopeFactory, BatchSize);
+            var secondWorker = CreateService(secondDb, otherDelivery, scopeFactory, BatchSize);
 
             var firstWorkerTask = firstWorker.ProcessDueAsync(nowUtc, CancellationToken.None);
             await slowDelivery.SendStarted.WaitAsync(TimeSpan.FromSeconds(10));
+            await leaseRenewal.FirstMessageRenewed.WaitAsync(TimeSpan.FromSeconds(10));
 
             var secondWorkerResult = await secondWorker.ProcessDueAsync(nowUtc, CancellationToken.None);
             slowDelivery.ReleaseSend();
@@ -45,12 +49,14 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
 
             firstWorkerResult.ClaimedCount.Should().Be(1);
             firstWorkerResult.SentCount.Should().Be(1);
-            secondWorkerResult.ClaimedCount.Should().Be(2);
-            secondWorkerResult.SentCount.Should().Be(2);
+            secondWorkerResult.ClaimedCount.Should().Be(BatchSize);
+            secondWorkerResult.SentCount.Should().Be(BatchSize);
             slowDelivery.DeliveredTo.Should().Equal("first@example.test");
-            otherDelivery.DeliveredTo.Should().Equal("second@example.test", "expired@example.test");
+            otherDelivery.DeliveredTo.Should().Equal(
+                Enumerable.Range(2, BatchSize - 1).Select(index => $"queued-{index:D2}@example.test")
+                    .Append("expired@example.test"));
 
-            await using var verificationDb = new SqliteAppDbContext(options);
+            await using var verificationDb = new SqliteAppDbContext(options, leaseRenewal);
             var messages = await verificationDb.OutboundMessages.OrderBy(message => message.Id).ToListAsync();
             messages.Should().OnlyContain(message => message.Status == OutboundMessageStatus.Sent);
         }
@@ -63,7 +69,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
     private static LeaveRequestEmailDeliveryService CreateService(
         AppDbContext db,
         INotificationService notificationService,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        int batchSize)
     {
         return new LeaveRequestEmailDeliveryService(
             db,
@@ -71,9 +78,9 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             Options.Create(new EmailDeliveryOptions
             {
                 Enabled = true,
-                BatchSize = 2,
+                BatchSize = batchSize,
                 LockDurationMinutes = 15,
-                LeaseRenewalIntervalSeconds = 30,
+                LeaseRenewalIntervalSeconds = 1,
             }),
             scopeFactory,
             NullLogger<LeaveRequestEmailDeliveryService>.Instance);
@@ -117,10 +124,11 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         db.LeaveRequests.Add(request);
         await db.SaveChangesAsync();
 
+        db.OutboundMessages.Add(CreateMessage(request.Id, "first@example.test", nowUtc));
         db.OutboundMessages.AddRange(
-            CreateMessage(request.Id, "first@example.test", nowUtc),
-            CreateMessage(request.Id, "second@example.test", nowUtc),
-            CreateMessage(request.Id, "expired@example.test", nowUtc, nowUtc.AddMinutes(-1)));
+            Enumerable.Range(2, 49)
+                .Select(index => CreateMessage(request.Id, $"queued-{index:D2}@example.test", nowUtc)));
+        db.OutboundMessages.Add(CreateMessage(request.Id, "expired@example.test", nowUtc, nowUtc.AddMinutes(-1)));
         await db.SaveChangesAsync();
     }
 
@@ -184,8 +192,42 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             throw new NotSupportedException();
     }
 
-    private sealed class SqliteAppDbContext(DbContextOptions<AppDbContext> options) : AppDbContext(options)
+    private sealed class LeaseRenewalObserver
     {
+        private readonly string _recipientEmail;
+        private readonly TaskCompletionSource _firstMessageRenewed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _lockUpdates;
+
+        public LeaseRenewalObserver(string recipientEmail)
+        {
+            _recipientEmail = recipientEmail;
+        }
+
+        public Task FirstMessageRenewed => _firstMessageRenewed.Task;
+
+        public void Observe(ChangeTracker changeTracker)
+        {
+            var renewed = changeTracker.Entries<OutboundMessage>().Any(entry =>
+                entry.State == EntityState.Modified &&
+                string.Equals(entry.Entity.RecipientEmail, _recipientEmail, StringComparison.OrdinalIgnoreCase) &&
+                entry.Property(message => message.LockedUntilUtc).IsModified);
+            if (renewed && Interlocked.Increment(ref _lockUpdates) >= 3)
+            {
+                _firstMessageRenewed.TrySetResult();
+            }
+        }
+    }
+
+    private sealed class SqliteAppDbContext(
+        DbContextOptions<AppDbContext> options,
+        LeaseRenewalObserver? leaseRenewal = null) : AppDbContext(options)
+    {
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            leaseRenewal?.Observe(ChangeTracker);
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Ignore<AppAdminAssignment>();
