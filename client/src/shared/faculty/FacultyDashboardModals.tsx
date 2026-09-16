@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-form';
 import { useState, type ReactNode } from 'react';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import {
   type FacultyDashboardResponse,
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
+import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import {
   facultyLeaveTypeLabels,
@@ -300,6 +301,7 @@ function LeaveRequestForm({
   onTitleChange: (title: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const leaveTypeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const leaveTypeLabelById = new Map(
@@ -404,6 +406,7 @@ function LeaveRequestForm({
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
   const leaveDayCount = getLeaveDayCount(
+    holidays,
     formValues.startDate,
     usesDateRange ? formValues.endDate : formValues.startDate,
     usesDateRange && formValues.excludeWeekends,

@@ -11,10 +11,12 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type {
   FacultyDashboardResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
+import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
 import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
 import { RequestDetailModal } from './FacultyDashboardModals.tsx';
 import { formatDateRange, getLeaveTone } from './FacultyDashboardPanels.tsx';
@@ -69,6 +71,7 @@ export function LeaveCalendar({
   onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
 }) {
+  const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
   const visibleRequests = useMemo(
     () => requests.filter((request) => !isDeniedRequest(request.status)),
     [requests]
@@ -201,7 +204,7 @@ export function LeaveCalendar({
           const dayRequests = day
             ? (requestsByDate.get(day.isoDate) ?? [])
             : [];
-          const holiday = day && getUniversityHoliday(day.isoDate);
+          const holiday = day && getUniversityHoliday(holidays, day.isoDate);
           const isWeekend =
             day && (day.date.getDay() === 0 || day.date.getDay() === 6);
 
