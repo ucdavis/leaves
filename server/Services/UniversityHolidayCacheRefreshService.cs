@@ -4,7 +4,7 @@ namespace Server.Services;
 
 public sealed class UniversityHolidayCacheRefreshService : BackgroundService
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromDays(7);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromDays(30);
 
     private readonly IUniversityHolidayCache _holidayCache;
     private readonly ILogger<UniversityHolidayCacheRefreshService> _logger;

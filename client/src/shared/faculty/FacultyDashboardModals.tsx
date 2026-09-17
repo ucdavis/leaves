@@ -226,7 +226,6 @@ function RequestDetailGrid({
         label="Submitted"
         value={formatDate(request.submittedAt)}
       />
-      <RequestDetailItem label="Request ID" value={`r${request.id}`} />
     </dl>
   );
 }
@@ -944,7 +943,7 @@ function buildOverlapMessage(request: FacultyLeaveRequest) {
   return `This overlaps with your ${request.leaveType} request (${formatDateRange(
     request.startDate,
     request.endDate
-  )}, ${formatCompactHours(request.totalHours)}, request r${request.id}).`;
+  )}, ${formatCompactHours(request.totalHours)}).`;
 }
 
 function isActiveRequestStatus(status: string) {

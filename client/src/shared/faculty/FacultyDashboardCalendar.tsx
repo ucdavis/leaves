@@ -240,11 +240,11 @@ export function LeaveCalendar({
                 <>
                   <div className="text-xs font-semibold">{day.dayOfMonth}</div>
                   {holiday ? (
-                    <span className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[10px] font-bold leading-tight text-sky-800">
+                    <span className="pointer-events-none mt-1 block text-center text-[10px] font-bold leading-tight text-sky-800">
                       {holiday.name}
                     </span>
                   ) : null}
-                  <div className="mt-3 space-y-1">
+                  <div className={`${holiday ? 'mt-2' : 'mt-3'} space-y-1`}>
                     {dayRequests.map((request) => {
                       const tone = getLeaveTone(request.leaveType);
                       const pending = isPendingRequest(request.status);

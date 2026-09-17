@@ -12,8 +12,6 @@ public interface IUniversityHolidayCache
 public sealed class UniversityHolidayCache : IUniversityHolidayCache
 {
     private const string CacheKey = "university-holidays";
-    private static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(8);
-
     private readonly IMemoryCache _memoryCache;
     private readonly IUcDavisHolidayService _holidayService;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
@@ -71,15 +69,10 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
             throw new InvalidDataException("UC Davis returned no holiday data.");
         }
 
-        // Do not remove the existing entry before this point. A failed fetch leaves
-        // the last known-good list available until its absolute expiration.
-        _memoryCache.Set(
-            CacheKey,
-            holidays,
-            new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = CacheLifetime,
-            });
+        // Only replace the cache after a complete, validated fetch. Keeping the
+        // value without an expiration lets callers continue using the last
+        // known-good list when a scheduled refresh fails.
+        _memoryCache.Set(CacheKey, holidays);
 
         return holidays;
     }
