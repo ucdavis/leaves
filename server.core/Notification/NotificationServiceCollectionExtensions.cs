@@ -19,11 +19,18 @@ public static class NotificationServiceCollectionExtensions
             .ValidateOnStart();
         services.AddOptions<NotificationOptions>()
             .Bind(configuration.GetSection(NotificationOptions.SectionName));
+        services.AddSingleton<IValidateOptions<EmailDeliveryOptions>, EmailDeliveryOptionsValidator>();
+        services.AddOptions<EmailDeliveryOptions>()
+            .Bind(configuration.GetSection(EmailDeliveryOptions.SectionName))
+            .ValidateOnStart();
 
         services.AddSingleton<MjmlRenderer>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<INotificationRenderer, RazorMjmlNotificationRenderer>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ILeaveRequestNotificationQueue, LeaveRequestNotificationQueue>();
+        services.AddScoped<ILeaveRequestEmailDeliveryService, LeaveRequestEmailDeliveryService>();
+        services.AddSingleton<IEmailDeliveryWakeSignal, EmailDeliveryWakeSignal>();
         services.AddRazorTemplating();
 
         return services;

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Core.Notification;
 using Server.Helpers;
 
 namespace Server.Services;
@@ -47,11 +48,19 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     ];
 
     private readonly AppDbContext _db;
+    private readonly ILeaveRequestNotificationQueue _notificationQueue;
+    private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
     private readonly ILogger<FacultyDashboardService> _logger;
 
-    public FacultyDashboardService(AppDbContext db, ILogger<FacultyDashboardService> logger)
+    public FacultyDashboardService(
+        AppDbContext db,
+        ILeaveRequestNotificationQueue notificationQueue,
+        IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
+        ILogger<FacultyDashboardService> logger)
     {
         _db = db;
+        _notificationQueue = notificationQueue;
+        _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
         _logger = logger;
     }
 
@@ -324,8 +333,13 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             UpdatedUtc = submittedAt,
         };
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         _db.LeaveRequests.Add(leaveRequest);
         await _db.SaveChangesAsync(cancellationToken);
+        await _notificationQueue.QueueSubmissionAsync(leaveRequest, appUser, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        _emailDeliveryWakeSignal.Signal();
 
         _logger.LogInformation(
             "Faculty leave request {LeaveRequestId} submitted for IAM {IamId}.",

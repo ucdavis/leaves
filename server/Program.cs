@@ -60,6 +60,7 @@ try
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddSingleton<AdminRoleCleanupBackgroundService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
+    builder.Services.AddHostedService<LeaveRequestEmailDeliveryBackgroundService>();
     builder.Services.AddScoped<IFacultyDashboardService, FacultyDashboardService>();
     builder.Services.AddHttpClient<IUcDavisHolidayService, UcDavisHolidayService>(client =>
     {
