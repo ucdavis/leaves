@@ -45,6 +45,7 @@ try
     // Add response caching for pages that opt-in
     // https://learn.microsoft.com/en-us/aspnet/core/performance/caching/middleware?view=aspnetcore-9.0
     builder.Services.AddResponseCaching();
+    builder.Services.AddMemoryCache();
 
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
@@ -61,6 +62,15 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
     builder.Services.AddHostedService<LeaveRequestEmailDeliveryBackgroundService>();
     builder.Services.AddScoped<IFacultyDashboardService, FacultyDashboardService>();
+    builder.Services.AddHttpClient<IUcDavisHolidayService, UcDavisHolidayService>(client =>
+    {
+        client.BaseAddress = new Uri("https://dates.ucdavis.edu/");
+        client.Timeout = TimeSpan.FromSeconds(10);
+    });
+    builder.Services.AddSingleton<UniversityHolidayCache>();
+    builder.Services.AddSingleton<IUniversityHolidayCache>(sp =>
+        sp.GetRequiredService<UniversityHolidayCache>());
+    builder.Services.AddHostedService<UniversityHolidayCacheRefreshService>();
     // add auth policies here
 
     // add db context (check secrets first, then config, then default)

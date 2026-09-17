@@ -1,5 +1,6 @@
 import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   addMonths,
   eachDayOfInterval,
@@ -11,7 +12,11 @@ import {
   startOfMonth,
 } from 'date-fns';
 import { useMemo, useState } from 'react';
-import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
+import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
+import {
+  getUniversityHoliday,
+  type UniversityHoliday,
+} from '@/shared/calendar/universityHolidays.ts';
 import type {
   ApprovalScope,
   CalendarFaculty,
@@ -44,6 +49,7 @@ export function LeaveOverviewCalendar({
   scope: ApprovalScope;
 }) {
   const navigate = useNavigate();
+  const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
   const initialMonth = useMemo(() => getInitialCalendarMonth(leaves), [leaves]);
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
   const days = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
@@ -92,9 +98,9 @@ export function LeaveOverviewCalendar({
               </th>
               {days.map((day) => (
                 <th
-                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0 ${getUniversityHoliday(day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
+                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0 ${getUniversityHoliday(holidays, day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
                   key={day.isoDate}
-                  title={getUniversityHoliday(day.isoDate)?.name}
+                  title={getUniversityHoliday(holidays, day.isoDate)?.name}
                 >
                   <time dateTime={day.isoDate}>{day.dayOfMonth}</time>
                 </th>
@@ -106,6 +112,7 @@ export function LeaveOverviewCalendar({
               <CalendarFacultyRow
                 days={days}
                 facultyMember={facultyMember}
+                holidays={holidays}
                 key={facultyMember.id}
                 leaves={leaves}
                 onSelectFaculty={(facultyId) =>
@@ -132,11 +139,13 @@ export function LeaveOverviewCalendar({
 function CalendarFacultyRow({
   days,
   facultyMember,
+  holidays,
   leaves,
   onSelectFaculty,
 }: {
   days: MonthDay[];
   facultyMember: CalendarFaculty;
+  holidays: readonly UniversityHoliday[];
   leaves: CalendarLeave[];
   onSelectFaculty: (facultyId: string) => void;
 }) {
@@ -163,6 +172,7 @@ function CalendarFacultyRow({
             day={day}
             facultyId={facultyMember.id}
             facultyName={facultyMember.name}
+            holidays={holidays}
             key={day.isoDate}
             leave={leave}
             onSelectFaculty={onSelectFaculty}
@@ -177,16 +187,18 @@ function CalendarDayCell({
   day,
   facultyId,
   facultyName,
+  holidays,
   leave,
   onSelectFaculty,
 }: {
   day: MonthDay;
   facultyId: string;
   facultyName: string;
+  holidays: readonly UniversityHoliday[];
   leave?: CalendarLeave;
   onSelectFaculty: (facultyId: string) => void;
 }) {
-  const holiday = getUniversityHoliday(day.isoDate);
+  const holiday = getUniversityHoliday(holidays, day.isoDate);
   const dayClassName = holiday
     ? 'bg-sky-100'
     : isWeekend(day.date)
