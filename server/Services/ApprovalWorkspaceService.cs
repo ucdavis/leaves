@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Core.Notification;
 using Server.Helpers;
 
 namespace Server.Services;
@@ -32,13 +34,19 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
     private readonly IAdminDirectoryDataService _directoryDataService;
     private readonly AppDbContext _db;
+    private readonly ILeaveRequestNotificationQueue _notificationQueue;
+    private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
 
     public ApprovalWorkspaceService(
         IAdminDirectoryDataService directoryDataService,
-        AppDbContext db)
+        AppDbContext db,
+        ILeaveRequestNotificationQueue notificationQueue,
+        IEmailDeliveryWakeSignal emailDeliveryWakeSignal)
     {
         _directoryDataService = directoryDataService;
         _db = db;
+        _notificationQueue = notificationQueue;
+        _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
     }
 
     public async Task<ApprovalWorkspaceResponse?> GetWorkspaceAsync(
@@ -202,6 +210,14 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return ApprovalDecisionResult.NotFound();
         }
 
+        var requester = await _db.AppUsers.SingleOrDefaultAsync(
+            user => user.Id == leaveRequest.AppUserId,
+            cancellationToken);
+        if (requester == null)
+        {
+            return ApprovalDecisionResult.NotFound();
+        }
+
         var nowUtc = DateTime.UtcNow;
         leaveRequest.Status = status.Value;
         leaveRequest.UpdatedUtc = nowUtc;
@@ -217,8 +233,37 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             Comment = request.Comment,
             IsSelfAction = false,
         });
+        _notificationQueue.QueueDecision(leaveRequest, requester);
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateKey(exception))
+        {
+            // Another approver completed this request after our pending-status read.
+            // Clear the rolled-back writes before checking the durable result.
+            _db.ChangeTracker.Clear();
+
+            var wasAlreadyDecided = await _db.LeaveRequests
+                .AsNoTracking()
+                .AnyAsync(item =>
+                    item.Id == requestId &&
+                    item.Status != LeaveRequestStatus.PendingApproval,
+                    cancellationToken);
+            var hasDecisionAction = await _db.LeaveRequestActions
+                .AsNoTracking()
+                .AnyAsync(item => item.LeaveRequestId == requestId, cancellationToken);
+
+            if (wasAlreadyDecided && hasDecisionAction)
+            {
+                return ApprovalDecisionResult.NotFound();
+            }
+
+            throw;
+        }
+
+        _emailDeliveryWakeSignal.Signal();
         return ApprovalDecisionResult.Success();
     }
 
@@ -239,6 +284,10 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
         return result.Succeeded;
     }
+
+    private static bool IsDuplicateKey(DbUpdateException exception) =>
+        exception.InnerException is SqlException sqlException &&
+        (sqlException.Number == 2601 || sqlException.Number == 2627);
 
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
         IReadOnlyList<CurrentEmployee> currentEmployees,
