@@ -18,7 +18,7 @@ type StatusSnapshot = {
 const dataSourceCopy: Record<
   string,
   {
-    detail: string;
+    detail: ReactNode;
     label: string;
   }
 > = {
@@ -29,6 +29,22 @@ const dataSourceCopy: Record<
   'db-people': {
     detail: 'Monthly report.',
     label: 'People',
+  },
+  'ucd-holiday-calendar': {
+    detail: (
+      <>
+        Source:{' '}
+        <a
+          className="link link-primary"
+          href="https://dates.ucdavis.edu/"
+          rel="noreferrer"
+          target="_blank"
+        >
+          dates.ucdavis.edu
+        </a>
+      </>
+    ),
+    label: 'Holiday calendar',
   },
 };
 
@@ -128,7 +144,7 @@ function FreshnessRow({
   status,
   updatedAt,
 }: {
-  detail: string;
+  detail: ReactNode;
   label: string;
   status: AdminDataSource['status'];
   updatedAt: string | null;

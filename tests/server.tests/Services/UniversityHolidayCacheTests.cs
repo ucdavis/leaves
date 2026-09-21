@@ -31,6 +31,7 @@ public sealed class UniversityHolidayCacheTests
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var cache = new UniversityHolidayCache(memoryCache, upstream);
         var cachedHolidays = await cache.GetHolidaysAsync(CancellationToken.None);
+        var lastSuccessfulRefreshUtc = cache.LastSuccessfulRefreshUtc;
         upstream.Exception = new HttpRequestException("UC Davis is unavailable.");
 
         var refresh = () => cache.RefreshAsync(CancellationToken.None);
@@ -38,6 +39,7 @@ public sealed class UniversityHolidayCacheTests
         await refresh.Should().ThrowAsync<HttpRequestException>();
         var holidaysAfterFailedRefresh = await cache.GetHolidaysAsync(CancellationToken.None);
         holidaysAfterFailedRefresh.Should().BeSameAs(cachedHolidays);
+        cache.LastSuccessfulRefreshUtc.Should().Be(lastSuccessfulRefreshUtc);
     }
 
     private sealed class StubHolidayService : IUcDavisHolidayService

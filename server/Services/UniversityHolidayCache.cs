@@ -7,6 +7,8 @@ public interface IUniversityHolidayCache
     Task<IReadOnlyList<UniversityHoliday>> GetHolidaysAsync(CancellationToken cancellationToken);
 
     Task RefreshAsync(CancellationToken cancellationToken);
+
+    DateTime? LastSuccessfulRefreshUtc { get; }
 }
 
 public sealed class UniversityHolidayCache : IUniversityHolidayCache
@@ -24,20 +26,25 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
         _holidayService = holidayService;
     }
 
+    public DateTime? LastSuccessfulRefreshUtc =>
+        _memoryCache.TryGetValue(CacheKey, out HolidayCalendarCacheEntry? entry)
+            ? entry?.LastSuccessfulRefreshUtc
+            : null;
+
     public async Task<IReadOnlyList<UniversityHoliday>> GetHolidaysAsync(CancellationToken cancellationToken)
     {
-        if (_memoryCache.TryGetValue(CacheKey, out IReadOnlyList<UniversityHoliday>? holidays) &&
-            holidays is not null)
+        if (_memoryCache.TryGetValue(CacheKey, out HolidayCalendarCacheEntry? entry) &&
+            entry is not null)
         {
-            return holidays;
+            return entry.Holidays;
         }
 
         await _refreshLock.WaitAsync(cancellationToken);
         try
         {
-            if (_memoryCache.TryGetValue(CacheKey, out holidays) && holidays is not null)
+            if (_memoryCache.TryGetValue(CacheKey, out entry) && entry is not null)
             {
-                return holidays;
+                return entry.Holidays;
             }
 
             return await FetchAndCacheAsync(cancellationToken);
@@ -72,8 +79,14 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
         // Only replace the cache after a complete, validated fetch. Keeping the
         // value without an expiration lets callers continue using the last
         // known-good list when a scheduled refresh fails.
-        _memoryCache.Set(CacheKey, holidays);
+        _memoryCache.Set(CacheKey, new HolidayCalendarCacheEntry(
+            holidays,
+            DateTime.UtcNow));
 
         return holidays;
     }
+
+    private sealed record HolidayCalendarCacheEntry(
+        IReadOnlyList<UniversityHoliday> Holidays,
+        DateTime LastSuccessfulRefreshUtc);
 }

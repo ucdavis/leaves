@@ -4,13 +4,16 @@ public sealed class AdminStatusService
 {
     private readonly AdminDirectoryDataService _directoryDataService;
     private readonly AdminStatusDataService _statusDataService;
+    private readonly IUniversityHolidayCache _holidayCache;
 
     public AdminStatusService(
         AdminDirectoryDataService directoryDataService,
-        AdminStatusDataService statusDataService)
+        AdminStatusDataService statusDataService,
+        IUniversityHolidayCache holidayCache)
     {
         _directoryDataService = directoryDataService;
         _statusDataService = statusDataService;
+        _holidayCache = holidayCache;
     }
 
     public async Task<AdminStatusPageResponse> GetStatusAsync(CancellationToken cancellationToken)
@@ -21,6 +24,7 @@ public sealed class AdminStatusService
         var vacationRows = statusData.CurrentAccrualBalances
             .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
             .ToList();
+        var lastHolidayCalendarRefreshUtc = _holidayCache.LastSuccessfulRefreshUtc;
 
         var dataSources = new[]
         {
@@ -32,6 +36,10 @@ public sealed class AdminStatusService
                 "db-accruals",
                 statusData.CurrentAccrualBalances.Count > 0 ? "ready" : "planned",
                 statusData.LatestAccrualUpdatedAt?.ToString("O")),
+            new AdminDataSourceResponse(
+                "ucd-holiday-calendar",
+                GetHolidayCalendarStatus(lastHolidayCalendarRefreshUtc),
+                lastHolidayCalendarRefreshUtc?.ToString("O")),
         };
 
         return new AdminStatusPageResponse(
@@ -64,6 +72,18 @@ public sealed class AdminStatusService
         }
 
         return latestPeoplePromotionAt.Value < DateTime.UtcNow.AddDays(-30)
+            ? "deferred"
+            : "ready";
+    }
+
+    private static string GetHolidayCalendarStatus(DateTime? lastSuccessfulRefreshUtc)
+    {
+        if (!lastSuccessfulRefreshUtc.HasValue)
+        {
+            return "planned";
+        }
+
+        return lastSuccessfulRefreshUtc.Value < DateTime.UtcNow.AddDays(-30)
             ? "deferred"
             : "ready";
     }
