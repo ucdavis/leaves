@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Server.Core.Data;
@@ -45,6 +46,10 @@ try
     // Add response caching for pages that opt-in
     // https://learn.microsoft.com/en-us/aspnet/core/performance/caching/middleware?view=aspnetcore-9.0
     builder.Services.AddResponseCaching();
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/json"]);
+    });
 
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
@@ -101,7 +106,6 @@ try
 
     app.Logger.LogInformation("Starting up {AppName} in {Environment} environment", app.Environment.ApplicationName, app.Environment.EnvironmentName);
 
-    // do db migrations at startup
     using (var scope = app.Services.CreateScope())
     {
         var init = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
@@ -147,6 +151,7 @@ try
     app.UseDefaultFiles();
     app.UseStaticFiles(staticFileOptions);
 
+    app.UseResponseCompression();
     app.UseResponseCaching();
 
     // Configure the HTTP request pipeline.

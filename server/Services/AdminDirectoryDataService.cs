@@ -38,6 +38,47 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             NonFacultyIamIds: coreData.NonFacultyIamIds);
     }
 
+    public async Task<AdminDirectoryData> LoadFacultyDirectoryDataAsync(CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var facultyEmployees = FacultyEmployeesQuery(today);
+
+        var departments = await _db.Departments
+            .AsNoTracking()
+            .Include(department => department.DepartmentEmailRoutings)
+            .OrderBy(department => department.DepartmentName)
+            .ToListAsync(cancellationToken);
+        var currentEmployees = await facultyEmployees
+            .OrderBy(employee => employee.DisplayName)
+            .ThenBy(employee => employee.IamId)
+            .ToListAsync(cancellationToken);
+        var appUsers = await (
+                from appUser in _db.AppUsers.AsNoTracking()
+                join employee in FacultyEmployeesQuery(today) on appUser.IamId equals employee.IamId
+                select appUser)
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.IamId)
+            .ToListAsync(cancellationToken);
+        var currentOverridesById = await LoadCurrentOverridesByIdAsync(currentEmployees, cancellationToken);
+        var currentChairAssignmentsByDepartment = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
+        var adminIamIds = (await _db.AppAdminAssignments
+                .AsNoTracking()
+                .Select(assignment => assignment.IamId.Trim())
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return new AdminDirectoryData(
+            AppUsers: appUsers,
+            Clusters: [],
+            CurrentCaoAssignmentsByCluster: new Dictionary<int, ClusterCaoAssignment>(),
+            CurrentChairAssignmentsByDepartment: currentChairAssignmentsByDepartment,
+            CurrentEmployees: currentEmployees,
+            CurrentOverridesById: currentOverridesById,
+            Departments: departments,
+            AdminIamIds: adminIamIds,
+            NonFacultyIamIds: new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+    }
+
     public async Task<AdminStatusDirectoryData> LoadStatusDirectoryDataAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -165,6 +206,24 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             Departments: departments,
             AdminIamIds: adminIamIds,
             NonFacultyIamIds: nonFacultyIamIds);
+    }
+
+    private IQueryable<CurrentEmployee> FacultyEmployeesQuery(DateOnly today)
+    {
+        var currentCaoIamIds = _db.ClusterCaoAssignments
+            .Where(assignment => assignment.ClosedUtc == null &&
+                                 assignment.EffectiveStartDate <= today &&
+                                 (!assignment.EffectiveEndDateExclusive.HasValue ||
+                                  assignment.EffectiveEndDateExclusive.Value > today))
+            .Select(assignment => assignment.IamId);
+
+        return _db.CurrentEmployees
+            .Where(employee => employee.HasCurrentAccrualRecord)
+            .Where(employee => !currentCaoIamIds.Contains(employee.IamId))
+            .Where(employee => !_db.People.Any(person =>
+                person.IamId == employee.IamId &&
+                person.IsEmployee == true &&
+                person.IsFaculty == false));
     }
 
     private async Task<Dictionary<int, EmployeeReportingDepartmentOverride>> LoadCurrentOverridesByIdAsync(

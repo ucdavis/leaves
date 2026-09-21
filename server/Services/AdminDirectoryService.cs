@@ -19,7 +19,7 @@ public sealed class AdminDirectoryService
 
     public async Task<AdminFacultyResponse> GetFacultyAsync(CancellationToken cancellationToken)
     {
-        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
+        var directoryData = await _directoryDataService.LoadFacultyDirectoryDataAsync(cancellationToken);
         return BuildFacultyResponse(directoryData);
     }
 
@@ -46,37 +46,16 @@ public sealed class AdminDirectoryService
 
     internal static AdminDepartmentsResponse BuildDepartmentsResponse(AdminDirectoryData directoryData)
     {
-        var userIdByIamId = BuildUserIdByIamId(directoryData);
         var roleAssignments = BuildRoleAssignments(directoryData);
 
         return new AdminDepartmentsResponse(
-            Clusters: BuildClusterResponses(directoryData, userIdByIamId),
-            Departments: BuildDepartmentResponses(directoryData, userIdByIamId),
+            Clusters: BuildClusterResponses(directoryData),
+            Departments: BuildDepartmentResponses(directoryData),
             Users: BuildUserResponses(directoryData, roleAssignments));
     }
 
-    private static Dictionary<string, string> BuildUserIdByIamId(AdminDirectoryData directoryData)
-    {
-        var userIdByIamId = directoryData.AppUsers
-            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
-            .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().IamId.Trim(), StringComparer.OrdinalIgnoreCase);
-
-        foreach (var employee in directoryData.CurrentEmployees)
-        {
-            var key = NormalizeKey(employee.IamId);
-            if (!userIdByIamId.ContainsKey(key))
-            {
-                userIdByIamId[key] = employee.IamId.Trim();
-            }
-        }
-
-        return userIdByIamId;
-    }
-
     private static IReadOnlyList<AdminDepartmentResponse> BuildDepartmentResponses(
-        AdminDirectoryData directoryData,
-        IReadOnlyDictionary<string, string> userIdByIamId)
+        AdminDirectoryData directoryData)
     {
         return directoryData.Departments
             .Select(department =>
@@ -86,7 +65,7 @@ public sealed class AdminDirectoryService
                     out var chairAssignment);
                 var chairUserId = chairAssignment == null
                     ? null
-                    : userIdByIamId.GetValueOrDefault(NormalizeKey(chairAssignment.IamId));
+                    : chairAssignment.IamId.Trim();
 
                 return new AdminDepartmentResponse(
                     ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "notification",
@@ -108,8 +87,7 @@ public sealed class AdminDirectoryService
     }
 
     private static IReadOnlyList<AdminClusterResponse> BuildClusterResponses(
-        AdminDirectoryData directoryData,
-        IReadOnlyDictionary<string, string> userIdByIamId)
+        AdminDirectoryData directoryData)
     {
         return directoryData.Clusters
             .Select(cluster =>
@@ -117,7 +95,7 @@ public sealed class AdminDirectoryService
                 directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
                 var caoUserId = caoAssignment == null
                     ? null
-                    : userIdByIamId.GetValueOrDefault(NormalizeKey(caoAssignment.IamId));
+                    : caoAssignment.IamId.Trim();
 
                 return new AdminClusterResponse(
                     CaoUserId: caoUserId,

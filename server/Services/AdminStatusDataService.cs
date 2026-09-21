@@ -24,11 +24,20 @@ public sealed class AdminStatusDataService
         var latestAccrualUpdatedAt = await _db.EmployeeAccrualBalances
             .Select(row => (DateTime?)row.LastUpdated)
             .MaxAsync(cancellationToken);
-        var currentAccrualBalances = await _db.CurrentAccrualBalances
-            .ToListAsync(cancellationToken);
+        var accrualSummary = await _db.CurrentAccrualBalances
+            .Where(balance => balance.TypeLabel.Contains("Vacation"))
+            .GroupBy(_ => 1)
+            .Select(group => new AccrualStatusSummary(
+                group.Count(),
+                group.Count(balance =>
+                    balance.ApproachingMax == "Y" ||
+                    balance.ApproachingMax == "Yes" ||
+                    balance.ApproachingMax == "True"),
+                group.Count(balance => balance.CalculatedBal >= balance.AccrualLimit)))
+            .SingleOrDefaultAsync(cancellationToken);
 
         return new AdminStatusData(
-            CurrentAccrualBalances: currentAccrualBalances,
+            AccrualSummary: accrualSummary ?? new AccrualStatusSummary(0, 0, 0),
             LatestAccrualUpdatedAt: latestAccrualUpdatedAt,
             LatestPeoplePromotionAt: latestPeoplePromotionAt,
             PendingRequestCount: pendingRequestCount);
@@ -36,7 +45,12 @@ public sealed class AdminStatusDataService
 }
 
 public sealed record AdminStatusData(
-    IReadOnlyList<CurrentAccrualBalance> CurrentAccrualBalances,
+    AccrualStatusSummary AccrualSummary,
     DateTime? LatestAccrualUpdatedAt,
     DateTime? LatestPeoplePromotionAt,
     int PendingRequestCount);
+
+public sealed record AccrualStatusSummary(
+    int VacationBalanceCount,
+    int ApproachingVacationCapCount,
+    int FacultyAtVacationCapCount);

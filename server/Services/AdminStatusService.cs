@@ -18,10 +18,6 @@ public sealed class AdminStatusService
         var directoryData = await _directoryDataService.LoadStatusDirectoryDataAsync(cancellationToken);
         var statusData = await _statusDataService.LoadStatusDataAsync(cancellationToken);
 
-        var vacationRows = statusData.CurrentAccrualBalances
-            .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
         var dataSources = new[]
         {
             new AdminDataSourceResponse(
@@ -30,7 +26,7 @@ public sealed class AdminStatusService
                 statusData.LatestPeoplePromotionAt?.ToString("O")),
             new AdminDataSourceResponse(
                 "db-accruals",
-                statusData.CurrentAccrualBalances.Count > 0 ? "ready" : "planned",
+                statusData.AccrualSummary.VacationBalanceCount > 0 ? "ready" : "planned",
                 statusData.LatestAccrualUpdatedAt?.ToString("O")),
         };
 
@@ -44,16 +40,9 @@ public sealed class AdminStatusService
                 !directoryData.CurrentChairAssignmentsByDepartment.ContainsKey(department.DepartmentCode.Trim())),
             StatusSnapshot: new AdminStatusSnapshotResponse(
                 Issues: new AdminIssuesResponse(
-                    ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
-                    FacultyAtVacationCap: vacationRows.Count(row => row.CalculatedBal >= row.AccrualLimit),
+                    ApproachingVacationCap: statusData.AccrualSummary.ApproachingVacationCapCount,
+                    FacultyAtVacationCap: statusData.AccrualSummary.FacultyAtVacationCapCount,
                     PendingRequests: statusData.PendingRequestCount)));
-    }
-
-    private static bool IsAffirmative(string? value)
-    {
-        return string.Equals(value?.Trim(), "Y", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value?.Trim(), "Yes", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value?.Trim(), "True", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetPeoplePromotionStatus(DateTime? latestPeoplePromotionAt)

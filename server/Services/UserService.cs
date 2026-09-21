@@ -214,23 +214,23 @@ public class UserService : IUserService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var isAdmin = await _dbContext.AppAdminAssignments
             .AsNoTracking()
-            .AnyAsync(assignment => assignment.IamId.Trim() == iamId);
+            .AnyAsync(assignment => assignment.IamId == iamId);
         var hasCurrentAccrualBalance = await (
                 from person in _dbContext.People
                 join balance in _dbContext.EmployeeAccrualBalances
                     on person.EmployeeId equals balance.EmployeeId
-                where person.IamId.Trim() == iamId
+                where person.IamId == iamId
                 select balance.EmployeeId)
             .AnyAsync();
         var isFaculty = hasCurrentAccrualBalance && await _dbContext.People
             .AnyAsync(person =>
-                person.IamId.Trim() == iamId &&
+                person.IamId == iamId &&
                 person.IsEmployee == true &&
                 person.IsFaculty == true);
         var isChair = hasCurrentAccrualBalance && await _dbContext.DepartmentChairAssignments
             .AsNoTracking()
             .AnyAsync(assignment =>
-                assignment.IamId.Trim() == iamId &&
+                assignment.IamId == iamId &&
                 assignment.ClosedUtc == null &&
                 assignment.EffectiveStartDate <= today &&
                 (!assignment.EffectiveEndDateExclusive.HasValue ||
@@ -238,7 +238,7 @@ public class UserService : IUserService
         var isCao = await _dbContext.ClusterCaoAssignments
             .AsNoTracking()
             .AnyAsync(assignment =>
-                assignment.IamId.Trim() == iamId &&
+                assignment.IamId == iamId &&
                 assignment.ClosedUtc == null &&
                 assignment.EffectiveStartDate <= today &&
                 (!assignment.EffectiveEndDateExclusive.HasValue ||
@@ -412,45 +412,47 @@ public class UserService : IUserService
     private Task<AppUser?> FindUnusedProfileByIamIdAsync(string iamId, CancellationToken cancellationToken)
     {
         return _dbContext.AppUsers
-            .Where(appUser => appUser.IamId.Trim().ToLower() == iamId && appUser.LastLoginUtc == null)
+            .Where(appUser => appUser.IamId == iamId && appUser.LastLoginUtc == null)
             .OrderByDescending(appUser => appUser.UpdatedUtc)
             .ThenByDescending(appUser => appUser.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Person?> FindPersonByEmailAsync(string? email, CancellationToken cancellationToken)
+    private Task<Person?> FindPersonByEmailAsync(string? email, CancellationToken cancellationToken)
     {
         var normalizedEmail = NormalizeEmail(email);
         if (normalizedEmail == null)
         {
-            return null;
+            return Task.FromResult<Person?>(null);
         }
 
-        var matches = await _dbContext.People
-            .Where(person => person.Email != null && person.Email.ToLower() == normalizedEmail)
+        var suppliedEmail = email!.Trim();
+
+        // Direct equality keeps this predicate indexable when the Walter-owned People table gains
+        // its email index. The supplied value preserves behavior for case-sensitive test providers.
+        return _dbContext.People
+            .Where(person => person.Email == normalizedEmail || person.Email == suppliedEmail)
             .OrderByDescending(person => person.PromotedAt)
             .ThenByDescending(person => person.ModifyDate)
-            .ToListAsync(cancellationToken);
-
-        return matches.FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     // if the user does not hace an entry in the people table employeeID is unknown
-    private async Task<Person?> FindPersonByIamIdAsync(string? iamId, CancellationToken cancellationToken)
+    private Task<Person?> FindPersonByIamIdAsync(string? iamId, CancellationToken cancellationToken)
     {
         var normalizedIamId = NormalizeIamIdToken(iamId);
         if (normalizedIamId == null)
         {
-            return null;
+            return Task.FromResult<Person?>(null);
         }
 
-        var matches = await _dbContext.People
-            .Where(person => person.IamId.ToLower() == normalizedIamId)
+        var upperCaseIamId = normalizedIamId.ToUpperInvariant();
+
+        return _dbContext.People
+            .Where(person => person.IamId == normalizedIamId || person.IamId == upperCaseIamId)
             .OrderByDescending(person => person.PromotedAt)
             .ThenByDescending(person => person.ModifyDate)
-            .ToListAsync(cancellationToken);
-
-        return matches.FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static string? NormalizeEmail(string? email)

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using Server.Services;
 
@@ -9,12 +10,15 @@ namespace Server.Helpers;
 public static class AuthenticationHelper
 {
     public const string EmulatingUserClaimType = "emulating_user";
+    private const string PrincipalRefreshTicksClaimType = "leaves_principal_refresh_ticks";
 
     /// <summary>
     /// Configures Microsoft Identity Web authentication with Azure AD/Entra ID
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<AuthenticationRefreshOptions>(configuration.GetSection("Authentication"));
+
         services
             .AddAuthentication(options =>
             {
@@ -118,6 +122,8 @@ public static class AuthenticationHelper
         {
             identity.AddClaim(new Claim(ClaimTypes.Role, role));
         }
+
+        ReplacePrincipalRefreshClaim(identity, DateTime.UtcNow);
     }
 
     /// <summary>
@@ -136,8 +142,17 @@ public static class AuthenticationHelper
             return;
         }
 
-        // On every request with a cookie, check if the user's roles/claims need updating
-        // We could use a cache here or roleVersion or timestamp or something, but for simplicity we'll just hit the DB every time
+        var refreshOptions = ctx.HttpContext.RequestServices
+            .GetRequiredService<IOptions<AuthenticationRefreshOptions>>()
+            .Value;
+        var now = DateTime.UtcNow;
+        if (!RequiresPrincipalRefresh(principal, now, refreshOptions.PrincipalRefreshInterval))
+        {
+            return;
+        }
+
+        // Profile and role queries are intentionally limited to this refresh interval. Role-changing
+        // operations are still observed on the next refresh without adding database work to every request.
         var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
         var profileProvisioned = await userService.EnsureUserProfileAsync(
             principal,
@@ -151,10 +166,51 @@ public static class AuthenticationHelper
 
         var updated = await userService.UpdateUserPrincipalIfNeeded(principal);
 
-        if (updated != null)
-        {
-            ctx.ReplacePrincipal(updated);
-            ctx.ShouldRenew = true; // Renew the cookie with the new principal
-        }
+        var refreshedPrincipal = updated ?? principal;
+        ctx.ReplacePrincipal(WithPrincipalRefreshClaim(refreshedPrincipal, now));
+        ctx.ShouldRenew = true;
     }
+
+    private static bool RequiresPrincipalRefresh(
+        ClaimsPrincipal principal,
+        DateTime now,
+        TimeSpan interval)
+    {
+        var refreshClaim = principal.FindFirst(PrincipalRefreshTicksClaimType)?.Value;
+        if (!long.TryParse(refreshClaim, out var refreshTicks) ||
+            refreshTicks < DateTime.MinValue.Ticks ||
+            refreshTicks > now.Ticks)
+        {
+            return true;
+        }
+
+        return now - new DateTime(refreshTicks, DateTimeKind.Utc) >= interval;
+    }
+
+    private static ClaimsPrincipal WithPrincipalRefreshClaim(ClaimsPrincipal principal, DateTime refreshedAt)
+    {
+        var identity = new ClaimsIdentity(
+            principal.Claims,
+            authenticationType: principal.Identity?.AuthenticationType);
+        ReplacePrincipalRefreshClaim(identity, refreshedAt);
+        return new ClaimsPrincipal(identity);
+    }
+
+    private static void ReplacePrincipalRefreshClaim(ClaimsIdentity identity, DateTime refreshedAt)
+    {
+        foreach (var claim in identity.FindAll(PrincipalRefreshTicksClaimType).ToList())
+        {
+            identity.RemoveClaim(claim);
+        }
+
+        identity.AddClaim(new Claim(PrincipalRefreshTicksClaimType, refreshedAt.Ticks.ToString()));
+    }
+}
+
+public sealed class AuthenticationRefreshOptions
+{
+    public int PrincipalRefreshIntervalMinutes { get; init; } = 5;
+
+    public TimeSpan PrincipalRefreshInterval => TimeSpan.FromMinutes(
+        Math.Clamp(PrincipalRefreshIntervalMinutes, 1, 60));
 }
