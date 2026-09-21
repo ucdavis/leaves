@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Server.Services;
 
@@ -16,25 +15,13 @@ public sealed class UniversityHolidaysController : ApiControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<UniversityHoliday>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> GetHolidays(CancellationToken cancellationToken)
+    public IActionResult GetHolidays()
     {
         try
         {
-            return Ok(await _holidayCache.GetHolidaysAsync(cancellationToken));
-        }
-        catch (HttpRequestException)
-        {
-            return HolidayDataUnavailable();
-        }
-        catch (JsonException)
-        {
-            return HolidayDataUnavailable();
+            return Ok(_holidayCache.GetHolidays());
         }
         catch (InvalidDataException)
-        {
-            return HolidayDataUnavailable();
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return HolidayDataUnavailable();
         }

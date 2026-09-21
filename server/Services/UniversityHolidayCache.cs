@@ -4,7 +4,7 @@ namespace Server.Services;
 
 public interface IUniversityHolidayCache
 {
-    Task<IReadOnlyList<UniversityHoliday>> GetHolidaysAsync(CancellationToken cancellationToken);
+    IReadOnlyList<UniversityHoliday> GetHolidays();
 
     Task RefreshAsync(CancellationToken cancellationToken);
 
@@ -16,7 +16,6 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
     private const string CacheKey = "university-holidays";
     private readonly IMemoryCache _memoryCache;
     private readonly IUcDavisHolidayService _holidayService;
-    private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     public UniversityHolidayCache(
         IMemoryCache memoryCache,
@@ -31,7 +30,7 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
             ? entry?.LastSuccessfulRefreshUtc
             : null;
 
-    public async Task<IReadOnlyList<UniversityHoliday>> GetHolidaysAsync(CancellationToken cancellationToken)
+    public IReadOnlyList<UniversityHoliday> GetHolidays()
     {
         if (_memoryCache.TryGetValue(CacheKey, out HolidayCalendarCacheEntry? entry) &&
             entry is not null)
@@ -39,33 +38,12 @@ public sealed class UniversityHolidayCache : IUniversityHolidayCache
             return entry.Holidays;
         }
 
-        await _refreshLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (_memoryCache.TryGetValue(CacheKey, out entry) && entry is not null)
-            {
-                return entry.Holidays;
-            }
-
-            return await FetchAndCacheAsync(cancellationToken);
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
+        throw new InvalidDataException("UC Davis holiday data has not been loaded.");
     }
 
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        await _refreshLock.WaitAsync(cancellationToken);
-        try
-        {
-            await FetchAndCacheAsync(cancellationToken);
-        }
-        finally
-        {
-            _refreshLock.Release();
-        }
+        await FetchAndCacheAsync(cancellationToken);
     }
 
     private async Task<IReadOnlyList<UniversityHoliday>> FetchAndCacheAsync(CancellationToken cancellationToken)
