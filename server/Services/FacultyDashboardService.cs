@@ -15,6 +15,12 @@ public interface IFacultyDashboardService
         string iamId,
         CancellationToken cancellationToken);
     Task<FacultyDashboardResponse?> GetHistoryAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
+    Task<FacultyHistoryPageResponse?> GetHistoryPageAsync(
+        ClaimsPrincipal principal,
+        int page,
+        int pageSize,
+        int? leaveTypeId,
+        CancellationToken cancellationToken);
     Task<FacultyLeaveRequestResponse?> GetRequestAsync(
         ClaimsPrincipal principal,
         int leaveRequestId,
@@ -218,6 +224,37 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             leaveTypes,
             pendingCount,
             approvedCount);
+    }
+
+    public async Task<FacultyHistoryPageResponse?> GetHistoryPageAsync(
+        ClaimsPrincipal principal,
+        int page,
+        int pageSize,
+        int? leaveTypeId,
+        CancellationToken cancellationToken)
+    {
+        var appUser = await ResolveAppUserAsync(principal, cancellationToken);
+        if (appUser == null)
+        {
+            return null;
+        }
+
+        var iamId = NormalizeIamId(appUser.IamId);
+        var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
+        var historyPage = await GetLeaveRequestPageAsync(
+            appUser.Id,
+            page,
+            pageSize,
+            leaveTypeId,
+            cancellationToken);
+        var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
+
+        return new FacultyHistoryPageResponse(
+            Faculty: BuildFacultyProfileResponse(appUser, iamId, employee, department),
+            LeaveTypes: BuildLeaveTypeResponses(leaveTypes),
+            Requests: historyPage.Requests,
+            TotalCount: historyPage.TotalCount);
     }
 
     public async Task<FacultyLeaveRequestResponse?> GetRequestAsync(
@@ -459,17 +496,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var balanceSummary = BuildBalanceSummary(accrualBalances);
 
         return new FacultyDashboardResponse(
-            Faculty: new FacultyProfileResponse(
-                IamId: iamId,
-                EmployeeId: employee?.EmployeeId?.Trim() ?? appUser.EmployeeId?.Trim(),
-                Name: employee?.DisplayName ?? appUser.DisplayName ?? iamId,
-                Email: employee?.Email ?? appUser.Email,
-                DepartmentCode: employee?.ResolvedReportingDepartmentCode,
-                DepartmentName: employee?.ResolvedReportingDepartmentName,
-                WorkflowMode: department?.WorkflowMode.ToString(),
-                EmployeeClass: employee?.EmployeeClassDescription,
-                JobTitle: employee?.JobCodeDescription,
-                LatestSnapshotDate: employee?.LatestAsOfDate),
+            Faculty: BuildFacultyProfileResponse(appUser, iamId, employee, department),
             Snapshot: new FacultyDashboardSnapshotResponse(
                 PendingRequests: pendingCount,
                 ApprovedRequests: approvedCount,
@@ -487,6 +514,25 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 .ToList(),
             RecentRequests: requests,
             LeaveTypes: BuildLeaveTypeResponses(leaveTypes));
+    }
+
+    private static FacultyProfileResponse BuildFacultyProfileResponse(
+        AppUser appUser,
+        string iamId,
+        CurrentEmployee? employee,
+        Department? department)
+    {
+        return new FacultyProfileResponse(
+            IamId: iamId,
+            EmployeeId: employee?.EmployeeId?.Trim() ?? appUser.EmployeeId?.Trim(),
+            Name: employee?.DisplayName ?? appUser.DisplayName ?? iamId,
+            Email: employee?.Email ?? appUser.Email,
+            DepartmentCode: employee?.ResolvedReportingDepartmentCode,
+            DepartmentName: employee?.ResolvedReportingDepartmentName,
+            WorkflowMode: department?.WorkflowMode.ToString(),
+            EmployeeClass: employee?.EmployeeClassDescription,
+            JobTitle: employee?.JobCodeDescription,
+            LatestSnapshotDate: employee?.LatestAsOfDate);
     }
 
     private async Task<List<FacultyLeaveRequestResponse>> GetLeaveRequestsAsync(
@@ -521,6 +567,47 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         return requests
             .Select(request => CreateFacultyLeaveRequestResponse(request, leaveTypesById))
             .ToList();
+    }
+
+    private async Task<FacultyLeaveRequestPage> GetLeaveRequestPageAsync(
+        int appUserId,
+        int page,
+        int pageSize,
+        int? leaveTypeId,
+        CancellationToken cancellationToken)
+    {
+        IQueryable<LeaveRequest> query = _db.LeaveRequests
+            .AsNoTracking()
+            .Where(request => request.AppUserId == appUserId);
+
+        if (leaveTypeId.HasValue)
+        {
+            query = query.Where(request => request.LeaveTypeId == leaveTypeId.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var requests = await query
+            .OrderByDescending(request => request.SubmittedAt)
+            .ThenByDescending(request => request.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var leaveTypeIds = requests
+            .SelectMany(request => new[] { request.LeaveTypeId, request.PayLeaveTypeId ?? 0 })
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+        var leaveTypesById = await _db.LeaveTypes
+            .AsNoTracking()
+            .Where(type => leaveTypeIds.Contains(type.Id))
+            .ToDictionaryAsync(type => type.Id, cancellationToken);
+
+        return new FacultyLeaveRequestPage(
+            totalCount,
+            requests
+                .Select(request => CreateFacultyLeaveRequestResponse(request, leaveTypesById))
+                .ToList());
     }
 
     private async Task<FacultyLeaveRequestResponse> BuildFacultyLeaveRequestResponseAsync(
@@ -774,6 +861,12 @@ public sealed record FacultyDashboardResponse(
     IReadOnlyCollection<FacultyLeaveRequestResponse> RecentRequests,
     IReadOnlyCollection<FacultyLeaveTypeResponse> LeaveTypes);
 
+public sealed record FacultyHistoryPageResponse(
+    FacultyProfileResponse Faculty,
+    IReadOnlyCollection<FacultyLeaveTypeResponse> LeaveTypes,
+    IReadOnlyCollection<FacultyLeaveRequestResponse> Requests,
+    int TotalCount);
+
 public sealed record FacultyProfileResponse(
     string IamId,
     string? EmployeeId,
@@ -813,6 +906,10 @@ public sealed record FacultyLeaveRequestResponse(
     string WorkflowMode,
     string DepartmentName,
     string? Note);
+
+internal sealed record FacultyLeaveRequestPage(
+    int TotalCount,
+    IReadOnlyCollection<FacultyLeaveRequestResponse> Requests);
 
 public sealed record FacultyLeaveTypeResponse(
     int Id,

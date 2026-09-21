@@ -12,13 +12,21 @@ import {
 } from '@/shared/faculty/FacultyDashboardPanels.tsx';
 
 export function RequestHistoryTable({
+  onPageChange,
   onSelectRequest,
   onShowInCalendar,
+  page,
+  pageSize,
   requests,
+  totalCount,
 }: {
+  onPageChange: (page: number) => void;
   onSelectRequest: (request: FacultyLeaveRequest) => void;
   onShowInCalendar?: (request: FacultyLeaveRequest) => void;
+  page: number;
+  pageSize: number;
   requests: FacultyLeaveRequest[];
+  totalCount: number;
 }) {
   const columns = useMemo<ColumnDef<FacultyLeaveRequest>[]>(
     () => [
@@ -40,6 +48,7 @@ export function RequestHistoryTable({
             </button>
           );
         },
+        enableSorting: false,
         header: 'Submitted',
       },
       {
@@ -55,6 +64,7 @@ export function RequestHistoryTable({
             </span>
           );
         },
+        enableSorting: false,
         header: 'Leave Type',
       },
       {
@@ -63,6 +73,7 @@ export function RequestHistoryTable({
           const { endDate, startDate } = row.original;
           return formatDateRange(startDate, endDate);
         },
+        enableSorting: false,
         header: 'Date(s)',
         id: 'dateRange',
       },
@@ -73,6 +84,7 @@ export function RequestHistoryTable({
             {formatCompactHours(getValue<number>())}
           </span>
         ),
+        enableSorting: false,
         header: 'Hours',
       },
       {
@@ -80,6 +92,7 @@ export function RequestHistoryTable({
         cell: ({ getValue }) => (
           <RequestStatusBadge status={getValue<string>()} />
         ),
+        enableSorting: false,
         header: 'Status',
       },
       ...(onShowInCalendar
@@ -97,6 +110,7 @@ export function RequestHistoryTable({
                   Show in calendar
                 </button>
               ),
+              enableSorting: false,
               header: '',
               id: 'showInCalendar',
             } satisfies ColumnDef<FacultyLeaveRequest>,
@@ -122,8 +136,14 @@ export function RequestHistoryTable({
       globalFilter="none"
       initialState={{
         pagination: {
-          pageSize: 10,
+          pageSize,
         },
+      }}
+      serverPagination={{
+        onPageChange,
+        page,
+        pageSize,
+        totalCount,
       }}
       showPageCount
       tableClassName="table-zebra"

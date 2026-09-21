@@ -39,6 +39,33 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.GetDepartmentsAsync(cancellationToken));
     }
 
+    [HttpGet("{departmentCode}/users")]
+    public async Task<IActionResult> GetDepartmentUsersAsync(
+        string departmentCode,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (page < 1 || pageSize is < 1 or > 100)
+        {
+            return ValidationProblem("Page must be at least 1 and page size must be between 1 and 100.");
+        }
+
+        var departmentExists = await _db.Departments
+            .AsNoTracking()
+            .AnyAsync(department => department.DepartmentCode == departmentCode, cancellationToken);
+        if (!departmentExists)
+        {
+            return NotFound();
+        }
+
+        return Ok(await _adminDirectoryService.GetDepartmentRosterAsync(
+            departmentCode,
+            page,
+            pageSize,
+            cancellationToken));
+    }
+
     [HttpPost("clusters")]
     public async Task<IActionResult> CreateCluster([FromBody] CreateClusterRequest request, CancellationToken cancellationToken)
     {

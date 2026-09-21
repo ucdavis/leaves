@@ -13,17 +13,20 @@ namespace Server.Controllers;
 public sealed class AdminController : ApiControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly AdminDirectoryDataService _adminDirectoryDataService;
     private readonly AdminDirectoryService _adminDirectoryService;
     private readonly AdminStatusService _adminStatusService;
     private readonly IUserService _userService;
 
     public AdminController(
         AppDbContext db,
+        AdminDirectoryDataService adminDirectoryDataService,
         AdminDirectoryService adminDirectoryService,
         AdminStatusService adminStatusService,
         IUserService userService)
     {
         _db = db;
+        _adminDirectoryDataService = adminDirectoryDataService;
         _adminDirectoryService = adminDirectoryService;
         _adminStatusService = adminStatusService;
         _userService = userService;
@@ -39,6 +42,14 @@ public sealed class AdminController : ApiControllerBase
     public async Task<IActionResult> GetFaculty(CancellationToken cancellationToken)
     {
         return Ok(await _adminDirectoryService.GetFacultyAsync(cancellationToken));
+    }
+
+    [HttpGet("directory-users")]
+    public async Task<IActionResult> SearchCaoCandidates(
+        [FromQuery] string? query,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _adminDirectoryDataService.SearchCaoCandidatesAsync(query, cancellationToken));
     }
 
     [HttpPost("users")]

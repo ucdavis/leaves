@@ -18,6 +18,13 @@ type TableActionsRenderer<TData extends object> =
   | ReactNode
   | ((table: Table<TData>) => ReactNode);
 
+interface ServerPagination {
+  onPageChange: (page: number) => void;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 interface DataTableProps<TData extends object> {
   columns: ColumnDef<TData>[];
   data: TData[];
@@ -25,6 +32,7 @@ interface DataTableProps<TData extends object> {
   getRowProps?: (row: Row<TData>) => HTMLAttributes<HTMLTableRowElement>;
   globalFilter?: 'left' | 'right' | 'none'; // Controls the position of the search box
   initialState?: InitialTableState; // Optional initial state for the table, use for stuff like setting page size or sorting
+  serverPagination?: ServerPagination;
   showPageCount?: boolean;
   tableActions?: TableActionsRenderer<TData>;
   tableClassName?: string;
@@ -37,6 +45,7 @@ export const DataTable = <TData extends object>({
   getRowProps,
   globalFilter = 'right',
   initialState,
+  serverPagination,
   showPageCount = false,
   tableActions,
   tableClassName,
@@ -102,6 +111,18 @@ export const DataTable = <TData extends object>({
 
   const resolvedTableActions =
     typeof tableActions === 'function' ? tableActions(table) : tableActions;
+  const pageCount = serverPagination
+    ? Math.max(1, Math.ceil(serverPagination.totalCount / serverPagination.pageSize))
+    : table.getPageCount();
+  const currentPage = serverPagination
+    ? serverPagination.page
+    : table.getState().pagination.pageIndex + 1;
+  const canGoToPreviousPage = serverPagination
+    ? serverPagination.page > 1
+    : table.getCanPreviousPage();
+  const canGoToNextPage = serverPagination
+    ? serverPagination.page < pageCount
+    : table.getCanNextPage();
 
   const toolbarItems =
     globalFilter === 'left'
@@ -147,7 +168,9 @@ export const DataTable = <TData extends object>({
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
-                    className="cursor-pointer"
+                    className={
+                      header.column.getCanSort() ? 'cursor-pointer' : undefined
+                    }
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler?.()}
                   >
@@ -196,22 +219,35 @@ export const DataTable = <TData extends object>({
         <div className="flex items-center justify-end gap-3 py-2">
           {showPageCount ? (
             <span aria-live="polite" className="text-sm text-base-content/70">
-              Page {table.getState().pagination.pageIndex + 1} of{' '}
-              {table.getPageCount()}
+              Page {currentPage} of {pageCount}
             </span>
           ) : null}
           <button
             className="btn btn-xs"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.previousPage()}
+            disabled={!canGoToPreviousPage}
+            onClick={() => {
+              if (serverPagination) {
+                serverPagination.onPageChange(serverPagination.page - 1);
+                return;
+              }
+
+              table.previousPage();
+            }}
             type="button"
           >
             Previous
           </button>
           <button
             className="btn btn-xs"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.nextPage()}
+            disabled={!canGoToNextPage}
+            onClick={() => {
+              if (serverPagination) {
+                serverPagination.onPageChange(serverPagination.page + 1);
+                return;
+              }
+
+              table.nextPage();
+            }}
             type="button"
           >
             Next

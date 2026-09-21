@@ -75,6 +75,32 @@ public sealed class FacultyController : ApiControllerBase
         return Ok(history);
     }
 
+    [HttpGet("history/page")]
+    public async Task<IActionResult> GetHistoryPage(
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromQuery] int? leaveTypeId,
+        CancellationToken cancellationToken)
+    {
+        if (!CanAccessFacultyWorkspace(User))
+        {
+            return Forbid();
+        }
+
+        var history = await _facultyDashboardService.GetHistoryPageAsync(
+            User,
+            Math.Max(1, page),
+            Math.Clamp(pageSize, 1, 100),
+            leaveTypeId,
+            cancellationToken);
+        if (history == null)
+        {
+            return NotFound("The authenticated user does not have a faculty profile in Leaves.");
+        }
+
+        return Ok(history);
+    }
+
     [HttpGet("requests/{id:int}")]
     public async Task<IActionResult> GetRequest(int id, CancellationToken cancellationToken)
     {

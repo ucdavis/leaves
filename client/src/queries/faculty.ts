@@ -11,6 +11,13 @@ export interface FacultyDashboardResponse {
   snapshot: FacultyDashboardSnapshot;
 }
 
+export interface FacultyHistoryPageResponse {
+  faculty: FacultyProfile;
+  leaveTypes: FacultyLeaveType[];
+  requests: FacultyLeaveRequest[];
+  totalCount: number;
+}
+
 export interface FacultyProfile {
   departmentCode?: string | null;
   departmentName?: string | null;
@@ -106,6 +113,32 @@ export const facultyHistoryQueryOptions = () =>
     queryKey: ['faculty', 'history'] as const,
     retry: false,
   });
+
+export const facultyHistoryPageQueryOptions = (
+  page: number,
+  pageSize: number,
+  leaveTypeId?: number
+) => {
+  const search = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  if (leaveTypeId) {
+    search.set('leaveTypeId', String(leaveTypeId));
+  }
+
+  return queryOptions({
+    queryFn: ({ signal }) =>
+      fetchJsonWithTimeout<FacultyHistoryPageResponse>(
+        `/api/faculty/history/page?${search.toString()}`,
+        dashboardRequestTimeoutMs,
+        signal
+      ),
+    queryKey: ['faculty', 'history', page, pageSize, leaveTypeId ?? 'all'] as const,
+    retry: false,
+  });
+};
 
 export async function createFacultyLeaveRequest(
   request: CreateFacultyLeaveRequest

@@ -5,9 +5,13 @@ import { useState } from 'react';
 import { RouterContext } from '@/main.tsx';
 import type {
   FacultyDashboardResponse,
+  FacultyHistoryPageResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
-import { facultyHistoryQueryOptions } from '@/queries/faculty.ts';
+import {
+  facultyHistoryPageQueryOptions,
+  facultyHistoryQueryOptions,
+} from '@/queries/faculty.ts';
 import { meQueryOptions } from '@/queries/user.ts';
 import { canAccessFacultyWorkspace } from '@/shared/auth/roleAccess.ts';
 import { PageErrorState } from '@/shared/errors/PageErrorState.tsx';
@@ -34,14 +38,26 @@ export const Route = createFileRoute('/(authenticated)/history')({
 });
 
 function RouteComponent() {
-  const dashboardQuery = useQuery(facultyHistoryQueryOptions());
+  const pageSize = 10;
   const [selectedType, setSelectedType] = useState('');
+  const [page, setPage] = useState(1);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const historyQuery = useQuery(
+    facultyHistoryPageQueryOptions(
+      page,
+      pageSize,
+      selectedType ? Number(selectedType) : undefined
+    )
+  );
+  const reportHistoryQuery = useQuery({
+    ...facultyHistoryQueryOptions(),
+    enabled: reportModalOpen,
+  });
 
-  if (dashboardQuery.isLoading) {
+  if (historyQuery.isLoading) {
     return (
       <div className="container py-10">
         <div className="rounded-lg border border-base-300 bg-base-100 p-8 text-center shadow-sm">
@@ -54,7 +70,7 @@ function RouteComponent() {
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (historyQuery.isError || !historyQuery.data) {
     return (
       <div className="container py-10">
         <PageErrorState
@@ -69,11 +85,19 @@ function RouteComponent() {
 
   return (
     <HistoryContent
-      data={dashboardQuery.data}
+      data={historyQuery.data}
+      onPageChange={setPage}
       onReportModalOpen={setReportModalOpen}
       onRequestSelected={setSelectedRequest}
-      onSelectedTypeChange={setSelectedType}
+      onSelectedTypeChange={(leaveType) => {
+        setPage(1);
+        setSelectedType(leaveType);
+      }}
       onToastMessage={setToastMessage}
+      page={page}
+      pageSize={pageSize}
+      reportData={reportHistoryQuery.data}
+      reportDataError={reportHistoryQuery.isError}
       reportModalOpen={reportModalOpen}
       selectedRequest={selectedRequest}
       selectedType={selectedType}
@@ -84,20 +108,30 @@ function RouteComponent() {
 
 function HistoryContent({
   data,
+  onPageChange,
   onReportModalOpen,
   onRequestSelected,
   onSelectedTypeChange,
   onToastMessage,
+  page,
+  pageSize,
   reportModalOpen,
+  reportData,
+  reportDataError,
   selectedRequest,
   selectedType,
   toastMessage,
 }: {
-  data: FacultyDashboardResponse;
+  data: FacultyHistoryPageResponse;
+  onPageChange: (page: number) => void;
   onReportModalOpen: (value: boolean) => void;
   onRequestSelected: (request: FacultyLeaveRequest | null) => void;
   onSelectedTypeChange: (value: string) => void;
   onToastMessage: (message: string | null) => void;
+  page: number;
+  pageSize: number;
+  reportData?: FacultyDashboardResponse;
+  reportDataError: boolean;
   reportModalOpen: boolean;
   selectedRequest: FacultyLeaveRequest | null;
   selectedType: string;
@@ -105,12 +139,6 @@ function HistoryContent({
 }) {
   const navigate = useNavigate();
   const typeOptions = getReportLeaveTypeOptions(data.leaveTypes);
-  const requests = selectedType
-    ? data.recentRequests.filter(
-        (request) => request.leaveType === selectedType
-      )
-    : data.recentRequests;
-
   return (
     <div className="container py-8 lg:py-10">
       <section className="mx-auto rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
@@ -124,7 +152,7 @@ function HistoryContent({
             >
               <option value="">All Types</option>
               {typeOptions.map((option) => (
-                <option key={option.value} value={option.label}>
+                <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
@@ -140,7 +168,8 @@ function HistoryContent({
         </div>
 
         <RequestHistoryTable
-          key={selectedType}
+          key={`${selectedType}-${page}`}
+          onPageChange={onPageChange}
           onSelectRequest={onRequestSelected}
           onShowInCalendar={(request) =>
             void navigate({
@@ -148,16 +177,42 @@ function HistoryContent({
               to: '/',
             })
           }
-          requests={requests}
+          page={page}
+          pageSize={pageSize}
+          requests={data.requests}
+          totalCount={data.totalCount}
         />
       </section>
 
-      {reportModalOpen ? (
+      {reportModalOpen && reportData ? (
         <ReportLeaveModal
-          data={data}
+          data={reportData}
           onClose={() => onReportModalOpen(false)}
           onSent={(message) => onToastMessage(message)}
         />
+      ) : null}
+      {reportModalOpen && !reportData ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-neutral/40 p-4">
+          <div className="rounded-lg bg-base-100 p-6 text-center shadow-xl">
+            {reportDataError ? (
+              <>
+                <p className="font-semibold">Unable to load the leave form.</p>
+                <button
+                  className="btn btn-primary btn-sm mt-4"
+                  onClick={() => onReportModalOpen(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="loading loading-spinner loading-md text-primary" />
+                <p className="mt-3 text-sm">Loading the leave report form.</p>
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
       {selectedRequest ? (
         <RequestDetailModal

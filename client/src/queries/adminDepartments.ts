@@ -27,14 +27,24 @@ type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
 type AdminDepartmentsResponse = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  users: AdminDepartmentUserResponse[];
 };
 
 export type AdminDepartmentsPageData = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
+};
+
+type AdminDepartmentRosterResponse = {
+  totalCount: number;
+  users: AdminDepartmentUserResponse[];
+};
+
+export type AdminDepartmentRosterData = {
+  totalCount: number;
   users: Array<AdminUser & { departmentId: string }>;
 };
+
+export type DirectorySearchUser = Pick<AdminUser, 'email' | 'id' | 'name'>;
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
   if (mode === 'approval' || mode === 'auto') {
@@ -59,15 +69,18 @@ function normalizeDepartmentData(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    users: response.users.map((user) => ({
-      ...user,
-      departmentId: user.departmentId ?? '',
-      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
-      departmentOverrideId: user.departmentOverrideId ?? '',
-      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      role: user.role,
-    })),
   };
+}
+
+function normalizeUsers(users: AdminDepartmentUserResponse[]) {
+  return users.map((user) => ({
+    ...user,
+    departmentId: user.departmentId ?? '',
+    departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
+    departmentOverrideId: user.departmentOverrideId ?? '',
+    departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
+    role: user.role,
+  }));
 }
 
 export const adminDepartmentsQueryOptions = () =>
@@ -87,6 +100,40 @@ export const adminDepartmentsQueryOptions = () =>
     },
     queryKey: ['admin', 'departments'] as const,
   });
+
+export const adminDepartmentRosterQueryOptions = (
+  departmentId: string,
+  page: number
+) =>
+  queryOptions({
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<AdminDepartmentRosterData> => {
+      const response = await fetchJson<AdminDepartmentRosterResponse>(
+        `/api/admin/departments/${encodeURIComponent(departmentId)}/users?page=${page}&pageSize=50`,
+        {},
+        signal
+      );
+
+      return {
+        totalCount: response.totalCount,
+        users: normalizeUsers(response.users),
+      };
+    },
+    queryKey: ['admin', 'department-roster', departmentId, page] as const,
+  });
+
+export async function searchCaoCandidates({
+  query,
+  signal,
+}: {
+  query: string;
+  signal?: AbortSignal;
+}): Promise<DirectorySearchUser[]> {
+  return fetchJson<DirectorySearchUser[]>(
+    `/api/admin/directory-users?query=${encodeURIComponent(query)}`,
+    {},
+    signal
+  );
+}
 
 export async function createAdminCluster({
   name,

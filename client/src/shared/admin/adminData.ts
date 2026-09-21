@@ -41,15 +41,18 @@ export type DepartmentRoutingEmail = {
 export type AdminDepartment = {
   approvalMode: ApprovalMode;
   chairUserId: string | null;
+  chairUserName: string | null;
   clusterId: string | null;
   code: string;
   id: string;
+  linkedUserCount: number;
   name: string;
   routingEmails: DepartmentRoutingEmail[];
 };
 
 export type AdminCluster = {
   caoUserId: string | null;
+  caoUserName: string | null;
   id: string;
   name: string;
 };
