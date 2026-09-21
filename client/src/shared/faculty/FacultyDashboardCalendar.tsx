@@ -17,7 +17,10 @@ import type {
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
-import { getUniversityHoliday } from '@/shared/calendar/universityHolidays.ts';
+import {
+  getUniversityHoliday,
+  getUniversityHolidayCoverageEnd,
+} from '@/shared/calendar/universityHolidays.ts';
 import { RequestDetailModal } from './FacultyDashboardModals.tsx';
 import { formatDateRange, getLeaveTone } from './FacultyDashboardPanels.tsx';
 
@@ -72,6 +75,7 @@ export function LeaveCalendar({
   requests: FacultyLeaveRequest[];
 }) {
   const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
+  const holidayCoverageEnd = getUniversityHolidayCoverageEnd(holidays);
   const visibleRequests = useMemo(
     () => requests.filter((request) => !isDeniedRequest(request.status)),
     [requests]
@@ -291,6 +295,12 @@ export function LeaveCalendar({
           </div>
         ))}
       </div>
+
+      <p className="mt-4 text-sm text-base-content/65">
+        {holidayCoverageEnd
+          ? `Holiday dates are currently available through ${format(parseISO(holidayCoverageEnd), 'MMMM d, yyyy')}.`
+          : 'Holiday data is temporarily unavailable, so holidays are not shown in this calendar.'}
+      </p>
 
       {selectedRequest ? (
         <RequestDetailModal

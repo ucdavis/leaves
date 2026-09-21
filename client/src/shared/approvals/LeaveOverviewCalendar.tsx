@@ -14,6 +14,7 @@ import {
 import { useMemo, useState } from 'react';
 import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
 import {
+  getUniversityHolidayCoverageEnd,
   getUniversityHoliday,
   type UniversityHoliday,
 } from '@/shared/calendar/universityHolidays.ts';
@@ -50,6 +51,7 @@ export function LeaveOverviewCalendar({
 }) {
   const navigate = useNavigate();
   const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
+  const holidayCoverageEnd = getUniversityHolidayCoverageEnd(holidays);
   const initialMonth = useMemo(() => getInitialCalendarMonth(leaves), [leaves]);
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
   const days = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
@@ -128,6 +130,12 @@ export function LeaveOverviewCalendar({
       </div>
 
       <CalendarLegend />
+
+      <p className="mt-4 text-sm text-base-content/65">
+        {holidayCoverageEnd
+          ? `Holiday dates are currently available through ${format(parseISO(holidayCoverageEnd), 'MMMM d, yyyy')}.`
+          : 'Holiday data is temporarily unavailable, so holidays are not shown in this calendar.'}
+      </p>
 
       <p className="mt-5 text-sm text-base-content/65">
         Click a faculty member&apos;s name to open their dashboard.

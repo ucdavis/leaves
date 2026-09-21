@@ -7,6 +7,6 @@ export const universityHolidaysQueryOptions = () =>
     queryFn: ({ signal }) =>
       fetchJson<UniversityHoliday[]>('/api/universityholidays', {}, signal),
     queryKey: ['university-holidays'] as const,
-    retry: false,
+    retry: 2,
     staleTime: 60 * 60 * 1000,
   });

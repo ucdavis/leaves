@@ -10,6 +10,16 @@ export function getUniversityHoliday(
   return holidays.find((holiday) => holiday.date === date);
 }
 
+export function getUniversityHolidayCoverageEnd(
+  holidays: readonly UniversityHoliday[]
+) {
+  return holidays.reduce<string | undefined>(
+    (latestDate, holiday) =>
+      !latestDate || holiday.date > latestDate ? holiday.date : latestDate,
+    undefined
+  );
+}
+
 export function getLeaveDayCount(
   holidays: readonly UniversityHoliday[],
   startDate: string,
