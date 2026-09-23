@@ -62,7 +62,13 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 .AsNoTracking()
                 .OrderBy(cluster => cluster.ClusterName)
                 .ToListAsync(cancellationToken),
-            CurrentEmployees: await _db.CurrentEmployees
+            Employees: await _db.People
+                .Where(person => person.IsEmployee == true)
+                .OrderBy(person => person.FullName)
+                .ThenBy(person => person.IamId)
+                .Select(person => new DirectoryEmployee(person.IamId, person.FullName, person.Email))
+                .ToListAsync(cancellationToken),
+            CurrentFaculty: await GetCurrentFacultyQuery()
                 .OrderBy(employee => employee.DisplayName)
                 .ThenBy(employee => employee.IamId)
                 .ToListAsync(cancellationToken),
@@ -115,16 +121,18 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return false;
         }
 
-        return await (
-                from employee in _db.CurrentEmployees
-                join person in _db.People on employee.IamId equals person.IamId
-                where employee.IamId.Trim() == normalizedIamId &&
-                      employee.ResolvedReportingDepartmentCode != null &&
-                      employee.ResolvedReportingDepartmentCode.Trim() == normalizedDepartmentCode &&
-                      person.IsEmployee == true &&
-                      person.IsFaculty == true
-                select employee.IamId)
-            .AnyAsync(cancellationToken);
+        return await GetCurrentFacultyQuery()
+            .AnyAsync(employee => employee.IamId == normalizedIamId &&
+                                  employee.ResolvedReportingDepartmentCode == normalizedDepartmentCode,
+                cancellationToken);
+    }
+
+    private IQueryable<CurrentEmployee> GetCurrentFacultyQuery()
+    {
+        return from employee in _db.CurrentEmployees
+               join person in _db.People on employee.IamId equals person.IamId
+               where person.IsEmployee == true && person.IsFaculty == true && employee.HasCurrentAccrualRecord
+               select employee;
     }
 
     private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(CancellationToken cancellationToken)
@@ -242,8 +250,11 @@ public sealed record AdminStatusDirectoryData(
 
 public sealed record AdminRoleOptionsData(
     IReadOnlyList<Cluster> Clusters,
-    IReadOnlyList<CurrentEmployee> CurrentEmployees,
+    IReadOnlyList<DirectoryEmployee> Employees,
+    IReadOnlyList<CurrentEmployee> CurrentFaculty,
     IReadOnlyList<Department> Departments);
+
+public sealed record DirectoryEmployee(string IamId, string? DisplayName, string? Email);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,

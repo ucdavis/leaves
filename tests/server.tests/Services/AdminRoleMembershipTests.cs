@@ -143,6 +143,7 @@ public class AdminRoleMembershipTests
         return new AdminRolesController(
             db,
             new AdminRolesService(new AdminDirectoryDataService(db)),
+            new AdminDirectoryDataService(db),
             new UserService(NullLogger<UserService>.Instance, db))
         {
             ControllerContext = new ControllerContext

@@ -65,7 +65,8 @@ public sealed class AdminRoleCleanupBackgroundService : BackgroundService
                 activeAdminAssignments,
                 activeCaoAssignments,
                 activeChairAssignments,
-                roleOptionsData.CurrentEmployees,
+                roleOptionsData.Employees,
+                roleOptionsData.CurrentFaculty,
                 roleOptionsData.Clusters,
                 roleOptionsData.Departments);
 
