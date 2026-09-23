@@ -289,7 +289,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         (sqlException.Number == 2601 || sqlException.Number == 2627);
 
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
-        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentEmployees,
         IReadOnlyDictionary<string, Department> departmentByCode,
         string scope,
         IReadOnlySet<string> reportingDepartmentCodes,
@@ -403,7 +403,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
     private static string GetFacultyDisplayName(
         string iamId,
-        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentEmployees,
         IReadOnlyList<AppUser> appUsers)
     {
         var normalizedIamId = NormalizeKey(iamId);

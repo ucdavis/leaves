@@ -42,7 +42,12 @@ function RouteComponent() {
         <PageErrorState
           badge="Faculty dashboard"
           code="404"
-          description="We could not load that faculty dashboard right now."
+          description={
+            dashboardQuery.error instanceof HttpError &&
+            dashboardQuery.error.status === 404
+              ? 'This person does not have a current faculty dashboard. Pending requests can still be reviewed in the approval workspace.'
+              : 'We could not load that faculty dashboard right now.'
+          }
           title="Dashboard unavailable"
         />
       </div>

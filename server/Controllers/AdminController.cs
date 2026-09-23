@@ -280,18 +280,18 @@ public sealed class AdminController : ApiControllerBase
         string iamId,
         CancellationToken cancellationToken)
     {
-        var currentOverrideId = await _db.CurrentEmployees
-            .Where(employee => employee.IamId == iamId)
-            .Select(employee => employee.ReportingDepartmentOverrideId)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (!currentOverrideId.HasValue)
-        {
-            return null;
-        }
-
+        // Match the view's Pacific effective date and latest-start/id precedence,
+        // even when the owner has no current faculty accrual record.
+        var utcNow = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeBySystemTimeZoneId(utcNow, "Pacific Standard Time"));
         var currentOverride = await _db.EmployeeReportingDepartmentOverrides
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(item => item.Id == currentOverrideId.Value, cancellationToken);
+            .Where(item => item.IamId == iamId && item.EffectiveStartDate <= today &&
+                (!item.EffectiveEndDateExclusive.HasValue || today < item.EffectiveEndDateExclusive.Value))
+            .OrderByDescending(item => item.EffectiveStartDate)
+            .ThenByDescending(item => item.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (currentOverride == null)
         {
@@ -305,8 +305,8 @@ public sealed class AdminController : ApiControllerBase
         }
 
         currentOverride.ClosedByAppUserId = closedByAppUserId.Value;
-        currentOverride.ClosedUtc = DateTime.UtcNow;
-        currentOverride.EffectiveEndDateExclusive = DateOnly.FromDateTime(DateTime.UtcNow);
+        currentOverride.ClosedUtc = utcNow;
+        currentOverride.EffectiveEndDateExclusive = today;
         return null;
     }
 

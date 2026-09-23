@@ -82,9 +82,9 @@ public class AdminDirectoryServiceTests
         {
             ["DEPT"] = new() { IamId = "staffchair", DepartmentCode = "DEPT" },
         },
-        CurrentFaculty: new[] { "faculty", "admin", "cao" }.Select(iam => new CurrentEmployee
+        CurrentFaculty: new[] { "faculty", "admin", "cao" }.Select(iam => new CurrentFacultyWithAccrual
         {
-            IamId = iam, DisplayName = $"Faculty {iam}", ResolvedReportingDepartmentCode = "DEPT", HasCurrentAccrualRecord = true,
+            IamId = iam, DisplayName = $"Faculty {iam}", ResolvedReportingDepartmentCode = "DEPT", IsFaculty = true,
         }).ToList(),
         CurrentOverridesById: new Dictionary<int, EmployeeReportingDepartmentOverride>(),
         Departments: [new Department { DepartmentCode = "DEPT", DepartmentName = "Department", ClusterId = 1 }],

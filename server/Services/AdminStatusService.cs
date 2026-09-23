@@ -26,7 +26,7 @@ public sealed class AdminStatusService
         var directoryData = await _directoryDataService.LoadStatusDirectoryDataAsync(cancellationToken);
         var statusData = await _statusDataService.LoadStatusDataAsync(cancellationToken);
 
-        var vacationRows = statusData.CurrentAccrualBalances
+        var vacationRows = statusData.CurrentFacultyAccrualBalances
             .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
             .ToList();
         var lastHolidayCalendarRefreshUtc = _holidayCache.LastSuccessfulRefreshUtc;
@@ -39,7 +39,8 @@ public sealed class AdminStatusService
                 statusData.LatestPeoplePromotionAt?.ToString("O")),
             new AdminDataSourceResponse(
                 "db-accruals",
-                statusData.CurrentAccrualBalances.Count > 0 ? "ready" : "planned",
+                // LastUpdated is required on raw import rows, including nonfaculty rows.
+                statusData.LatestAccrualUpdatedAt.HasValue ? "ready" : "planned",
                 statusData.LatestAccrualUpdatedAt?.ToString("O")),
             new AdminDataSourceResponse(
                 "ucd-holiday-calendar",

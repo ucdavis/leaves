@@ -75,9 +75,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         }
 
         var iamId = NormalizeIamId(appUser.IamId);
-        var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var employee = await GetCurrentFacultyWithAccrualAsync(iamId, cancellationToken);
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
-        var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
+        var accrualBalances = await GetCurrentFacultyAccrualBalancesAsync(iamId, cancellationToken);
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
         var recentRequests = await GetLeaveRequestsAsync(
             appUser.Id,
@@ -109,6 +109,14 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         }
 
         var normalizedTargetIamId = NormalizeIamId(iamId);
+        var targetEmployee = await GetCurrentFacultyWithAccrualAsync(
+            normalizedTargetIamId,
+            cancellationToken);
+        if (targetEmployee == null)
+        {
+            return FacultyDashboardViewerResult.TargetNotFound();
+        }
+
         if (string.Equals(viewer.IamId, normalizedTargetIamId, StringComparison.OrdinalIgnoreCase))
         {
             var ownDashboard = await GetDashboardAsync(principal, cancellationToken);
@@ -122,15 +130,6 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .SingleOrDefaultAsync(
                 user => user.IamId == normalizedTargetIamId,
                 cancellationToken);
-        var targetEmployee = await GetCurrentEmployeeAsync(
-            normalizedTargetIamId,
-            cancellationToken);
-
-        if (targetEmployee == null)
-        {
-            return FacultyDashboardViewerResult.TargetNotFound();
-        }
-
         var targetDepartment = await ResolveReportingDepartmentAsync(
             targetEmployee,
             cancellationToken);
@@ -156,7 +155,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             return FacultyDashboardViewerResult.Forbidden();
         }
 
-        var accrualBalances = await GetCurrentAccrualBalancesAsync(
+        var accrualBalances = await GetCurrentFacultyAccrualBalancesAsync(
             normalizedTargetIamId,
             cancellationToken);
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(
@@ -201,9 +200,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         }
 
         var iamId = NormalizeIamId(appUser.IamId);
-        var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var employee = await GetCurrentFacultyWithAccrualAsync(iamId, cancellationToken);
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
-        var accrualBalances = await GetCurrentAccrualBalancesAsync(iamId, cancellationToken);
+        var accrualBalances = await GetCurrentFacultyAccrualBalancesAsync(iamId, cancellationToken);
         var (pendingCount, approvedCount) = await GetRequestSnapshotCountsAsync(iamId, cancellationToken);
         var allRequests = await GetLeaveRequestsAsync(appUser.Id, null, cancellationToken);
         var leaveTypes = await GetLeaveTypesAsync(cancellationToken);
@@ -299,7 +298,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 "You already have a leave request that includes one or more of these dates.");
         }
 
-        var employee = await GetCurrentEmployeeAsync(iamId, cancellationToken);
+        var employee = await GetCurrentFacultyWithAccrualAsync(iamId, cancellationToken);
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         if (department == null)
         {
@@ -392,18 +391,18 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .SingleOrDefaultAsync(user => user.IamId == iamId, cancellationToken);
     }
 
-    private async Task<CurrentEmployee?> GetCurrentEmployeeAsync(string iamId, CancellationToken cancellationToken)
+    private async Task<CurrentFacultyWithAccrual?> GetCurrentFacultyWithAccrualAsync(string iamId, CancellationToken cancellationToken)
     {
-        return await _db.CurrentEmployees
+        return await _db.CurrentFacultyWithAccrual
             .AsNoTracking()
             .Where(employee => employee.IamId == iamId)
-            .Select(employee => new CurrentEmployee
+            .Select(employee => new CurrentFacultyWithAccrual
             {
                 DisplayName = employee.DisplayName,
                 Email = employee.Email,
                 EmployeeClassDescription = employee.EmployeeClassDescription,
                 EmployeeId = employee.EmployeeId,
-                HasCurrentAccrualRecord = employee.HasCurrentAccrualRecord,
+                IsFaculty = employee.IsFaculty,
                 HasReportingDepartmentOverride = employee.HasReportingDepartmentOverride,
                 HrStatus = employee.HrStatus,
                 IamId = employee.IamId,
@@ -418,15 +417,15 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<List<CurrentAccrualBalance>> GetCurrentAccrualBalancesAsync(
+    private async Task<List<CurrentFacultyAccrualBalance>> GetCurrentFacultyAccrualBalancesAsync(
         string iamId,
         CancellationToken cancellationToken)
     {
-        return await _db.CurrentAccrualBalances
+        return await _db.CurrentFacultyAccrualBalances
             .AsNoTracking()
             .Where(balance => balance.IamId == iamId)
             .OrderBy(balance => balance.TypeLabel)
-            .Select(balance => new CurrentAccrualBalance
+            .Select(balance => new CurrentFacultyAccrualBalance
             {
                 AccrualLimit = balance.AccrualLimit,
                 AccrualPercentage = balance.AccrualPercentage,
@@ -448,9 +447,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     private static FacultyDashboardResponse BuildDashboardResponse(
         AppUser appUser,
         string iamId,
-        CurrentEmployee? employee,
+        CurrentFacultyWithAccrual? employee,
         Department? department,
-        IReadOnlyCollection<CurrentAccrualBalance> accrualBalances,
+        IReadOnlyCollection<CurrentFacultyAccrualBalance> accrualBalances,
         IReadOnlyCollection<FacultyLeaveRequestResponse> requests,
         IReadOnlyCollection<LeaveType> leaveTypes,
         int pendingCount,
@@ -622,7 +621,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     }
 
     private async Task<Department?> ResolveReportingDepartmentAsync(
-        CurrentEmployee? employee,
+        CurrentFacultyWithAccrual? employee,
         CancellationToken cancellationToken)
     {
         var departmentCode = employee?.ResolvedReportingDepartmentCode?.Trim();
@@ -714,7 +713,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         return errors;
     }
 
-    private static FacultyBalanceSummary BuildBalanceSummary(IReadOnlyCollection<CurrentAccrualBalance> balances)
+    private static FacultyBalanceSummary BuildBalanceSummary(IReadOnlyCollection<CurrentFacultyAccrualBalance> balances)
     {
         var availableBalanceHours = balances
             .Where(balance => balance.CalculatedBal > 0)

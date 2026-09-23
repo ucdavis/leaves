@@ -24,11 +24,11 @@ public sealed class AdminStatusDataService
         var latestAccrualUpdatedAt = await _db.EmployeeAccrualBalances
             .Select(row => (DateTime?)row.LastUpdated)
             .MaxAsync(cancellationToken);
-        var currentAccrualBalances = await _db.CurrentAccrualBalances
+        var currentAccrualBalances = await _db.CurrentFacultyAccrualBalances
             .ToListAsync(cancellationToken);
 
         return new AdminStatusData(
-            CurrentAccrualBalances: currentAccrualBalances,
+            CurrentFacultyAccrualBalances: currentAccrualBalances,
             LatestAccrualUpdatedAt: latestAccrualUpdatedAt,
             LatestPeoplePromotionAt: latestPeoplePromotionAt,
             PendingRequestCount: pendingRequestCount);
@@ -36,7 +36,7 @@ public sealed class AdminStatusDataService
 }
 
 public sealed record AdminStatusData(
-    IReadOnlyList<CurrentAccrualBalance> CurrentAccrualBalances,
+    IReadOnlyList<CurrentFacultyAccrualBalance> CurrentFacultyAccrualBalances,
     DateTime? LatestAccrualUpdatedAt,
     DateTime? LatestPeoplePromotionAt,
     int PendingRequestCount);

@@ -3,14 +3,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Server.Core.Domain;
 
-public class CurrentEmployee
+public class CurrentFacultyWithAccrual
 {
     public required string IamId { get; set; }
     public string? EmployeeId { get; set; }
     public string? DisplayName { get; set; }
     public string? Email { get; set; }
     public DateOnly? LatestAsOfDate { get; set; }
-    public bool HasCurrentAccrualRecord { get; set; }
+    public bool? IsFaculty { get; set; }
     public string? HrStatus { get; set; }
     public string? EmployeeClassCode { get; set; }
     public string? EmployeeClassDescription { get; set; }
@@ -23,10 +23,10 @@ public class CurrentEmployee
     public int? ReportingDepartmentOverrideId { get; set; }
     public bool HasReportingDepartmentOverride { get; set; }
 
-    public static void Configure(EntityTypeBuilder<CurrentEmployee> entity)
+    public static void Configure(EntityTypeBuilder<CurrentFacultyWithAccrual> entity)
     {
         entity.HasNoKey();
-        entity.ToView("vw_CurrentEmployee", "dbo");
+        entity.ToView("vw_CurrentFacultyWithAccrual", "dbo");
 
         entity.Property(e => e.IamId).HasColumnType("char(10)").HasMaxLength(10);
     }

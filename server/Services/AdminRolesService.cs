@@ -42,7 +42,7 @@ public sealed class AdminRolesService
         IReadOnlyList<ClusterCaoAssignment> caoAssignments,
         IReadOnlyList<DepartmentChairAssignment> chairAssignments,
         IReadOnlyList<DirectoryEmployee> employees,
-        IReadOnlyList<CurrentEmployee> currentFaculty,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentFaculty,
         IReadOnlyList<Cluster> clusters,
         IReadOnlyList<Department> departments)
     {

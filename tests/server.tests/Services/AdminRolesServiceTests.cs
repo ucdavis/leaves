@@ -152,7 +152,7 @@ public class AdminRolesServiceTests
     private static AdminRoleOptionsData CreateOptions() => new(
         Clusters: [new Cluster { Id = 1, ClusterName = "Cluster" }, new Cluster { Id = 2, ClusterName = "Inactive", IsActive = false }],
         Employees: [new DirectoryEmployee("staff", "Staff member", "staff@example.test"), new DirectoryEmployee("faculty", "Faculty member", "faculty@example.test")],
-        CurrentFaculty: [new CurrentEmployee { IamId = "faculty", HasCurrentAccrualRecord = true, ResolvedReportingDepartmentCode = "DEPT", ResolvedReportingDepartmentName = "Department" }],
+        CurrentFaculty: [new CurrentFacultyWithAccrual { IamId = "faculty", IsFaculty = true, ResolvedReportingDepartmentCode = "DEPT", ResolvedReportingDepartmentName = "Department" }],
         Departments: [
             new Department { DepartmentCode = "DEPT", DepartmentName = "Department" },
             new Department { DepartmentCode = "OTHER", DepartmentName = "Other department" },
