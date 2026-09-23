@@ -1,22 +1,35 @@
+using Microsoft.Extensions.Options;
+
 namespace Server.Services;
 
 public sealed class AdminStatusService
 {
     private readonly AdminDirectoryDataService _directoryDataService;
     private readonly AdminStatusDataService _statusDataService;
+    private readonly IUniversityHolidayCache _holidayCache;
+    private readonly UcDavisHolidayOptions _holidayOptions;
 
     public AdminStatusService(
         AdminDirectoryDataService directoryDataService,
-        AdminStatusDataService statusDataService)
+        AdminStatusDataService statusDataService,
+        IUniversityHolidayCache holidayCache,
+        IOptions<UcDavisHolidayOptions> holidayOptions)
     {
         _directoryDataService = directoryDataService;
         _statusDataService = statusDataService;
+        _holidayCache = holidayCache;
+        _holidayOptions = holidayOptions.Value;
     }
 
     public async Task<AdminStatusPageResponse> GetStatusAsync(CancellationToken cancellationToken)
     {
         var directoryData = await _directoryDataService.LoadStatusDirectoryDataAsync(cancellationToken);
         var statusData = await _statusDataService.LoadStatusDataAsync(cancellationToken);
+
+        var vacationRows = statusData.CurrentAccrualBalances
+            .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var lastHolidayCalendarRefreshUtc = _holidayCache.LastSuccessfulRefreshUtc;
 
         var dataSources = new[]
         {
@@ -28,6 +41,11 @@ public sealed class AdminStatusService
                 "db-accruals",
                 statusData.AccrualSummary.VacationBalanceCount > 0 ? "ready" : "planned",
                 statusData.LatestAccrualUpdatedAt?.ToString("O")),
+            new AdminDataSourceResponse(
+                "ucd-holiday-calendar",
+                GetHolidayCalendarStatus(lastHolidayCalendarRefreshUtc),
+                lastHolidayCalendarRefreshUtc?.ToString("O"),
+                _holidayOptions.BaseUrl),
         };
 
         return new AdminStatusPageResponse(
@@ -56,6 +74,18 @@ public sealed class AdminStatusService
             ? "deferred"
             : "ready";
     }
+
+    private static string GetHolidayCalendarStatus(DateTime? lastSuccessfulRefreshUtc)
+    {
+        if (!lastSuccessfulRefreshUtc.HasValue)
+        {
+            return "planned";
+        }
+
+        return lastSuccessfulRefreshUtc.Value < DateTime.UtcNow.AddDays(-30)
+            ? "deferred"
+            : "ready";
+    }
 }
 
 public sealed record AdminStatusPageResponse(
@@ -66,7 +96,11 @@ public sealed record AdminStatusPageResponse(
     int DepartmentsMissingChairs,
     AdminStatusSnapshotResponse StatusSnapshot);
 
-public sealed record AdminDataSourceResponse(string Id, string Status, string? UpdatedAt);
+public sealed record AdminDataSourceResponse(
+    string Id,
+    string Status,
+    string? UpdatedAt,
+    string? SourceUrl = null);
 
 public sealed record AdminStatusSnapshotResponse(
     AdminIssuesResponse Issues);

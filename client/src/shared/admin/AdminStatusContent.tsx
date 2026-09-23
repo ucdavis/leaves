@@ -30,6 +30,10 @@ const dataSourceCopy: Record<
     detail: 'Monthly report.',
     label: 'People',
   },
+  'ucd-holiday-calendar': {
+    detail: 'UC Davis calendar.',
+    label: 'Holiday calendar',
+  },
 };
 
 export function AdminStatusContent({
@@ -71,7 +75,7 @@ export function AdminStatusContent({
           <div className="space-y-1">
             {dataSources.map((source) => (
               <FreshnessRow
-                detail={dataSourceCopy[source.id]?.detail ?? ''}
+                detail={getDataSourceDetail(source)}
                 key={source.id}
                 label={dataSourceCopy[source.id]?.label ?? source.id}
                 status={source.status}
@@ -105,6 +109,26 @@ export function AdminStatusContent({
   );
 }
 
+function getDataSourceDetail(source: AdminDataSource): ReactNode {
+  if (source.id !== 'ucd-holiday-calendar' || !source.sourceUrl) {
+    return dataSourceCopy[source.id]?.detail ?? '';
+  }
+
+  return (
+    <>
+      Source:{' '}
+      <a
+        className="link link-primary"
+        href={source.sourceUrl}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {source.sourceUrl}
+      </a>
+    </>
+  );
+}
+
 function AdminSectionCard({
   children,
   title,
@@ -128,7 +152,7 @@ function FreshnessRow({
   status,
   updatedAt,
 }: {
-  detail: string;
+  detail: ReactNode;
   label: string;
   status: AdminDataSource['status'];
   updatedAt: string | null;

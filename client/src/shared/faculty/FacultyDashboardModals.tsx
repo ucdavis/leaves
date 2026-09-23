@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-form';
 import { useState, type ReactNode } from 'react';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import {
   type FacultyDashboardResponse,
   type FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
+import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import {
   facultyLeaveTypeLabels,
@@ -23,12 +24,16 @@ import {
   formatCompactHours,
   formatDate,
   formatDateRange,
+  formatLongDate,
   getLeaveTone,
   isIsoDate,
   reportLeaveButtonClass,
 } from './FacultyDashboardPanels.tsx';
 import { RequestStatusBadge } from './FacultyDashboardPanels.tsx';
-import { getLeaveDayCount } from '@/shared/calendar/universityHolidays.ts';
+import {
+  getLeaveDayCount,
+  getUniversityHolidayCoverageEnd,
+} from '@/shared/calendar/universityHolidays.ts';
 import { getValidationErrorMessage } from '@/shared/forms/validationError.ts';
 
 const myInfoVaultUrl = 'https://myinfovault.ucdavis.edu/';
@@ -225,7 +230,6 @@ function RequestDetailGrid({
         label="Submitted"
         value={formatDate(request.submittedAt)}
       />
-      <RequestDetailItem label="Request ID" value={`r${request.id}`} />
     </dl>
   );
 }
@@ -300,6 +304,10 @@ function LeaveRequestForm({
   onTitleChange: (title: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const {
+    data: holidays = [],
+    isPending: isLoadingHolidays,
+  } = useQuery(universityHolidaysQueryOptions());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const leaveTypeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const leaveTypeLabelById = new Map(
@@ -403,11 +411,16 @@ function LeaveRequestForm({
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
+  const holidayDataAvailable = holidays.length > 0;
+  const holidayCoverageEnd = getUniversityHolidayCoverageEnd(holidays);
   const leaveDayCount = getLeaveDayCount(
+    holidays,
     formValues.startDate,
     usesDateRange ? formValues.endDate : formValues.startDate,
     usesDateRange && formValues.excludeWeekends,
-    usesDateRange && formValues.excludeUniversityHolidays
+    usesDateRange &&
+      holidayDataAvailable &&
+      formValues.excludeUniversityHolidays
   );
 
   return (
@@ -597,13 +610,18 @@ function LeaveRequestForm({
                     <form.AppField name="excludeUniversityHolidays">
                       {(field) => (
                         <field.CheckboxField
-                          description="Do not count UC Davis holidays or academic breaks in the range calculation."
+                          description={getHolidayExclusionDescription(
+                            holidayCoverageEnd,
+                            isLoadingHolidays
+                          )}
+                          disabled={!holidayDataAvailable}
                           label="Exclude university holidays"
                         />
                       )}
                     </form.AppField>
                     <LeaveDayCalculation
                       excludesUniversityHolidays={
+                        holidayDataAvailable &&
                         formValues.excludeUniversityHolidays
                       }
                       excludesWeekends={formValues.excludeWeekends}
@@ -715,6 +733,19 @@ function getExclusionDescription(
   }
 
   return '';
+}
+
+function getHolidayExclusionDescription(
+  holidayCoverageEnd: string | undefined,
+  isLoadingHolidays: boolean
+) {
+  if (holidayCoverageEnd) {
+    return `Do not count UC Davis holidays or academic breaks in the range calculation. Holiday dates are currently available through ${formatLongDate(holidayCoverageEnd)}.`;
+  }
+
+  return isLoadingHolidays
+    ? 'Holiday data is loading. University holidays cannot yet be excluded from the range calculation.'
+    : 'Holiday data is temporarily unavailable. University holidays cannot be excluded from the range calculation.';
 }
 
 function FacultySummary({
@@ -941,7 +972,7 @@ function buildOverlapMessage(request: FacultyLeaveRequest) {
   return `This overlaps with your ${request.leaveType} request (${formatDateRange(
     request.startDate,
     request.endDate
-  )}, ${formatCompactHours(request.totalHours)}, request r${request.id}).`;
+  )}, ${formatCompactHours(request.totalHours)}).`;
 }
 
 function isActiveRequestStatus(status: string) {

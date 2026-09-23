@@ -59,6 +59,7 @@ export type AdminCluster = {
 
 export type AdminDataSource = {
   id: string;
+  sourceUrl?: string | null;
   status: ImportStatus;
   updatedAt: string | null;
 };
