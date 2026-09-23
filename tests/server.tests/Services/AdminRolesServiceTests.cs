@@ -9,17 +9,18 @@ public class AdminRolesServiceTests
     private static readonly DateOnly Today = new(2026, 9, 23);
 
     [Fact]
-    public async Task Role_options_load_employee_identities_without_accruals_or_AppUsers()
+    public async Task Role_options_load_only_requested_employee_identities_without_accruals_or_AppUsers()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         db.Set<Person>().AddRange(
             new Person { IamId = "staff00001", IsEmployee = true, IsFaculty = false, FullName = "Staff member", Email = "staff@example.test" },
             new Person { IamId = "fac0000001", IsEmployee = true, IsFaculty = true, FullName = "Faculty without accruals" },
+            new Person { IamId = "other00001", IsEmployee = true, IsFaculty = false },
             new Person { IamId = "former0001", IsEmployee = false, IsFaculty = true },
             new Person { IamId = "unknown001", IsEmployee = null, IsFaculty = true });
         await db.SaveChangesAsync();
 
-        var options = await new AdminDirectoryDataService(db).LoadRoleOptionsDataAsync(CancellationToken.None);
+        var options = await new AdminDirectoryDataService(db).LoadRoleOptionsDataAsync(["staff00001", "fac0000001", "former0001", "unknown001"], CancellationToken.None);
 
         options.Employees.Select(employee => employee.IamId).Should().BeEquivalentTo("staff00001", "fac0000001");
         options.Employees.Single(employee => employee.IamId == "staff00001").DisplayName.Should().Be("Staff member");

@@ -14,10 +14,27 @@ public sealed class AdminRolesService
     public async Task<AdminRolesResponse> GetRolesAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var roleOptionsData = await _directoryDataService.LoadRoleOptionsDataAsync(cancellationToken);
         var roleAssignmentsData = await _directoryDataService.LoadRoleAssignmentsDataAsync(cancellationToken);
+        var iamIds = roleAssignmentsData.AdminAssignments.Select(assignment => assignment.IamId)
+            .Concat(roleAssignmentsData.CaoAssignments.Select(assignment => assignment.IamId))
+            .Concat(roleAssignmentsData.ChairAssignments.Select(assignment => assignment.IamId));
+        var roleOptionsData = await _directoryDataService.LoadRoleOptionsDataAsync(iamIds, cancellationToken);
 
         return BuildRolesResponse(roleOptionsData, roleAssignmentsData, today);
+    }
+
+    public async Task<IReadOnlyList<AdminRoleUserOption>> SearchAdminCandidatesAsync(
+        string? query,
+        CancellationToken cancellationToken)
+    {
+        var ids = await _directoryDataService.SearchEmployeeIdsAsync(query, forCao: false, cancellationToken);
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var options = await _directoryDataService.LoadRoleOptionsDataAsync(ids, cancellationToken);
+        return BuildUserOptions(options);
     }
 
     internal static InactiveRoleAssignmentChanges GetInactiveRoleAssignmentChanges(
@@ -188,7 +205,20 @@ public sealed class AdminRolesService
             .ThenBy(assignment => assignment.Name)
             .ToList();
 
-        var users = roleOptionsData.Employees
+        return new AdminRolesResponse(
+            Assignments: assignments,
+            Clusters: clusters.Select(cluster => new AdminRoleOption(cluster.Id.ToString(), cluster.ClusterName, cluster.IsActive)).ToList(),
+            Departments: departments.Select(department => new AdminRoleOption(department.DepartmentCode, department.DepartmentName, department.IsActive)).ToList(),
+            Users: BuildUserOptions(roleOptionsData));
+    }
+
+    private static IReadOnlyList<AdminRoleUserOption> BuildUserOptions(AdminRoleOptionsData roleOptionsData)
+    {
+        var currentFacultyByIamId = roleOptionsData.CurrentFaculty
+            .ToDictionary(employee => employee.IamId.Trim(), StringComparer.OrdinalIgnoreCase);
+        var departmentsByCode = roleOptionsData.Departments
+            .ToDictionary(department => department.DepartmentCode, StringComparer.OrdinalIgnoreCase);
+        return roleOptionsData.Employees
             .Select(employee =>
             {
                 var iamId = employee.IamId.Trim();
@@ -209,11 +239,6 @@ public sealed class AdminRolesService
             .ThenBy(user => user.IamId, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return new AdminRolesResponse(
-            Assignments: assignments,
-            Clusters: clusters.Select(cluster => new AdminRoleOption(cluster.Id.ToString(), cluster.ClusterName, cluster.IsActive)).ToList(),
-            Departments: departments.Select(department => new AdminRoleOption(department.DepartmentCode, department.DepartmentName, department.IsActive)).ToList(),
-            Users: users);
     }
 
     private static AdminRoleAssignmentResponse CreateAssignmentResponse(

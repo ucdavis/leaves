@@ -24,16 +24,25 @@ type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
   role: AdminRole;
 };
 
+export type AdminCaoUser = Pick<
+  AdminUser,
+  'id' | 'active' | 'email' | 'name'
+> & {
+  designation: AdminUser['designation'] | 'faculty';
+};
+
 type AdminDepartmentsResponse = {
+  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  users: AdminDepartmentUserResponse[];
+  facultyUsers: AdminDepartmentUserResponse[];
 };
 
 export type AdminDepartmentsPageData = {
+  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  users: Array<AdminUser & { departmentId: string }>;
+  facultyUsers: AdminUser[];
 };
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
@@ -59,7 +68,7 @@ function normalizeDepartmentData(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    users: response.users.map((user) => ({
+    facultyUsers: response.facultyUsers.map((user) => ({
       ...user,
       departmentId: user.departmentId ?? '',
       departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
@@ -87,6 +96,20 @@ export const adminDepartmentsQueryOptions = () =>
     },
     queryKey: ['admin', 'departments'] as const,
   });
+
+export const caoCandidatesQueryOptions = (query: string) => {
+  const term = query.trim();
+  return queryOptions({
+    enabled: term.length >= 2 && term.length <= 128,
+    queryFn: ({ signal }): Promise<AdminCaoUser[]> =>
+      fetchJson<AdminCaoUser[]>(
+        `/api/admin/departments/cao-candidates?query=${encodeURIComponent(term)}`,
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'caoCandidates', term] as const,
+  });
+};
 
 export async function createAdminCluster({
   name,

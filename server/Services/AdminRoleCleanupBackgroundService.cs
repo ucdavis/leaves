@@ -45,7 +45,6 @@ public sealed class AdminRoleCleanupBackgroundService : BackgroundService
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var directoryDataService = scope.ServiceProvider.GetRequiredService<AdminDirectoryDataService>();
 
-            var roleOptionsData = await directoryDataService.LoadRoleOptionsDataAsync(cancellationToken);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var activeCaoAssignments = await db.ClusterCaoAssignments
                 .Where(assignment => assignment.ClosedUtc == null &&
@@ -59,6 +58,11 @@ public sealed class AdminRoleCleanupBackgroundService : BackgroundService
                 .ToListAsync(cancellationToken);
             var activeAdminAssignments = await db.AppAdminAssignments
                 .ToListAsync(cancellationToken);
+
+            var iamIds = activeAdminAssignments.Select(assignment => assignment.IamId)
+                .Concat(activeCaoAssignments.Select(assignment => assignment.IamId))
+                .Concat(activeChairAssignments.Select(assignment => assignment.IamId));
+            var roleOptionsData = await directoryDataService.LoadRoleOptionsDataAsync(iamIds, cancellationToken);
 
             var now = DateTime.UtcNow;
             var changes = AdminRolesService.GetInactiveRoleAssignmentChanges(

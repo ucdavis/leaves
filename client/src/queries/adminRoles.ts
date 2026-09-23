@@ -45,10 +45,28 @@ export const adminRolesQueryOptions = () =>
     }: {
       signal: AbortSignal;
     }): Promise<AdminRolesResponse> => {
-      return await fetchJson<AdminRolesResponse>('/api/admin/roles', {}, signal);
+      return await fetchJson<AdminRolesResponse>(
+        '/api/admin/roles',
+        {},
+        signal
+      );
     },
     queryKey: ['admin', 'roles'] as const,
   });
+
+export const adminCandidatesQueryOptions = (query: string) => {
+  const term = query.trim();
+  return queryOptions({
+    enabled: term.length >= 2 && term.length <= 128,
+    queryFn: ({ signal }): Promise<AdminRoleUserOption[]> =>
+      fetchJson<AdminRoleUserOption[]>(
+        `/api/admin/roles/admin-candidates?query=${encodeURIComponent(term)}`,
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'adminCandidates', term] as const,
+  });
+};
 
 export async function addAdminAssignment({
   iamId,

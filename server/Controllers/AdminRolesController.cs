@@ -36,6 +36,12 @@ public sealed class AdminRolesController : ApiControllerBase
         return Ok(await _adminRolesService.GetRolesAsync(cancellationToken));
     }
 
+    [HttpGet("admin-candidates")]
+    public async Task<IActionResult> SearchAdminCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    {
+        return Ok(await _adminRolesService.SearchAdminCandidatesAsync(query, cancellationToken));
+    }
+
     [HttpPost("admins")]
     public async Task<IActionResult> AddAdminAsync([FromBody] AddAdminRequest request, CancellationToken cancellationToken)
     {

@@ -14,7 +14,24 @@ public sealed class AdminDirectoryService
     public async Task<AdminDepartmentsResponse> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
         var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
-        return BuildDepartmentsResponse(directoryData);
+        var caoEmployees = await _directoryDataService.LoadCaoEmployeesAsync(
+            directoryData.CurrentCaoAssignmentsByCluster.Values.Select(assignment => assignment.IamId),
+            cancellationToken);
+        return BuildDepartmentsResponse(directoryData, caoEmployees);
+    }
+
+    public async Task<IReadOnlyList<AdminCaoUserResponse>> SearchCaoCandidatesAsync(
+        string? query,
+        CancellationToken cancellationToken)
+    {
+        var ids = await _directoryDataService.SearchEmployeeIdsAsync(query, forCao: true, cancellationToken);
+        var employees = await _directoryDataService.LoadCaoEmployeesAsync(ids, cancellationToken);
+        return employees.Select(employee => new AdminCaoUserResponse(
+            Id: employee.IamId.Trim(),
+            Active: true,
+            Designation: GetDesignation("faculty", employee.IsFaculty == false),
+            Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+            Name: NullIfWhiteSpace(employee.DisplayName) ?? employee.IamId.Trim())).ToList();
     }
 
     public async Task<AdminFacultyResponse> GetFacultyAsync(CancellationToken cancellationToken)
@@ -25,58 +42,25 @@ public sealed class AdminDirectoryService
 
     internal static AdminFacultyResponse BuildFacultyResponse(AdminDirectoryData directoryData)
     {
-        var departmentResponse = BuildDepartmentsResponse(directoryData);
-        var currentCaoIamIds = directoryData.CurrentCaoAssignmentsByCluster.Values
-            .Select(assignment => NormalizeKey(assignment.IamId))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var facultyIamIds = directoryData.CurrentEmployees
-            .Where(employee => employee.HasCurrentAccrualRecord)
-            .Where(employee =>
-                !directoryData.NonFacultyIamIds.Contains(NormalizeKey(employee.IamId)) &&
-                !currentCaoIamIds.Contains(NormalizeKey(employee.IamId)))
-            .Select(employee => NormalizeKey(employee.IamId))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         return new AdminFacultyResponse(
-            Departments: departmentResponse.Departments,
-            FacultyUsers: departmentResponse.Users
-                .Where(user => facultyIamIds.Contains(NormalizeKey(user.IamId)))
-                .ToList());
+            Departments: BuildDepartmentResponses(directoryData),
+            FacultyUsers: BuildFacultyUserResponses(directoryData, BuildRoleAssignments(directoryData)));
     }
 
-    internal static AdminDepartmentsResponse BuildDepartmentsResponse(AdminDirectoryData directoryData)
+    internal static AdminDepartmentsResponse BuildDepartmentsResponse(
+        AdminDirectoryData directoryData,
+        IReadOnlyList<CaoDirectoryEmployee> caoEmployees)
     {
-        var userIdByIamId = BuildUserIdByIamId(directoryData);
         var roleAssignments = BuildRoleAssignments(directoryData);
-
         return new AdminDepartmentsResponse(
-            Clusters: BuildClusterResponses(directoryData, userIdByIamId),
-            Departments: BuildDepartmentResponses(directoryData, userIdByIamId),
-            Users: BuildUserResponses(directoryData, roleAssignments));
-    }
-
-    private static Dictionary<string, string> BuildUserIdByIamId(AdminDirectoryData directoryData)
-    {
-        var userIdByIamId = directoryData.AppUsers
-            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
-            .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().IamId.Trim(), StringComparer.OrdinalIgnoreCase);
-
-        foreach (var employee in directoryData.CurrentEmployees)
-        {
-            var key = NormalizeKey(employee.IamId);
-            if (!userIdByIamId.ContainsKey(key))
-            {
-                userIdByIamId[key] = employee.IamId.Trim();
-            }
-        }
-
-        return userIdByIamId;
+            Clusters: BuildClusterResponses(directoryData),
+            Departments: BuildDepartmentResponses(directoryData),
+            FacultyUsers: BuildFacultyUserResponses(directoryData, roleAssignments),
+            CaoUsers: BuildCaoUserResponses(directoryData, caoEmployees, roleAssignments));
     }
 
     private static IReadOnlyList<AdminDepartmentResponse> BuildDepartmentResponses(
-        AdminDirectoryData directoryData,
-        IReadOnlyDictionary<string, string> userIdByIamId)
+        AdminDirectoryData directoryData)
     {
         return directoryData.Departments
             .Select(department =>
@@ -84,9 +68,7 @@ public sealed class AdminDirectoryService
                 directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(
                     department.DepartmentCode.Trim(),
                     out var chairAssignment);
-                var chairUserId = chairAssignment == null
-                    ? null
-                    : userIdByIamId.GetValueOrDefault(NormalizeKey(chairAssignment.IamId));
+                var chairUserId = chairAssignment?.IamId.Trim();
 
                 return new AdminDepartmentResponse(
                     ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "notification",
@@ -108,16 +90,13 @@ public sealed class AdminDirectoryService
     }
 
     private static IReadOnlyList<AdminClusterResponse> BuildClusterResponses(
-        AdminDirectoryData directoryData,
-        IReadOnlyDictionary<string, string> userIdByIamId)
+        AdminDirectoryData directoryData)
     {
         return directoryData.Clusters
             .Select(cluster =>
             {
                 directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
-                var caoUserId = caoAssignment == null
-                    ? null
-                    : userIdByIamId.GetValueOrDefault(NormalizeKey(caoAssignment.IamId));
+                var caoUserId = caoAssignment?.IamId.Trim();
 
                 return new AdminClusterResponse(
                     CaoUserId: caoUserId,
@@ -142,7 +121,7 @@ public sealed class AdminDirectoryService
             CaoIamIds: caoIamIds);
     }
 
-    private static IReadOnlyList<AdminUserResponse> BuildUserResponses(
+    private static IReadOnlyList<AdminUserResponse> BuildFacultyUserResponses(
         AdminDirectoryData directoryData,
         RoleAssignments roleAssignments)
     {
@@ -151,7 +130,7 @@ public sealed class AdminDirectoryService
             .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        return directoryData.CurrentEmployees
+        return directoryData.CurrentFaculty
             .Select(employee =>
             {
                 var lookupIamId = NormalizeKey(employee.IamId);
@@ -178,7 +157,7 @@ public sealed class AdminDirectoryService
                     DepartmentOverrideEndDate: currentOverride?.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
                     DepartmentOverrideId: NullIfWhiteSpace(currentOverride?.DepartmentCode),
                     DepartmentOverrideStartDate: currentOverride?.EffectiveStartDate.ToString("yyyy-MM-dd"),
-                    Designation: GetDesignation(role, directoryData.NonFacultyIamIds.Contains(lookupIamId)),
+                    Designation: GetDesignation(role, isNonFaculty: false),
                     Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
                     EmployeeId: NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
                     HasAppUser: appUser != null,
@@ -189,6 +168,38 @@ public sealed class AdminDirectoryService
             })
             .OrderBy(user => user.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(user => user.IamId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IReadOnlyList<AdminCaoUserResponse> BuildCaoUserResponses(
+        AdminDirectoryData directoryData,
+        IReadOnlyList<CaoDirectoryEmployee> employees,
+        RoleAssignments roleAssignments)
+    {
+        var appUsersByIamId = directoryData.AppUsers
+            .Where(user => !string.IsNullOrWhiteSpace(user.IamId))
+            .GroupBy(user => NormalizeKey(user.IamId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        return employees.Select(employee =>
+            {
+                var iamId = employee.IamId.Trim();
+                var lookupIamId = NormalizeKey(iamId);
+                appUsersByIamId.TryGetValue(lookupIamId, out var appUser);
+                var role = GetRole(
+                    roleAssignments.AdminIamIds.Contains(lookupIamId),
+                    roleAssignments.ChairIamIds.Contains(lookupIamId),
+                    roleAssignments.CaoIamIds.Contains(lookupIamId));
+
+                return new AdminCaoUserResponse(
+                    Id: iamId,
+                    Active: appUser?.IsActive ?? true,
+                    Designation: GetDesignation(role, employee.IsFaculty == false),
+                    Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                    Name: NullIfWhiteSpace(employee.DisplayName) ?? NullIfWhiteSpace(appUser?.DisplayName) ?? iamId);
+            })
+            .OrderBy(user => user.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(user => user.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
@@ -232,7 +243,10 @@ public sealed class AdminDirectoryService
 public sealed record AdminDepartmentsResponse(
     IReadOnlyList<AdminClusterResponse> Clusters,
     IReadOnlyList<AdminDepartmentResponse> Departments,
-    IReadOnlyList<AdminUserResponse> Users);
+    IReadOnlyList<AdminUserResponse> FacultyUsers,
+    IReadOnlyList<AdminCaoUserResponse> CaoUsers);
+
+public sealed record AdminCaoUserResponse(string Id, bool Active, string Designation, string Email, string Name);
 
 public sealed record AdminFacultyResponse(
     IReadOnlyList<AdminDepartmentResponse> Departments,
