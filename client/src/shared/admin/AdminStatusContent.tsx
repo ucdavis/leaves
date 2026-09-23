@@ -18,7 +18,7 @@ type StatusSnapshot = {
 const dataSourceCopy: Record<
   string,
   {
-    detail: ReactNode;
+    detail: string;
     label: string;
   }
 > = {
@@ -31,19 +31,7 @@ const dataSourceCopy: Record<
     label: 'People',
   },
   'ucd-holiday-calendar': {
-    detail: (
-      <>
-        Source:{' '}
-        <a
-          className="link link-primary"
-          href="https://dates.ucdavis.edu/"
-          rel="noreferrer"
-          target="_blank"
-        >
-          dates.ucdavis.edu
-        </a>
-      </>
-    ),
+    detail: 'UC Davis calendar.',
     label: 'Holiday calendar',
   },
 };
@@ -87,7 +75,7 @@ export function AdminStatusContent({
           <div className="space-y-1">
             {dataSources.map((source) => (
               <FreshnessRow
-                detail={dataSourceCopy[source.id]?.detail ?? ''}
+                detail={getDataSourceDetail(source)}
                 key={source.id}
                 label={dataSourceCopy[source.id]?.label ?? source.id}
                 status={source.status}
@@ -118,6 +106,26 @@ export function AdminStatusContent({
         </AdminSectionCard>
       </section>
     </div>
+  );
+}
+
+function getDataSourceDetail(source: AdminDataSource): ReactNode {
+  if (source.id !== 'ucd-holiday-calendar' || !source.sourceUrl) {
+    return dataSourceCopy[source.id]?.detail ?? '';
+  }
+
+  return (
+    <>
+      Source:{' '}
+      <a
+        className="link link-primary"
+        href={source.sourceUrl}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {source.sourceUrl}
+      </a>
+    </>
   );
 }
 

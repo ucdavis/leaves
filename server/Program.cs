@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Server.Core.Data;
 using Server.Core.Notification;
 using Server.Helpers;
@@ -62,9 +63,16 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
     builder.Services.AddHostedService<LeaveRequestEmailDeliveryBackgroundService>();
     builder.Services.AddScoped<IFacultyDashboardService, FacultyDashboardService>();
-    builder.Services.AddHttpClient<IUcDavisHolidayService, UcDavisHolidayService>(client =>
+    builder.Services.AddOptions<UcDavisHolidayOptions>()
+        .Bind(builder.Configuration.GetSection(UcDavisHolidayOptions.SectionName))
+        .Validate(
+            options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+            $"{UcDavisHolidayOptions.SectionName}:BaseUrl must be an absolute URL.")
+        .ValidateOnStart();
+    builder.Services.AddHttpClient<IUcDavisHolidayService, UcDavisHolidayService>((serviceProvider, client) =>
     {
-        client.BaseAddress = new Uri("https://dates.ucdavis.edu/");
+        var holidayOptions = serviceProvider.GetRequiredService<IOptions<UcDavisHolidayOptions>>().Value;
+        client.BaseAddress = new Uri(holidayOptions.BaseUrl, UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(10);
     });
     builder.Services.AddSingleton<UniversityHolidayCache>();

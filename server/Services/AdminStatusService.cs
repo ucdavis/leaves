@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+
 namespace Server.Services;
 
 public sealed class AdminStatusService
@@ -5,15 +7,18 @@ public sealed class AdminStatusService
     private readonly AdminDirectoryDataService _directoryDataService;
     private readonly AdminStatusDataService _statusDataService;
     private readonly IUniversityHolidayCache _holidayCache;
+    private readonly UcDavisHolidayOptions _holidayOptions;
 
     public AdminStatusService(
         AdminDirectoryDataService directoryDataService,
         AdminStatusDataService statusDataService,
-        IUniversityHolidayCache holidayCache)
+        IUniversityHolidayCache holidayCache,
+        IOptions<UcDavisHolidayOptions> holidayOptions)
     {
         _directoryDataService = directoryDataService;
         _statusDataService = statusDataService;
         _holidayCache = holidayCache;
+        _holidayOptions = holidayOptions.Value;
     }
 
     public async Task<AdminStatusPageResponse> GetStatusAsync(CancellationToken cancellationToken)
@@ -39,7 +44,8 @@ public sealed class AdminStatusService
             new AdminDataSourceResponse(
                 "ucd-holiday-calendar",
                 GetHolidayCalendarStatus(lastHolidayCalendarRefreshUtc),
-                lastHolidayCalendarRefreshUtc?.ToString("O")),
+                lastHolidayCalendarRefreshUtc?.ToString("O"),
+                _holidayOptions.BaseUrl),
         };
 
         return new AdminStatusPageResponse(
@@ -97,7 +103,11 @@ public sealed record AdminStatusPageResponse(
     int DepartmentsMissingChairs,
     AdminStatusSnapshotResponse StatusSnapshot);
 
-public sealed record AdminDataSourceResponse(string Id, string Status, string? UpdatedAt);
+public sealed record AdminDataSourceResponse(
+    string Id,
+    string Status,
+    string? UpdatedAt,
+    string? SourceUrl = null);
 
 public sealed record AdminStatusSnapshotResponse(
     AdminIssuesResponse Issues);

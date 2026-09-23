@@ -2,6 +2,13 @@ using System.Net.Http.Json;
 
 namespace Server.Services;
 
+public sealed class UcDavisHolidayOptions
+{
+    public const string SectionName = "UcDavisHoliday";
+
+    public string BaseUrl { get; init; } = string.Empty;
+}
+
 public interface IUcDavisHolidayService
 {
     Task<IReadOnlyList<UniversityHoliday>> GetHolidaysAsync(CancellationToken cancellationToken);
