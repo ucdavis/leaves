@@ -52,7 +52,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToListAsync(cancellationToken);
         var chairAssignments = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
         var caoAssignments = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
-        var linkedUserCounts = (await _db.CurrentEmployees
+        var linkedUserCounts = (await CurrentFacultyEmployeesQuery(today)
                 .Where(employee => employee.ResolvedReportingDepartmentCode != null)
                 .GroupBy(employee => employee.ResolvedReportingDepartmentCode!)
                 .Select(group => new DepartmentUserCount(group.Key, group.Count()))
@@ -85,19 +85,8 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
     {
         var normalizedDepartmentCode = departmentCode.Trim();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var currentCaoIamIds = _db.ClusterCaoAssignments
-            .Where(assignment => assignment.ClosedUtc == null &&
-                                 assignment.EffectiveStartDate <= today &&
-                                 (!assignment.EffectiveEndDateExclusive.HasValue ||
-                                  assignment.EffectiveEndDateExclusive.Value > today))
-            .Select(assignment => assignment.IamId);
-        var rosterQuery = _db.CurrentEmployees
-            .Where(employee => employee.ResolvedReportingDepartmentCode == normalizedDepartmentCode)
-            .Where(employee => !currentCaoIamIds.Contains(employee.IamId))
-            .Where(employee => !_db.People.Any(person =>
-                person.IamId == employee.IamId &&
-                person.IsEmployee == true &&
-                person.IsFaculty == false));
+        var rosterQuery = CurrentFacultyEmployeesQuery(today)
+            .Where(employee => employee.ResolvedReportingDepartmentCode == normalizedDepartmentCode);
         var totalCount = await rosterQuery.CountAsync(cancellationToken);
         var employees = await rosterQuery
             .OrderBy(employee => employee.DisplayName)
@@ -348,6 +337,12 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
 
     private IQueryable<CurrentEmployee> FacultyEmployeesQuery(DateOnly today)
     {
+        return CurrentFacultyEmployeesQuery(today)
+            .Where(employee => employee.HasCurrentAccrualRecord);
+    }
+
+    private IQueryable<CurrentEmployee> CurrentFacultyEmployeesQuery(DateOnly today)
+    {
         var currentCaoIamIds = _db.ClusterCaoAssignments
             .Where(assignment => assignment.ClosedUtc == null &&
                                  assignment.EffectiveStartDate <= today &&
@@ -355,13 +350,13 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                                   assignment.EffectiveEndDateExclusive.Value > today))
             .Select(assignment => assignment.IamId);
 
-        return _db.CurrentEmployees
-            .Where(employee => employee.HasCurrentAccrualRecord)
-            .Where(employee => !currentCaoIamIds.Contains(employee.IamId))
-            .Where(employee => !_db.People.Any(person =>
-                person.IamId == employee.IamId &&
-                person.IsEmployee == true &&
-                person.IsFaculty == false));
+        return
+            from employee in _db.CurrentEmployees
+            join person in _db.People on employee.IamId equals person.IamId
+            where !currentCaoIamIds.Contains(employee.IamId) &&
+                  person.IsEmployee == true &&
+                  person.IsFaculty == true
+            select employee;
     }
 
     private async Task<IReadOnlyDictionary<string, string>> LoadDisplayNamesByIamIdAsync(

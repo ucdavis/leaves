@@ -426,12 +426,8 @@ public class UserService : IUserService
             return Task.FromResult<Person?>(null);
         }
 
-        var suppliedEmail = email!.Trim();
-
-        // Direct equality keeps this predicate indexable when the Walter-owned People table gains
-        // its email index. The supplied value preserves behavior for case-sensitive test providers.
         return _dbContext.People
-            .Where(person => person.Email == normalizedEmail || person.Email == suppliedEmail)
+            .Where(person => person.Email != null && person.Email.ToLower() == normalizedEmail)
             .OrderByDescending(person => person.PromotedAt)
             .ThenByDescending(person => person.ModifyDate)
             .FirstOrDefaultAsync(cancellationToken);

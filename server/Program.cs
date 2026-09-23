@@ -149,9 +149,8 @@ try
     };
 
     app.UseDefaultFiles();
-    app.UseStaticFiles(staticFileOptions);
-
     app.UseResponseCompression();
+    app.UseStaticFiles(staticFileOptions);
     app.UseResponseCaching();
 
     // Configure the HTTP request pipeline.

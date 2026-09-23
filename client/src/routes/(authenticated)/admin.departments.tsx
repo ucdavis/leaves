@@ -252,6 +252,7 @@ function AdminDepartmentsRoute() {
                   }}
                   onChangeQuery={(value) => {
                     setClusterCaoQuery(value);
+                    setSelectedClusterCaoUser(null);
                     setIsClusterCaoSearchOpen(true);
                   }}
                   onConfirm={() => {

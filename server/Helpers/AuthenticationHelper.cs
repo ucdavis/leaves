@@ -17,7 +17,13 @@ public static class AuthenticationHelper
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<AuthenticationRefreshOptions>(configuration.GetSection("Authentication"));
+        services.AddOptions<AuthenticationRefreshOptions>()
+            .Bind(configuration.GetSection("Authentication"))
+            .Validate(
+                options => options.PrincipalRefreshIntervalMinutes >= 1 &&
+                           options.PrincipalRefreshIntervalMinutes <= 60,
+                "Authentication:PrincipalRefreshIntervalMinutes must be between 1 and 60.")
+            .ValidateOnStart();
 
         services
             .AddAuthentication(options =>
@@ -189,11 +195,26 @@ public static class AuthenticationHelper
 
     private static ClaimsPrincipal WithPrincipalRefreshClaim(ClaimsPrincipal principal, DateTime refreshedAt)
     {
-        var identity = new ClaimsIdentity(
-            principal.Claims,
-            authenticationType: principal.Identity?.AuthenticationType);
+        var identities = principal.Identities
+            .Select(identity => new ClaimsIdentity(identity))
+            .ToList();
+        var identity = identities.FirstOrDefault(identity => identity.IsAuthenticated);
+        if (identity == null)
+        {
+            identity = new ClaimsIdentity(principal.Identity);
+            identities.Add(identity);
+        }
+
+        foreach (var existingIdentity in identities)
+        {
+            foreach (var claim in existingIdentity.FindAll(PrincipalRefreshTicksClaimType).ToList())
+            {
+                existingIdentity.RemoveClaim(claim);
+            }
+        }
+
         ReplacePrincipalRefreshClaim(identity, refreshedAt);
-        return new ClaimsPrincipal(identity);
+        return new ClaimsPrincipal(identities);
     }
 
     private static void ReplacePrincipalRefreshClaim(ClaimsIdentity identity, DateTime refreshedAt)
@@ -211,6 +232,5 @@ public sealed class AuthenticationRefreshOptions
 {
     public int PrincipalRefreshIntervalMinutes { get; init; } = 5;
 
-    public TimeSpan PrincipalRefreshInterval => TimeSpan.FromMinutes(
-        Math.Clamp(PrincipalRefreshIntervalMinutes, 1, 60));
+    public TimeSpan PrincipalRefreshInterval => TimeSpan.FromMinutes(PrincipalRefreshIntervalMinutes);
 }
