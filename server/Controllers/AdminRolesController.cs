@@ -42,9 +42,9 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("IAM ID is required.");
         }
 
-        var isEligibleForAdminAssignment = await _db.CurrentEmployees
+        var isEligibleForAdminAssignment = await _db.People
             .AnyAsync(
-                employee => employee.IamId.Trim() == iamId,
+                person => person.IsEmployee == true && person.IamId.Trim() == iamId,
                 cancellationToken);
         if (!isEligibleForAdminAssignment)
         {
@@ -251,8 +251,8 @@ public sealed class AdminRolesController : ApiControllerBase
             return ImmediateAssignmentValidationResult.WithError(ValidationProblem("IAM ID is required."));
         }
 
-        var directoryUserExists = await _db.CurrentEmployees
-            .AnyAsync(employee => employee.IamId.Trim() == trimmedIamId, cancellationToken);
+        var directoryUserExists = await _db.People
+            .AnyAsync(person => person.IsEmployee == true && person.IamId.Trim() == trimmedIamId, cancellationToken);
         if (!directoryUserExists)
         {
             return ImmediateAssignmentValidationResult.WithError(

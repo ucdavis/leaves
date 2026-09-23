@@ -99,8 +99,8 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return false;
         }
 
-        return await _db.CurrentEmployees
-            .AnyAsync(employee => employee.IamId.Trim() == normalizedIamId, cancellationToken);
+        return await _db.People
+            .AnyAsync(person => person.IsEmployee == true && person.IamId.Trim() == normalizedIamId, cancellationToken);
     }
 
     public async Task<bool> IsCurrentFacultyInDepartmentAsync(
