@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Server.Core.Data;
 using Server.Core.Notification;
 using Server.Helpers;
@@ -45,6 +46,7 @@ try
     // Add response caching for pages that opt-in
     // https://learn.microsoft.com/en-us/aspnet/core/performance/caching/middleware?view=aspnetcore-9.0
     builder.Services.AddResponseCaching();
+    builder.Services.AddMemoryCache();
 
     // add scoped services here
     builder.Services.AddScoped<IDbInitializer, DbInitializer>();
@@ -61,6 +63,22 @@ try
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AdminRoleCleanupBackgroundService>());
     builder.Services.AddHostedService<LeaveRequestEmailDeliveryBackgroundService>();
     builder.Services.AddScoped<IFacultyDashboardService, FacultyDashboardService>();
+    builder.Services.AddOptions<UcDavisHolidayOptions>()
+        .Bind(builder.Configuration.GetSection(UcDavisHolidayOptions.SectionName))
+        .Validate(
+            options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+            $"{UcDavisHolidayOptions.SectionName}:BaseUrl must be an absolute URL.")
+        .ValidateOnStart();
+    builder.Services.AddHttpClient<IUcDavisHolidayService, UcDavisHolidayService>((serviceProvider, client) =>
+    {
+        var holidayOptions = serviceProvider.GetRequiredService<IOptions<UcDavisHolidayOptions>>().Value;
+        client.BaseAddress = new Uri(holidayOptions.BaseUrl, UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(10);
+    });
+    builder.Services.AddSingleton<UniversityHolidayCache>();
+    builder.Services.AddSingleton<IUniversityHolidayCache>(sp =>
+        sp.GetRequiredService<UniversityHolidayCache>());
+    builder.Services.AddHostedService<UniversityHolidayCacheRefreshService>();
     // add auth policies here
 
     // add db context (check secrets first, then config, then default)
