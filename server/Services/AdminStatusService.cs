@@ -26,9 +26,6 @@ public sealed class AdminStatusService
         var directoryData = await _directoryDataService.LoadStatusDirectoryDataAsync(cancellationToken);
         var statusData = await _statusDataService.LoadStatusDataAsync(cancellationToken);
 
-        var vacationRows = statusData.CurrentAccrualBalances
-            .Where(row => row.TypeLabel.Contains("Vacation", StringComparison.OrdinalIgnoreCase))
-            .ToList();
         var lastHolidayCalendarRefreshUtc = _holidayCache.LastSuccessfulRefreshUtc;
 
         var dataSources = new[]

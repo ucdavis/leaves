@@ -51,7 +51,6 @@ try
     {
         options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["application/json"]);
     });
-    builder.Services.AddResponseCaching();
     builder.Services.AddMemoryCache();
 
     // add scoped services here
