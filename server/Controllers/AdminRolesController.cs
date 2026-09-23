@@ -44,7 +44,7 @@ public sealed class AdminRolesController : ApiControllerBase
 
         var isEligibleForAdminAssignment = await _db.People
             .AnyAsync(
-                person => person.IsEmployee == true && person.IamId.Trim() == iamId,
+                person => person.IsEmployee == true && person.IamId == iamId,
                 cancellationToken);
         if (!isEligibleForAdminAssignment)
         {
@@ -252,7 +252,7 @@ public sealed class AdminRolesController : ApiControllerBase
         }
 
         var directoryUserExists = await _db.People
-            .AnyAsync(person => person.IsEmployee == true && person.IamId.Trim() == trimmedIamId, cancellationToken);
+            .AnyAsync(person => person.IsEmployee == true && person.IamId == trimmedIamId, cancellationToken);
         if (!directoryUserExists)
         {
             return ImmediateAssignmentValidationResult.WithError(

@@ -24,7 +24,7 @@ public class AdminRoleMembershipTests
         using var db = TestDbContextFactory.CreateInMemory();
         db.Set<Person>().Add(new Person
         {
-            IamId = "employee  ",
+            IamId = "employee01",
             IsEmployee = isEmployee,
             IsStudent = true,
             IsExternal = true,
@@ -32,7 +32,7 @@ public class AdminRoleMembershipTests
         await db.SaveChangesAsync();
         var service = new AdminDirectoryDataService(db);
 
-        var exists = await service.DirectoryUserExistsAsync(" employee ", CancellationToken.None);
+        var exists = await service.DirectoryUserExistsAsync(" employee01 ", CancellationToken.None);
 
         exists.Should().Be(expected);
         db.AppUsers.Should().BeEmpty();
@@ -61,19 +61,19 @@ public class AdminRoleMembershipTests
         using var db = TestDbContextFactory.CreateInMemory();
         db.Set<Person>().Add(new Person
         {
-            IamId = "employee  ",
+            IamId = "employee01",
             IsEmployee = true,
             IsFaculty = isFaculty,
         });
         var controller = await CreateControllerAsync(db);
 
-        var adminResult = await controller.AddAdminAsync(new(" employee "), CancellationToken.None);
-        var caoResult = await controller.AddCaoAsync(new(1, " employee "), CancellationToken.None);
+        var adminResult = await controller.AddAdminAsync(new(" employee01 "), CancellationToken.None);
+        var caoResult = await controller.AddCaoAsync(new(1, " employee01 "), CancellationToken.None);
 
         adminResult.Should().BeOfType<NoContentResult>();
         caoResult.Should().BeOfType<NoContentResult>();
-        db.AppAdminAssignments.Should().ContainSingle().Which.IamId.Should().Be("employee");
-        db.ClusterCaoAssignments.Should().ContainSingle().Which.IamId.Should().Be("employee");
+        db.AppAdminAssignments.Should().ContainSingle().Which.IamId.Should().Be("employee01");
+        db.ClusterCaoAssignments.Should().ContainSingle().Which.IamId.Should().Be("employee01");
         db.AppUsers.Should().ContainSingle().Which.IamId.Should().Be("adminactor");
         db.EmployeeAccrualBalances.Should().BeEmpty();
     }
