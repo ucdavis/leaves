@@ -26,19 +26,6 @@ public class CurrentFacultyWithAccrualTests
         entity.FindProperty(nameof(CurrentFacultyWithAccrual.ReportingDepartmentOverrideId))!.IsNullable.Should().BeTrue();
     }
 
-    [Fact]
-    public void IamIdLookupTranslatesToAViewQuery()
-    {
-        using var db = CreateSqlServerContext();
-
-        var sql = db.CurrentFacultyWithAccrual
-            .Where(employee => employee.IamId == "sbaker")
-            .ToQueryString();
-
-        sql.Should().Contain("FROM [dbo].[vw_CurrentFacultyWithAccrual]");
-        sql.Should().Contain("WHERE [v].[IamId] = 'sbaker'");
-    }
-
     private static AppDbContext CreateSqlServerContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

@@ -28,19 +28,6 @@ public class CurrentFacultyAccrualBalanceTests
         entity.FindProperty(nameof(CurrentFacultyAccrualBalance.AccrualPercentage))!.GetScale().Should().Be(2);
     }
 
-    [Fact]
-    public void IamIdLookupTranslatesToAViewQuery()
-    {
-        using var db = CreateSqlServerContext();
-
-        var sql = db.CurrentFacultyAccrualBalances
-            .Where(balance => balance.IamId == "sbaker")
-            .ToQueryString();
-
-        sql.Should().Contain("FROM [dbo].[vw_CurrentFacultyAccrualBalance]");
-        sql.Should().Contain("WHERE [v].[IamId] = 'sbaker'");
-    }
-
     private static AppDbContext CreateSqlServerContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

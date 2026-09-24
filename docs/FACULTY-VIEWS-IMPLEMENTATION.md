@@ -210,3 +210,18 @@ Work through one reviewable stage at a time. Check an item only after its implem
 - Validation runner source and detailed logs remain locally under `/private/tmp/leaves-faculty-acceptance`, `/private/tmp/leaves-faculty-api-acceptance`, and `/tmp/leaves-faculty-acceptance-*.log`. These temporary checks use only the named sandbox manifest and loopback SQL endpoint. The checklist is the durable acceptance record.
 - Scope exclusions remain deliberate: override-management UI for owners absent from the faculty roster is [issue #55](https://github.com/ucdavis/leaves/issues/55), and existing self-approval behavior is unchanged. No shared database migration, deployment, push, or merge was performed.
 - Closed the browser and removed `faculty-views-acceptance` with `./dev/sandbox down --name faculty-views-acceptance`. Verified zero containers, volumes, or networks with its Compose label remain, including the volume holding both disposable databases. All checklist items are complete. The checklist is the only uncommitted file.
+
+### 2026-09-24: review regression coverage
+
+- Replaced SQL-fragment assertions with a SQL Server migration test covering upgrade, rollback, re-upgrade, view membership, IAM lookups, per-person latest dates, representative positions, Level5/4/3 fallback, Pacific-effective overrides, and MAX/count/min/max/divergence results. Rollback compares observable query results with the preceding schema. EF metadata tests remain unchanged.
+- The integration test creates and deletes a uniquely named database on the disposable sandbox SQL service. Ordinary unit runs explicitly skip it unless `LEAVES_SANDBOX_TESTS=1`. Run it inside the sandbox app container, where `sql` resolves to the disposable database service:
+
+```bash
+./dev/sandbox up --name faculty-view-tests --json
+sandbox_project=$(./dev/sandbox status --name faculty-view-tests --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"])')
+sandbox_app=$(docker ps --filter "label=com.docker.compose.project=$sandbox_project" --filter label=com.docker.compose.service=devcontainer --format '{{.ID}}')
+docker exec --user vscode --workdir /workspace --env LEAVES_SANDBOX_TESTS=1 "$sandbox_app" dotnet test tests/server.tests/server.tests.csproj --filter 'FullyQualifiedName~FacultyViewsMigrationTests|FullyQualifiedName~CurrentFacultyWithAccrualTests|FullyQualifiedName~CurrentFacultyAccrualBalanceTests'
+./dev/sandbox down --name faculty-view-tests
+```
+
+- Focused verification passed: **3 tests, 0 failures, 0 skipped**, including the live SQL migration test and both EF metadata tests. No full test or lint suite was run in this review phase. Existing dependency advisory warnings remain. Removed `faculty-view-tests` afterward: two containers, twelve volumes, and one network. No shared database or application code was changed.
