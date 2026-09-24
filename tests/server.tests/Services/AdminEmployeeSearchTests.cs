@@ -38,6 +38,28 @@ public class AdminEmployeeSearchTests
         db.EmployeeAccrualBalances.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Candidate_responses_keep_exact_IamId_match_ahead_of_name_matches(bool forCao)
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        db.Set<Person>().AddRange(
+            new Person { IamId = "1234567890", FullName = "Zulu Exact", IsEmployee = true },
+            new Person { IamId = "other00001", FullName = "Alpha 1234567890", IsEmployee = true },
+            new Person { IamId = "other00002", FullName = "Beta 1234567890", IsEmployee = true });
+        await db.SaveChangesAsync();
+        var dataService = new AdminDirectoryDataService(db);
+
+        var ids = forCao
+            ? (await new AdminDirectoryService(dataService).SearchCaoCandidatesAsync("1234567890", default))
+                .Select(user => user.Id)
+            : (await new AdminRolesService(dataService).SearchAdminCandidatesAsync("1234567890", default))
+                .Select(user => user.IamId);
+
+        ids.Should().Equal("1234567890", "other00001", "other00002");
+    }
+
     [Fact]
     public async Task Cao_search_preserves_employee_active_and_role_rules_including_assignment_dates()
     {

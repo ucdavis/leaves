@@ -299,6 +299,13 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         }
 
         var employee = await GetCurrentFacultyWithAccrualAsync(iamId, cancellationToken);
+        if (employee == null)
+        {
+            return CreateLeaveRequestResult.Invalid(
+                "faculty",
+                "Only current faculty with accrual records can submit leave requests.");
+        }
+
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         if (department == null)
         {

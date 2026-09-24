@@ -34,7 +34,11 @@ public sealed class AdminRolesService
         }
 
         var options = await _directoryDataService.LoadRoleOptionsDataAsync(ids, cancellationToken);
-        return BuildUserOptions(options);
+        var idOrder = ids.Select((id, index) => (Id: id.Trim(), Index: index))
+            .ToDictionary(item => item.Id, item => item.Index, StringComparer.OrdinalIgnoreCase);
+        return BuildUserOptions(options)
+            .OrderBy(user => idOrder[user.IamId])
+            .ToList();
     }
 
     internal static InactiveRoleAssignmentChanges GetInactiveRoleAssignmentChanges(

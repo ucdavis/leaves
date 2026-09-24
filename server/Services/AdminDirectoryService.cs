@@ -26,12 +26,15 @@ public sealed class AdminDirectoryService
     {
         var ids = await _directoryDataService.SearchEmployeeIdsAsync(query, forCao: true, cancellationToken);
         var employees = await _directoryDataService.LoadCaoEmployeesAsync(ids, cancellationToken);
-        return employees.Select(employee => new AdminCaoUserResponse(
-            Id: employee.IamId.Trim(),
-            Active: true,
-            Designation: GetDesignation("faculty", employee.IsFaculty == false),
-            Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
-            Name: NullIfWhiteSpace(employee.DisplayName) ?? employee.IamId.Trim())).ToList();
+        var idOrder = ids.Select((id, index) => (Id: id.Trim(), Index: index))
+            .ToDictionary(item => item.Id, item => item.Index, StringComparer.OrdinalIgnoreCase);
+        return employees.OrderBy(employee => idOrder[employee.IamId.Trim()])
+            .Select(employee => new AdminCaoUserResponse(
+                Id: employee.IamId.Trim(),
+                Active: true,
+                Designation: GetDesignation("faculty", employee.IsFaculty == false),
+                Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                Name: NullIfWhiteSpace(employee.DisplayName) ?? employee.IamId.Trim())).ToList();
     }
 
     public async Task<AdminFacultyResponse> GetFacultyAsync(CancellationToken cancellationToken)
