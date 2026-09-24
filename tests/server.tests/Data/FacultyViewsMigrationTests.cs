@@ -195,7 +195,7 @@ public class FacultyViewsMigrationTests
         public SandboxFactAttribute()
         {
             if (Environment.GetEnvironmentVariable("LEAVES_SANDBOX_TESTS") != "1")
-                Skip = "Run inside dev/sandbox with LEAVES_SANDBOX_TESTS=1; see docs/FACULTY-VIEWS-IMPLEMENTATION.md.";
+                Skip = "Run inside dev/sandbox with LEAVES_SANDBOX_TESTS=1.";
         }
     }
 }

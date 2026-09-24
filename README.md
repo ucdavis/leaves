@@ -12,8 +12,6 @@ To select an admin or CAO, enter 2-128 characters of a name, email address, or I
 
 Pending requests stay with their saved approval scope when the requester moves departments or loses faculty eligibility. Calendars and approver dashboard access follow the current faculty roster. If a faculty dashboard is unavailable, pending requests remain accessible in the approval workspace.
 
-See the [faculty views implementation checklist](docs/FACULTY-VIEWS-IMPLEMENTATION.md) for data contracts, validation evidence, and deferred override-management UI work.
-
 ## Architecture
 
 - **Backend**: .NET 10 Web API with ASP.NET Core
@@ -207,7 +205,7 @@ The VS Code flow intentionally uses the `http-cli` launch profile instead of the
 
 - Run `dotnet test` from the repository root to execute the .NET test project included in `app.sln`.
 - Alternatively, target the project directly with `dotnet test tests/server.tests/server.tests.csproj`.
-- Ordinary runs do not require SQL Server and skip the sandbox-only faculty-view migration test. See the [sandbox migration-test instructions](docs/FACULTY-VIEWS-IMPLEMENTATION.md#2026-09-24-review-regression-coverage) to execute that test against a disposable SQL Server database.
+- Ordinary runs do not require SQL Server and skip the sandbox-only faculty-view migration test. To run it, start `./dev/sandbox`, then execute the test inside its app container with `LEAVES_SANDBOX_TESTS=1`. Tear down the sandbox afterward.
 
 ## Updating Dependencies
 
