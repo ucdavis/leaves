@@ -170,7 +170,6 @@ Work through one reviewable stage at a time. Check an item only after its implem
 - This follow-up supersedes earlier evidence describing directory-wide CAO or admin candidate responses. Stage 4 remains next. No shared database, cloud deployment, or git commit was performed.
 - Closed the validation browser and removed the sandbox. Verified no containers, volumes, or networks remain with its Compose project label. Follow-up changes remain uncommitted, with the previously staged changes preserved.
 
-
 ### 2026-09-23: stage 4 complete
 
 - Added `CurrentFacultyWithAccrual` and `CurrentFacultyAccrualBalance` with keyless mappings to the final view names. Preserved IAM column type and balance precision, added nullable `IsFaculty` to the faculty projection, and removed `HasCurrentAccrualRecord` from application models and consumers.
@@ -189,7 +188,6 @@ Work through one reviewable stage at a time. Check an item only after its implem
 - A second sandbox check removed all positive faculty flags while retaining raw accruals. Status still reported accrual data present with the raw latest-update timestamp, with zero faculty cap metrics. Removing the disposable raw rows changed import status to planned with no timestamp.
 - Stage 5 still needs the complete old-schema upgrade, rollback/re-upgrade, position/fallback/override edge-case matrix, and end-to-end decision acceptance. The stage 4 smoke checks do not complete that acceptance stage. Changes remain uncommitted for review.
 - Closed the validation browser and removed the sandbox with `./dev/sandbox down --name faculty-views-stage4`. Verified no containers, volumes, or networks with its Compose project label remain. No shared database, cloud deployment, or git commit was performed.
-
 
 ### 2026-09-23: stage 5 complete
 

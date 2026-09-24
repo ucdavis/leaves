@@ -68,8 +68,10 @@ public class AdminEmployeeSearchTests
         var ids = new[] { "staff", "faculty", "nullfac", "gone", "unknown", "inactive", "admin", "cao", "chair", "future", "expired", "closed" };
         foreach (var id in ids)
         {
-            db.Set<Person>().Add(new Person {
-                IamId = id.PadRight(10, '0'), FullName = $"Needle {id}",
+            db.Set<Person>().Add(new Person
+            {
+                IamId = id.PadRight(10, '0'),
+                FullName = $"Needle {id}",
                 IsEmployee = id == "gone" ? false : id == "unknown" ? null : true,
                 IsFaculty = id == "nullfac" ? null : id == "faculty",
             });

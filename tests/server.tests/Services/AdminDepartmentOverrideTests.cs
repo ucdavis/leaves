@@ -19,7 +19,9 @@ public class AdminDepartmentOverrideTests
         db.AppUsers.Add(actor);
         db.Departments.Add(new Department
         {
-            DepartmentCode = "DEPT", DepartmentName = "Department", IsActive = activeDepartment,
+            DepartmentCode = "DEPT",
+            DepartmentName = "Department",
+            IsActive = activeDepartment,
         });
         await db.SaveChangesAsync();
         var today = DateOnly.FromDateTime(
@@ -28,8 +30,12 @@ public class AdminDepartmentOverrideTests
         {
             var item = new EmployeeReportingDepartmentOverride
             {
-                Id = id, IamId = "missing", DepartmentCode = "DEPT", CreatedByAppUserId = actor.Id,
-                EffectiveStartDate = today.AddDays(start), EffectiveEndDateExclusive = end.HasValue ? today.AddDays(end.Value) : null,
+                Id = id,
+                IamId = "missing",
+                DepartmentCode = "DEPT",
+                CreatedByAppUserId = actor.Id,
+                EffectiveStartDate = today.AddDays(start),
+                EffectiveEndDateExclusive = end.HasValue ? today.AddDays(end.Value) : null,
             };
             db.EmployeeReportingDepartmentOverrides.Add(item);
             return item;

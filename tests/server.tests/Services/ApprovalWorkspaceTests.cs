@@ -23,20 +23,30 @@ public class ApprovalWorkspaceTests
         await db.SaveChangesAsync();
         db.DepartmentChairAssignments.Add(new DepartmentChairAssignment
         {
-            DepartmentCode = department.DepartmentCode, IamId = viewer.IamId,
-            EffectiveStartDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1), CreatedByAppUserId = viewer.Id,
+            DepartmentCode = department.DepartmentCode,
+            IamId = viewer.IamId,
+            EffectiveStartDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
+            CreatedByAppUserId = viewer.Id,
         });
         db.ClusterCaoAssignments.Add(new ClusterCaoAssignment
         {
-            ClusterId = cluster.Id, IamId = viewer.IamId,
-            EffectiveStartDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1), CreatedByAppUserId = viewer.Id,
+            ClusterId = cluster.Id,
+            IamId = viewer.IamId,
+            EffectiveStartDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
+            CreatedByAppUserId = viewer.Id,
         });
         void AddRequest(int id, string iamId, LeaveRequestStatus status, bool inScope)
         {
             db.LeaveRequests.Add(new LeaveRequest
             {
-                Id = id, IamId = iamId, AppUserId = former.Id, LeaveTypeId = 1, Status = status,
-                StartDate = new DateOnly(2026, 10, 1), EndDate = new DateOnly(2026, 10, 2), TotalHours = 16,
+                Id = id,
+                IamId = iamId,
+                AppUserId = former.Id,
+                LeaveTypeId = 1,
+                Status = status,
+                StartDate = new DateOnly(2026, 10, 1),
+                EndDate = new DateOnly(2026, 10, 2),
+                TotalHours = 16,
                 ReportingDepartmentCodeSnapshot = inScope ? department.DepartmentCode : "OTHER",
                 ReportingDepartmentNameSnapshot = inScope ? department.DepartmentName : "Other department",
                 ClusterIdSnapshot = inScope ? cluster.Id : 2,

@@ -46,12 +46,12 @@ public class FacultyViewsMigrationTests
     {
         var index = 0;
         foreach (var employee in new bool?[] { true, false, null })
-        foreach (var faculty in new bool?[] { true, false, null })
-        {
-            var id = $"{++index:D8}";
-            db.Set<Person>().Add(new Person { IamId = id, EmployeeId = id, IsEmployee = employee, IsFaculty = faculty });
-            db.Set<EmployeeAccrualBalance>().Add(Balance(id, "1", new DateOnly(2026, 1, 1), 10));
-        }
+            foreach (var faculty in new bool?[] { true, false, null })
+            {
+                var id = $"{++index:D8}";
+                db.Set<Person>().Add(new Person { IamId = id, EmployeeId = id, IsEmployee = employee, IsFaculty = faculty });
+                db.Set<EmployeeAccrualBalance>().Add(Balance(id, "1", new DateOnly(2026, 1, 1), 10));
+            }
         db.Set<Person>().Add(new Person { IamId = "noaccrual", EmployeeId = "99999999", IsEmployee = true, IsFaculty = true });
         db.Set<Person>().Add(new Person { IamId = "ranked", EmployeeId = "88888888", IsEmployee = true, IsFaculty = true, FullName = "People name", Email = "people@example.test" });
         var date = new DateOnly(2026, 2, 1);
@@ -157,14 +157,37 @@ public class FacultyViewsMigrationTests
 
     private static EmployeeAccrualBalance Balance(string id, string position, DateOnly date, decimal amount, string job = "A", string employeeClass = "A", int leaveType = 1) => new()
     {
-        EmployeeId = id, PositionNumber = position, AsOfDate = date, LeaveTypeNumber = leaveType,
-        EmployeeName = "Accrual name", EmployeeEmail = "accrual@example.test", UnionCode = "", UnionDescription = "",
-        EmployeeClassCode = employeeClass, EmployeeClassDescription = "", JobCode = job, JobCodeDescription = "",
-        HrStatus = "A", EmployeeStatus = "A", EmployeeStatusDescription = "", EmployeeType = "", EmployeeTypeDescription = "",
-        TypeLabel = "Vacation", CalculatedBal = amount, ApproachingMax = "N",
-        Level1Dept = "", Level1DeptDesc = "", Level2Dept = "", Level2DeptDesc = "",
-        Level3Dept = "L3", Level3DeptDesc = "Level three", Level4Dept = "L4", Level4DeptDesc = "Level four",
-        Level5Dept = $"L5-{position}", Level5DeptDesc = $"Level five {position}", LastUpdated = DateTime.UtcNow
+        EmployeeId = id,
+        PositionNumber = position,
+        AsOfDate = date,
+        LeaveTypeNumber = leaveType,
+        EmployeeName = "Accrual name",
+        EmployeeEmail = "accrual@example.test",
+        UnionCode = "",
+        UnionDescription = "",
+        EmployeeClassCode = employeeClass,
+        EmployeeClassDescription = "",
+        JobCode = job,
+        JobCodeDescription = "",
+        HrStatus = "A",
+        EmployeeStatus = "A",
+        EmployeeStatusDescription = "",
+        EmployeeType = "",
+        EmployeeTypeDescription = "",
+        TypeLabel = "Vacation",
+        CalculatedBal = amount,
+        ApproachingMax = "N",
+        Level1Dept = "",
+        Level1DeptDesc = "",
+        Level2Dept = "",
+        Level2DeptDesc = "",
+        Level3Dept = "L3",
+        Level3DeptDesc = "Level three",
+        Level4Dept = "L4",
+        Level4DeptDesc = "Level four",
+        Level5Dept = $"L5-{position}",
+        Level5DeptDesc = $"Level five {position}",
+        LastUpdated = DateTime.UtcNow
     };
 
     public sealed class SandboxFactAttribute : FactAttribute

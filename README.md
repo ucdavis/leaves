@@ -33,7 +33,6 @@ See the [faculty views implementation checklist](docs/FACULTY-VIEWS-IMPLEMENTATI
    ```
 
 2. **Open In DevContainer**
-
    - Open the project folder in Visual Studio Code.
    - Click the prompt to open in container (or manually select from the command palette).
 
@@ -51,6 +50,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the app:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -70,6 +70,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the database:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -86,6 +87,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the database:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -99,7 +101,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
 In development, the frontend runs from **http://localhost:5173** and proxies backend requests to ASP.NET Core on **http://localhost:5165**.
 
 - **Main App**: http://localhost:5173
-- **Backend API**: http://localhost:5165/api/*
+- **Backend API**: http://localhost:5165/api/\*
 - **API Documentation (Swagger)**: http://localhost:5165/swagger
 - **Health Check**: http://localhost:5165/health
 - **Visual Studio F5**: launches through the backend profile, then redirects to the Vite dev server on `:5173`

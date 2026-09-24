@@ -84,7 +84,10 @@ public class AdminDirectoryServiceTests
         },
         CurrentFaculty: new[] { "faculty", "admin", "cao" }.Select(iam => new CurrentFacultyWithAccrual
         {
-            IamId = iam, DisplayName = $"Faculty {iam}", ResolvedReportingDepartmentCode = "DEPT", IsFaculty = true,
+            IamId = iam,
+            DisplayName = $"Faculty {iam}",
+            ResolvedReportingDepartmentCode = "DEPT",
+            IsFaculty = true,
         }).ToList(),
         CurrentOverridesById: new Dictionary<int, EmployeeReportingDepartmentOverride>(),
         Departments: [new Department { DepartmentCode = "DEPT", DepartmentName = "Department", ClusterId = 1 }],
