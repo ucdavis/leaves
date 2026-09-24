@@ -4,6 +4,16 @@
 
 A full-stack web application template featuring a .NET 10 backend with React/Vite frontend, using OIDC authentication with Microsoft Entra ID.
 
+## Faculty and administrative workflows
+
+Faculty rosters, dashboard balances, and leave submission require current employee and faculty status plus an accrual record. Eligible faculty remain in rosters when they are also admins or CAOs. Chairs must be eligible faculty in their department. Admin and CAO assignments require current employee status but do not require accrual records or a prior application login; CAOs may also be faculty or have an unknown faculty flag.
+
+To select an admin or CAO, enter 2-128 characters of a name, email address, or IAM ID prefix. Searches return up to 20 eligible matches, with an exact IAM ID match first. Refine the search if the person is not shown.
+
+Pending requests stay with their saved approval scope when the requester moves departments or loses faculty eligibility. Calendars and approver dashboard access follow the current faculty roster. If a faculty dashboard is unavailable, pending requests remain accessible in the approval workspace.
+
+See the [faculty views implementation checklist](docs/FACULTY-VIEWS-IMPLEMENTATION.md) for data contracts, validation evidence, and deferred override-management UI work.
+
 ## Architecture
 
 - **Backend**: .NET 10 Web API with ASP.NET Core
@@ -195,7 +205,7 @@ The VS Code flow intentionally uses the `http-cli` launch profile instead of the
 
 - Run `dotnet test` from the repository root to execute the .NET test project included in `app.sln`.
 - Alternatively, target the project directly with `dotnet test tests/server.tests/server.tests.csproj`.
-- The tests use EF Core's in-memory provider (see `tests/server.tests/TestDbContextFactory.cs`) so no SQL Server instance is required.
+- Ordinary runs do not require SQL Server and skip the sandbox-only faculty-view migration test. See the [sandbox migration-test instructions](docs/FACULTY-VIEWS-IMPLEMENTATION.md#2026-09-24-review-regression-coverage) to execute that test against a disposable SQL Server database.
 
 ## Updating Dependencies
 
