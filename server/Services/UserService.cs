@@ -16,6 +16,8 @@ public interface IUserService
 
     Task<string?> GetDisplayNameForUser(string userId);
 
+    Task<string?> GetIamIdForUser(string userId);
+
     Task<List<string>> GetRolesForUser(string userId);
 
     Task<ClaimsPrincipal?> UpdateUserPrincipalIfNeeded(ClaimsPrincipal principal);
@@ -186,6 +188,11 @@ public class UserService : IUserService
         }
 
         return true;
+    }
+
+    public Task<string?> GetIamIdForUser(string userId)
+    {
+        return ResolveIamIdAsync(userId);
     }
 
     public async Task<string?> GetDisplayNameForUser(string userId)

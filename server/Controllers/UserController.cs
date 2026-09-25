@@ -27,6 +27,7 @@ public class UserController : ApiControllerBase
             GetClaimValue("preferred_username")
             ?? GetClaimValue(ClaimTypes.Email)
             ?? userName;
+        var iamId = await _userService.GetIamIdForUser(userId);
         var entraObjectId =
             GetClaimValue(ClaimConstants.ObjectId)
             ?? GetClaimValue(ClaimConstants.Oid);
@@ -37,7 +38,7 @@ public class UserController : ApiControllerBase
             .ToArray();
 
         var isEmulating = User.HasClaim(claim => claim.Type == AuthenticationHelper.EmulatingUserClaimType);
-        var response = new UserResponse(userId, entraObjectId, userName, userEmail, userRoles, isEmulating);
+        var response = new UserResponse(userId, entraObjectId, iamId, userName, userEmail, userRoles, isEmulating);
         return Ok(response);
     }
 
@@ -46,6 +47,7 @@ public class UserController : ApiControllerBase
     private sealed record UserResponse(
         string Id,
         string? EntraObjectId,
+        string? IamId,
         string Name,
         string Email,
         IReadOnlyCollection<string> Roles,
