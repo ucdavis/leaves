@@ -22,7 +22,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var coreData = await LoadDirectoryCoreDataAsync(cancellationToken);
-        var currentOverridesById = await LoadCurrentOverridesByIdAsync(coreData.CurrentEmployees, cancellationToken);
+        var currentOverridesById = await LoadCurrentOverridesByIdAsync(coreData.CurrentFaculty, cancellationToken);
         var currentChairAssignmentsByDepartment = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
         var currentCaoAssignmentsByCluster = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
 
@@ -31,11 +31,68 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             Clusters: coreData.Clusters,
             CurrentCaoAssignmentsByCluster: currentCaoAssignmentsByCluster,
             CurrentChairAssignmentsByDepartment: currentChairAssignmentsByDepartment,
-            CurrentEmployees: coreData.CurrentEmployees,
+            CurrentFaculty: coreData.CurrentFaculty,
             CurrentOverridesById: currentOverridesById,
             Departments: coreData.Departments,
-            AdminIamIds: coreData.AdminIamIds,
-            NonFacultyIamIds: coreData.NonFacultyIamIds);
+            AdminIamIds: coreData.AdminIamIds);
+    }
+
+    public async Task<IReadOnlyList<CaoDirectoryEmployee>> LoadCaoEmployeesAsync(
+        IEnumerable<string> iamIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = iamIds.Select(id => id.Trim()).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await _db.People
+            .Where(person => person.IsEmployee == true && ids.Contains(person.IamId))
+            .OrderBy(person => person.FullName)
+            .ThenBy(person => person.IamId)
+            .Select(person => new CaoDirectoryEmployee(person.IamId, person.FullName, person.Email, person.IsFaculty))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> SearchEmployeeIdsAsync(
+        string? query,
+        bool forCao,
+        CancellationToken cancellationToken)
+    {
+        var term = query?.Trim() ?? string.Empty;
+        if (term.Length < 2 || term.Length > 128)
+        {
+            return [];
+        }
+
+        var people = _db.People.Where(person => person.IsEmployee == true &&
+            (person.IamId.StartsWith(term) ||
+             (person.FullName != null && person.FullName.Contains(term)) ||
+             (person.Email != null && person.Email.Contains(term))) &&
+            !_db.AppAdminAssignments.Any(assignment => assignment.IamId == person.IamId));
+
+        if (forCao)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            people = people.Where(person =>
+                !_db.AppUsers.Any(user => user.IamId == person.IamId && !user.IsActive) &&
+                !_db.ClusterCaoAssignments.Any(assignment => assignment.IamId == person.IamId &&
+                    assignment.ClosedUtc == null && assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)) &&
+                !_db.DepartmentChairAssignments.Any(assignment => assignment.IamId == person.IamId &&
+                    assignment.ClosedUtc == null && assignment.EffectiveStartDate <= today &&
+                    (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > today)));
+        }
+
+        // Filter and cap in SQL before materializing any directory entries.
+        return await people
+            .OrderBy(person => person.IamId == term ? 0 : 1)
+            .ThenBy(person => person.FullName)
+            .ThenBy(person => person.IamId)
+            .Select(person => person.IamId)
+            .Take(20)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<AdminStatusDirectoryData> LoadStatusDirectoryDataAsync(CancellationToken cancellationToken)
@@ -55,14 +112,24 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 .ToListAsync(cancellationToken));
     }
 
-    public async Task<AdminRoleOptionsData> LoadRoleOptionsDataAsync(CancellationToken cancellationToken)
+    public async Task<AdminRoleOptionsData> LoadRoleOptionsDataAsync(
+        IEnumerable<string> iamIds,
+        CancellationToken cancellationToken)
     {
+        var ids = iamIds.Select(id => id.Trim()).Distinct().ToArray();
         return new AdminRoleOptionsData(
             Clusters: await _db.Clusters
                 .AsNoTracking()
                 .OrderBy(cluster => cluster.ClusterName)
                 .ToListAsync(cancellationToken),
-            CurrentEmployees: await _db.CurrentEmployees
+            Employees: await _db.People
+                .Where(person => person.IsEmployee == true && ids.Contains(person.IamId))
+                .OrderBy(person => person.FullName)
+                .ThenBy(person => person.IamId)
+                .Select(person => new DirectoryEmployee(person.IamId, person.FullName, person.Email))
+                .ToListAsync(cancellationToken),
+            CurrentFaculty: await _db.CurrentFacultyWithAccrual
+                .Where(employee => ids.Contains(employee.IamId))
                 .OrderBy(employee => employee.DisplayName)
                 .ThenBy(employee => employee.IamId)
                 .ToListAsync(cancellationToken),
@@ -99,8 +166,8 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return false;
         }
 
-        return await _db.CurrentEmployees
-            .AnyAsync(employee => employee.IamId.Trim() == normalizedIamId, cancellationToken);
+        return await _db.People
+            .AnyAsync(person => person.IsEmployee == true && person.IamId == normalizedIamId, cancellationToken);
     }
 
     public async Task<bool> IsCurrentFacultyInDepartmentAsync(
@@ -115,16 +182,10 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return false;
         }
 
-        return await (
-                from employee in _db.CurrentEmployees
-                join person in _db.People on employee.IamId equals person.IamId
-                where employee.IamId.Trim() == normalizedIamId &&
-                      employee.ResolvedReportingDepartmentCode != null &&
-                      employee.ResolvedReportingDepartmentCode.Trim() == normalizedDepartmentCode &&
-                      person.IsEmployee == true &&
-                      person.IsFaculty == true
-                select employee.IamId)
-            .AnyAsync(cancellationToken);
+        return await _db.CurrentFacultyWithAccrual
+            .AnyAsync(employee => employee.IamId == normalizedIamId &&
+                                  employee.ResolvedReportingDepartmentCode == normalizedDepartmentCode,
+                cancellationToken);
     }
 
     private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(CancellationToken cancellationToken)
@@ -138,7 +199,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .Include(department => department.DepartmentEmailRoutings)
             .OrderBy(department => department.DepartmentName)
             .ToListAsync(cancellationToken);
-        var currentEmployees = await _db.CurrentEmployees
+        var currentFaculty = await _db.CurrentFacultyWithAccrual
             .OrderBy(employee => employee.DisplayName)
             .ThenBy(employee => employee.IamId)
             .ToListAsync(cancellationToken);
@@ -147,11 +208,6 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .OrderBy(user => user.DisplayName)
             .ThenBy(user => user.IamId)
             .ToListAsync(cancellationToken);
-        var nonFacultyIamIds = (await _db.People
-                .Where(person => person.IsEmployee == true && person.IsFaculty == false)
-                .Select(person => person.IamId.Trim())
-                .ToListAsync(cancellationToken))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var adminIamIds = (await _db.AppAdminAssignments
                 .AsNoTracking()
                 .Select(assignment => assignment.IamId.Trim())
@@ -161,14 +217,13 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
         return new AdminDirectoryCoreData(
             AppUsers: appUsers,
             Clusters: clusters,
-            CurrentEmployees: currentEmployees,
+            CurrentFaculty: currentFaculty,
             Departments: departments,
-            AdminIamIds: adminIamIds,
-            NonFacultyIamIds: nonFacultyIamIds);
+            AdminIamIds: adminIamIds);
     }
 
     private async Task<Dictionary<int, EmployeeReportingDepartmentOverride>> LoadCurrentOverridesByIdAsync(
-        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentEmployees,
         CancellationToken cancellationToken)
     {
         var currentOverrideIds = currentEmployees
@@ -228,11 +283,10 @@ public sealed record AdminDirectoryData(
     IReadOnlyList<Cluster> Clusters,
     IReadOnlyDictionary<int, ClusterCaoAssignment> CurrentCaoAssignmentsByCluster,
     IReadOnlyDictionary<string, DepartmentChairAssignment> CurrentChairAssignmentsByDepartment,
-    IReadOnlyList<CurrentEmployee> CurrentEmployees,
+    IReadOnlyList<CurrentFacultyWithAccrual> CurrentFaculty,
     IReadOnlyDictionary<int, EmployeeReportingDepartmentOverride> CurrentOverridesById,
     IReadOnlyList<Department> Departments,
-    IReadOnlySet<string> AdminIamIds,
-    IReadOnlySet<string> NonFacultyIamIds);
+    IReadOnlySet<string> AdminIamIds);
 
 public sealed record AdminStatusDirectoryData(
     IReadOnlyList<Cluster> Clusters,
@@ -242,8 +296,13 @@ public sealed record AdminStatusDirectoryData(
 
 public sealed record AdminRoleOptionsData(
     IReadOnlyList<Cluster> Clusters,
-    IReadOnlyList<CurrentEmployee> CurrentEmployees,
+    IReadOnlyList<DirectoryEmployee> Employees,
+    IReadOnlyList<CurrentFacultyWithAccrual> CurrentFaculty,
     IReadOnlyList<Department> Departments);
+
+public sealed record CaoDirectoryEmployee(string IamId, string? DisplayName, string? Email, bool? IsFaculty);
+
+public sealed record DirectoryEmployee(string IamId, string? DisplayName, string? Email);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,
@@ -253,7 +312,6 @@ public sealed record AdminRoleAssignmentsData(
 internal sealed record AdminDirectoryCoreData(
     IReadOnlyList<AppUser> AppUsers,
     IReadOnlyList<Cluster> Clusters,
-    IReadOnlyList<CurrentEmployee> CurrentEmployees,
+    IReadOnlyList<CurrentFacultyWithAccrual> CurrentFaculty,
     IReadOnlyList<Department> Departments,
-    IReadOnlySet<string> AdminIamIds,
-    IReadOnlySet<string> NonFacultyIamIds);
+    IReadOnlySet<string> AdminIamIds);

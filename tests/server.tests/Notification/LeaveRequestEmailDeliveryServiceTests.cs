@@ -233,8 +233,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             modelBuilder.Ignore<AppAdminAssignment>();
             modelBuilder.Ignore<Cluster>();
             modelBuilder.Ignore<ClusterCaoAssignment>();
-            modelBuilder.Ignore<CurrentAccrualBalance>();
-            modelBuilder.Ignore<CurrentEmployee>();
+            modelBuilder.Ignore<CurrentFacultyAccrualBalance>();
+            modelBuilder.Ignore<CurrentFacultyWithAccrual>();
             modelBuilder.Ignore<Department>();
             modelBuilder.Ignore<DepartmentChairAssignment>();
             modelBuilder.Ignore<DepartmentEmailRouting>();

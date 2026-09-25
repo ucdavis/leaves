@@ -15,15 +15,18 @@ public sealed class AdminRolesController : ApiControllerBase
 {
     private readonly AppDbContext _db;
     private readonly AdminRolesService _adminRolesService;
+    private readonly AdminDirectoryDataService _directoryDataService;
     private readonly IUserService _userService;
 
     public AdminRolesController(
         AppDbContext db,
         AdminRolesService adminRolesService,
+        AdminDirectoryDataService directoryDataService,
         IUserService userService)
     {
         _db = db;
         _adminRolesService = adminRolesService;
+        _directoryDataService = directoryDataService;
         _userService = userService;
     }
 
@@ -31,6 +34,12 @@ public sealed class AdminRolesController : ApiControllerBase
     public async Task<IActionResult> GetRolesAsync(CancellationToken cancellationToken)
     {
         return Ok(await _adminRolesService.GetRolesAsync(cancellationToken));
+    }
+
+    [HttpGet("admin-candidates")]
+    public async Task<IActionResult> SearchAdminCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    {
+        return Ok(await _adminRolesService.SearchAdminCandidatesAsync(query, cancellationToken));
     }
 
     [HttpPost("admins")]
@@ -42,10 +51,7 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("IAM ID is required.");
         }
 
-        var isEligibleForAdminAssignment = await _db.CurrentEmployees
-            .AnyAsync(
-                employee => employee.IamId.Trim() == iamId,
-                cancellationToken);
+        var isEligibleForAdminAssignment = await _directoryDataService.DirectoryUserExistsAsync(iamId, cancellationToken);
         if (!isEligibleForAdminAssignment)
         {
             return ValidationProblem("Selected user must be a current directory user.");
@@ -147,7 +153,7 @@ public sealed class AdminRolesController : ApiControllerBase
             return ValidationProblem("Selected department is inactive.");
         }
 
-        var isCurrentFacultyInDepartment = await IsCurrentFacultyInDepartmentAsync(
+        var isCurrentFacultyInDepartment = await _directoryDataService.IsCurrentFacultyInDepartmentAsync(
             validationResult.IamId!,
             departmentCode,
             cancellationToken);
@@ -251,8 +257,7 @@ public sealed class AdminRolesController : ApiControllerBase
             return ImmediateAssignmentValidationResult.WithError(ValidationProblem("IAM ID is required."));
         }
 
-        var directoryUserExists = await _db.CurrentEmployees
-            .AnyAsync(employee => employee.IamId.Trim() == trimmedIamId, cancellationToken);
+        var directoryUserExists = await _directoryDataService.DirectoryUserExistsAsync(trimmedIamId, cancellationToken);
         if (!directoryUserExists)
         {
             return ImmediateAssignmentValidationResult.WithError(
@@ -302,23 +307,6 @@ public sealed class AdminRolesController : ApiControllerBase
                           (!assignment.EffectiveEndDateExclusive.HasValue || assignment.EffectiveEndDateExclusive.Value > onDate) &&
                           (!excludeAssignmentId.HasValue || assignment.Id != excludeAssignmentId.Value),
             cancellationToken);
-    }
-
-    private async Task<bool> IsCurrentFacultyInDepartmentAsync(
-        string iamId,
-        string departmentCode,
-        CancellationToken cancellationToken)
-    {
-        return await (
-                from employee in _db.CurrentEmployees
-                join person in _db.People on employee.IamId equals person.IamId
-                where employee.IamId.Trim() == iamId &&
-                      employee.ResolvedReportingDepartmentCode != null &&
-                      employee.ResolvedReportingDepartmentCode.Trim() == departmentCode &&
-                      person.IsEmployee == true &&
-                      person.IsFaculty == true
-                select employee.IamId)
-            .AnyAsync(cancellationToken);
     }
 
     private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)

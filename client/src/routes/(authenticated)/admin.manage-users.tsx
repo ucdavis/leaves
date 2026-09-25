@@ -1,6 +1,8 @@
-import { useId, useMemo, useState } from 'react';
+import { getDirectorySearchMessage } from '@/shared/admin/directorySearch.ts';
+import { useId, useState } from 'react';
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
@@ -9,6 +11,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import {
   addAdminAssignment,
   adminRolesQueryOptions,
+  adminCandidatesQueryOptions,
   removeRoleAssignment,
   type AdminAssignableRoleType,
   type AdminRoleAssignment,
@@ -69,9 +72,15 @@ export type AdminRolePersonOption = {
 function AdminUsersRoute() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminRolesQueryOptions());
-  const [iamId, setIamId] = useState('');
+  const [selectedUser, setSelectedUser] =
+    useState<AdminRolePersonOption | null>(null);
+  const iamId = selectedUser?.iamId ?? '';
   const [personQuery, setPersonQuery] = useState('');
   const [isPersonSearchOpen, setIsPersonSearchOpen] = useState(false);
+  const personSearch = useQuery({
+    ...adminCandidatesQueryOptions(personQuery),
+    enabled: isPersonSearchOpen && personQuery.trim().length >= 2,
+  });
   const [error, setError] = useState<string | null>(null);
   const [showInactiveAssignments, setShowInactiveAssignments] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingRoleAction | null>(
@@ -93,49 +102,16 @@ function AdminUsersRoute() {
     onSuccess: refreshRoles,
   });
 
-  const isSaving =
-    addAdminMutation.isPending ||
-    removeMutation.isPending;
+  const isSaving = addAdminMutation.isPending || removeMutation.isPending;
 
-  const selectedUser = data.users.find((user) => user.iamId === iamId) ?? null;
   const selectedUserName = selectedUser?.name ?? iamId;
   const assignmentRows = data.assignments.filter(
     (assignment) =>
       assignment.type === 'admin' &&
       (showInactiveAssignments || assignment.active)
   );
-  const assignedAdminIamIds = useMemo(
-    () =>
-      new Set(
-        data.assignments
-          .filter(
-            (assignment) => assignment.active && assignment.type === 'admin'
-          )
-          .map((assignment) => assignment.iamId.toLowerCase())
-      ),
-    [data.assignments]
-  );
-  const normalizedPersonQuery = personQuery.trim().toLowerCase();
-  const filteredUsers = useMemo(
-    () =>
-      data.users.filter((user) => {
-        if (assignedAdminIamIds.has(user.iamId.toLowerCase())) {
-          return false;
-        }
-
-        if (!normalizedPersonQuery) {
-          return true;
-        }
-
-        const searchableText = [user.name, user.email].join(' ').toLowerCase();
-
-        return searchableText.includes(normalizedPersonQuery);
-      }),
-    [assignedAdminIamIds, data.users, normalizedPersonQuery]
-  );
-
   const resetForm = () => {
-    setIamId('');
+    setSelectedUser(null);
     setPersonQuery('');
     setIsPersonSearchOpen(false);
   };
@@ -259,21 +235,23 @@ function AdminUsersRoute() {
               <span className="label-text font-medium">Person</span>
               <PersonSearchField
                 isOpen={isPersonSearchOpen}
+                isSearching={personSearch.isFetching}
                 onChangeOpen={setIsPersonSearchOpen}
                 onChangeQuery={(value) => {
                   setPersonQuery(value);
-                  setIamId('');
+                  setSelectedUser(null);
                   setIsPersonSearchOpen(true);
                 }}
                 onSelectUser={(user) => {
-                  setIamId(user.iamId);
+                  setSelectedUser(user);
                   setPersonQuery(user.name);
                   setIsPersonSearchOpen(false);
                   setError(null);
                 }}
                 query={personQuery}
+                searchFailed={personSearch.isError}
                 selectedIamId={iamId}
-                users={filteredUsers}
+                users={personSearch.data ?? []}
               />
             </label>
 
@@ -281,10 +259,7 @@ function AdminUsersRoute() {
               className={`btn btn-primary lg:self-end ${
                 !pendingAction && error ? 'opacity-60' : ''
               }`}
-              disabled={
-                isSaving ||
-                !iamId
-              }
+              disabled={isSaving || !iamId}
               onClick={() =>
                 setPendingAction({
                   kind: 'add',
@@ -443,25 +418,36 @@ function RoleWarningModal({
 
 export function PersonSearchField({
   isOpen,
+  isSearching,
   onChangeOpen,
   onChangeQuery,
   onSelectUser,
   query,
+  searchFailed,
   selectedIamId,
   users,
 }: {
   isOpen: boolean;
+  isSearching: boolean;
   onChangeOpen: (value: boolean) => void;
   onChangeQuery: (value: string) => void;
   onSelectUser: (user: AdminRolePersonOption) => void;
   query: string;
+  searchFailed: boolean;
   selectedIamId: string;
   users: AdminRolePersonOption[];
 }) {
-  const showResults = isOpen && query.trim().length > 0;
+  const showResults = isOpen;
   const resultsId = useId();
   const [activeIndex, setActiveIndex] = useState(0);
-  const visibleUsers = users.slice(0, 8);
+  const visibleUsers =
+    query.trim().length >= 2 && !isSearching && !searchFailed ? users : [];
+  const searchMessage = getDirectorySearchMessage(
+    query,
+    isSearching,
+    searchFailed,
+    users.length
+  );
 
   return (
     <div
@@ -482,6 +468,7 @@ export function PersonSearchField({
         aria-controls={resultsId}
         aria-expanded={showResults}
         className="input input-bordered w-full"
+        maxLength={128}
         onChange={(event) => {
           onChangeQuery(event.target.value);
           onChangeOpen(true);
@@ -497,7 +484,7 @@ export function PersonSearchField({
             onChangeOpen(false);
           }
         }}
-        placeholder="Search name or email"
+        placeholder="Search name, email or IAM ID"
         role="combobox"
         type="text"
         value={query}
@@ -543,9 +530,12 @@ export function PersonSearchField({
             );
           })}
 
-          {visibleUsers.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-base-content/70">
-              No people match that search.
+          {searchMessage ? (
+            <div
+              className="px-4 py-3 text-sm text-base-content/70"
+              role="status"
+            >
+              {searchMessage}
             </div>
           ) : null}
         </div>

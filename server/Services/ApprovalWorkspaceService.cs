@@ -96,11 +96,11 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),
                 FacultyInitials: BuildInitials(GetFacultyDisplayName(
                     request.IamId,
-                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.CurrentFaculty,
                     context.DirectoryData.AppUsers)),
                 FacultyName: GetFacultyDisplayName(
                     request.IamId,
-                    context.DirectoryData.CurrentEmployees,
+                    context.DirectoryData.CurrentFaculty,
                     context.DirectoryData.AppUsers),
                 Id: request.Id,
                 LeaveType: GetLeaveTypeName(request, leaveTypesById),
@@ -158,9 +158,8 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         }
 
         var faculty = BuildFacultyRoster(
-            directoryData.CurrentEmployees,
+            directoryData.CurrentFaculty,
             departmentByCode,
-            directoryData.NonFacultyIamIds,
             scope,
             reportingDepartmentCodes,
             clusterIds);
@@ -290,16 +289,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         (sqlException.Number == 2601 || sqlException.Number == 2627);
 
     private static IReadOnlyList<ApprovalWorkspaceFacultyResponse> BuildFacultyRoster(
-        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentEmployees,
         IReadOnlyDictionary<string, Department> departmentByCode,
-        IReadOnlySet<string> nonFacultyIamIds,
         string scope,
         IReadOnlySet<string> reportingDepartmentCodes,
         IReadOnlySet<int> clusterIds)
     {
         var faculty = currentEmployees
-            .Where(employee => employee.HasCurrentAccrualRecord)
-            .Where(employee => !nonFacultyIamIds.Contains(employee.IamId.Trim()))
             .Where(employee =>
             {
                 var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim() ?? string.Empty;
@@ -407,7 +403,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
     private static string GetFacultyDisplayName(
         string iamId,
-        IReadOnlyList<CurrentEmployee> currentEmployees,
+        IReadOnlyList<CurrentFacultyWithAccrual> currentEmployees,
         IReadOnlyList<AppUser> appUsers)
     {
         var normalizedIamId = NormalizeKey(iamId);

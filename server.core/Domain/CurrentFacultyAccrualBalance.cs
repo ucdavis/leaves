@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Server.Core.Domain;
 
-public class CurrentAccrualBalance
+public class CurrentFacultyAccrualBalance
 {
     public required string IamId { get; set; }
     public required string EmployeeId { get; set; }
@@ -19,10 +19,10 @@ public class CurrentAccrualBalance
     public decimal MaxCalculatedBal { get; set; }
     public bool HasDivergentPositionBalances { get; set; }
 
-    public static void Configure(EntityTypeBuilder<CurrentAccrualBalance> entity)
+    public static void Configure(EntityTypeBuilder<CurrentFacultyAccrualBalance> entity)
     {
         entity.HasNoKey();
-        entity.ToView("vw_CurrentAccrualBalance", "dbo");
+        entity.ToView("vw_CurrentFacultyAccrualBalance", "dbo");
 
         entity.Property(e => e.IamId).HasColumnType("char(10)").HasMaxLength(10);
         entity.Property(e => e.CalculatedBal).HasPrecision(10, 2);

@@ -4,6 +4,14 @@
 
 A full-stack web application template featuring a .NET 10 backend with React/Vite frontend, using OIDC authentication with Microsoft Entra ID.
 
+## Faculty and administrative workflows
+
+Faculty rosters, dashboard balances, and leave submission require current employee and faculty status plus an accrual record. Eligible faculty remain in rosters when they are also admins or CAOs. Chairs must be eligible faculty in their department. Admin and CAO assignments require current employee status but do not require accrual records or a prior application login; CAOs may also be faculty or have an unknown faculty flag.
+
+To select an admin or CAO, enter 2-128 characters of a name, email address, or IAM ID prefix. Searches return up to 20 eligible matches, with an exact IAM ID match first. Refine the search if the person is not shown.
+
+Pending requests stay with their saved approval scope when the requester moves departments or loses faculty eligibility. Calendars and approver dashboard access follow the current faculty roster. If a faculty dashboard is unavailable, pending requests remain accessible in the approval workspace.
+
 ## Architecture
 
 - **Backend**: .NET 10 Web API with ASP.NET Core
@@ -23,7 +31,6 @@ A full-stack web application template featuring a .NET 10 backend with React/Vit
    ```
 
 2. **Open In DevContainer**
-
    - Open the project folder in Visual Studio Code.
    - Click the prompt to open in container (or manually select from the command palette).
 
@@ -41,6 +48,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the app:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -60,6 +68,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the database:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -76,6 +85,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
    - Docker (for the local SQL Server container)
 
    Install dependencies and start the database:
+
    ```bash
    npm install
    cd client && npm install && cd ..
@@ -89,7 +99,7 @@ _Using the DevContainer is optional, but it will get you the right version of do
 In development, the frontend runs from **http://localhost:5173** and proxies backend requests to ASP.NET Core on **http://localhost:5165**.
 
 - **Main App**: http://localhost:5173
-- **Backend API**: http://localhost:5165/api/*
+- **Backend API**: http://localhost:5165/api/\*
 - **API Documentation (Swagger)**: http://localhost:5165/swagger
 - **Health Check**: http://localhost:5165/health
 - **Visual Studio F5**: launches through the backend profile, then redirects to the Vite dev server on `:5173`
@@ -195,7 +205,7 @@ The VS Code flow intentionally uses the `http-cli` launch profile instead of the
 
 - Run `dotnet test` from the repository root to execute the .NET test project included in `app.sln`.
 - Alternatively, target the project directly with `dotnet test tests/server.tests/server.tests.csproj`.
-- The tests use EF Core's in-memory provider (see `tests/server.tests/TestDbContextFactory.cs`) so no SQL Server instance is required.
+- Ordinary runs do not require SQL Server and skip the sandbox-only faculty-view migration test. To run it, start `./dev/sandbox`, then execute the test inside its app container with `LEAVES_SANDBOX_TESTS=1`. Tear down the sandbox afterward.
 
 ## Updating Dependencies
 

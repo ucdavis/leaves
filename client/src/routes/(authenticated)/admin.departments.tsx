@@ -1,12 +1,16 @@
+import { getDirectorySearchMessage } from '@/shared/admin/directorySearch.ts';
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
 import {
   adminDepartmentsQueryOptions,
+  caoCandidatesQueryOptions,
+  type AdminCaoUser,
   createAdminCluster,
   createAdminDepartment,
   deleteAdminCluster,
@@ -51,7 +55,7 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
 function AdminDepartmentsRoute() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
-  const { clusters, departments, users } = data;
+  const { caoUsers, clusters, departments, facultyUsers } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
@@ -60,7 +64,15 @@ function AdminDepartmentsRoute() {
   );
   const [clusterCaoQuery, setClusterCaoQuery] = useState('');
   const [isClusterCaoSearchOpen, setIsClusterCaoSearchOpen] = useState(false);
-  const [selectedClusterCaoUserId, setSelectedClusterCaoUserId] = useState('');
+  const [selectedClusterCaoUser, setSelectedClusterCaoUser] =
+    useState<AdminCaoUser | null>(null);
+  const caoSearch = useQuery({
+    ...caoCandidatesQueryOptions(clusterCaoQuery),
+    enabled:
+      editingClusterCaoId !== null &&
+      isClusterCaoSearchOpen &&
+      clusterCaoQuery.trim().length >= 2,
+  });
   const [pendingCaoChange, setPendingCaoChange] = useState<{
     clusterId: string;
     clusterName: string;
@@ -141,11 +153,8 @@ function AdminDepartmentsRoute() {
     );
 
     if (selectedDepartment) {
-      const departmentUsers = users.filter(
-        (user) =>
-          user.departmentId === selectedDepartment.id &&
-          user.designation !== 'nfa' &&
-          user.role !== 'cao'
+      const departmentUsers = facultyUsers.filter(
+        (user) => user.departmentId === selectedDepartment.id
       );
 
       return (
@@ -324,26 +333,28 @@ function AdminDepartmentsRoute() {
                 <div className="text-lg font-semibold">{cluster.name}</div>
                 <ClusterCaoEditor
                   currentCaoName={
-                    users.find((user) => user.id === cluster.caoUserId)?.name ??
-                    null
+                    caoUsers.find((user) => user.id === cluster.caoUserId)
+                      ?.name ?? cluster.caoUserId
                   }
                   isEditing={editingClusterCaoId === cluster.id}
                   isSaving={updateClusterMutation.isPending}
+                  isSearching={caoSearch.isFetching}
                   isSearchOpen={isClusterCaoSearchOpen}
                   onCancel={() => {
                     setEditingClusterCaoId(null);
                     setClusterCaoQuery('');
                     setIsClusterCaoSearchOpen(false);
-                    setSelectedClusterCaoUserId('');
+                    setSelectedClusterCaoUser(null);
                   }}
                   onChangeQuery={(value) => {
+                    if (value !== clusterCaoQuery) {
+                      setSelectedClusterCaoUser(null);
+                    }
                     setClusterCaoQuery(value);
                     setIsClusterCaoSearchOpen(true);
                   }}
                   onConfirm={() => {
-                    const selectedUser = users.find(
-                      (user) => user.id === selectedClusterCaoUserId
-                    );
+                    const selectedUser = selectedClusterCaoUser;
                     if (!selectedUser) {
                       return;
                     }
@@ -353,8 +364,8 @@ function AdminDepartmentsRoute() {
                       clusterId: cluster.id,
                       clusterName: cluster.name,
                       currentCaoName:
-                        users.find((user) => user.id === cluster.caoUserId)
-                          ?.name ?? null,
+                        caoUsers.find((user) => user.id === cluster.caoUserId)
+                          ?.name ?? cluster.caoUserId,
                       nextCaoName: selectedUser.name,
                       nextCaoUserId: selectedUser.id,
                     });
@@ -363,16 +374,17 @@ function AdminDepartmentsRoute() {
                     setEditingClusterCaoId(cluster.id);
                     setClusterCaoQuery('');
                     setIsClusterCaoSearchOpen(false);
-                    setSelectedClusterCaoUserId('');
+                    setSelectedClusterCaoUser(null);
                   }}
                   onSelectUser={(user) => {
-                    setSelectedClusterCaoUserId(user.id);
+                    setSelectedClusterCaoUser(user);
                     setClusterCaoQuery(user.name);
                     setIsClusterCaoSearchOpen(false);
                   }}
                   query={clusterCaoQuery}
-                  selectedUserId={selectedClusterCaoUserId}
-                  users={getNonFacultyAssignableUsers(users)}
+                  searchFailed={caoSearch.isError}
+                  selectedUserId={selectedClusterCaoUser?.id ?? ''}
+                  users={caoSearch.data ?? []}
                 />
               </div>
 
@@ -394,15 +406,16 @@ function AdminDepartmentsRoute() {
 
             <div className="space-y-3">
               {cluster.departments.map((department) => {
-                const linkedUserCount = users.filter(
+                const linkedUserCount = facultyUsers.filter(
                   (user) => user.departmentId === department.id
                 ).length;
 
                 return (
                   <DepartmentRow
                     chairName={
-                      users.find((user) => user.id === department.chairUserId)
-                        ?.name ?? null
+                      facultyUsers.find(
+                        (user) => user.id === department.chairUserId
+                      )?.name ?? null
                     }
                     department={department}
                     key={department.id}
@@ -427,13 +440,14 @@ function AdminDepartmentsRoute() {
               {unassignedDepartments.map((department) => (
                 <DepartmentRow
                   chairName={
-                    users.find((user) => user.id === department.chairUserId)
-                      ?.name ?? null
+                    facultyUsers.find(
+                      (user) => user.id === department.chairUserId
+                    )?.name ?? null
                   }
                   department={department}
                   key={department.id}
                   linkedUserCount={
-                    users.filter(
+                    facultyUsers.filter(
                       (user) =>
                         user.departmentId === department.id && user.active
                     ).length
@@ -513,7 +527,7 @@ function AdminDepartmentsRoute() {
                   setEditingClusterCaoId(null);
                   setClusterCaoQuery('');
                   setIsClusterCaoSearchOpen(false);
-                  setSelectedClusterCaoUserId('');
+                  setSelectedClusterCaoUser(null);
                 }
               })
           }
@@ -552,7 +566,7 @@ function AdminDepartmentsRoute() {
                 setEditingClusterCaoId(null);
                 setClusterCaoQuery('');
                 setIsClusterCaoSearchOpen(false);
-                setSelectedClusterCaoUserId('');
+                setSelectedClusterCaoUser(null);
               } catch (error) {
                 setPendingCaoChangeError(getAdminMutationErrorMessage(error));
               }
@@ -564,25 +578,11 @@ function AdminDepartmentsRoute() {
   );
 }
 
-function getNonFacultyAssignableUsers(
-  users: Array<{
-    active: boolean;
-    departmentId: string;
-    designation: string;
-    email: string;
-    id: string;
-    name: string;
-  }>
-) {
-  return users
-    .filter((user) => user.active && user.designation === 'nfa')
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
 function ClusterCaoEditor({
   currentCaoName,
   isEditing,
   isSaving,
+  isSearching,
   isSearchOpen,
   onCancel,
   onChangeQuery,
@@ -590,38 +590,32 @@ function ClusterCaoEditor({
   onEdit,
   onSelectUser,
   query,
+  searchFailed,
   selectedUserId,
   users,
 }: {
   currentCaoName: string | null;
   isEditing: boolean;
   isSaving: boolean;
+  isSearching: boolean;
   isSearchOpen: boolean;
   onCancel: () => void;
   onChangeQuery: (value: string) => void;
   onConfirm: () => void;
   onEdit: () => void;
-  onSelectUser: (user: { email: string; id: string; name: string }) => void;
+  onSelectUser: (user: AdminCaoUser) => void;
   query: string;
+  searchFailed: boolean;
   selectedUserId: string;
-  users: Array<{
-    email: string;
-    id: string;
-    name: string;
-  }>;
+  users: AdminCaoUser[];
 }) {
-  const filteredUsers = users.filter((user) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return true;
-    }
-
-    return [user.name, user.email, user.id]
-      .join(' ')
-      .toLowerCase()
-      .includes(normalizedQuery);
-  });
-  const showResults = isSearchOpen && query.trim().length > 0;
+  const showResults = isSearchOpen;
+  const searchMessage = getDirectorySearchMessage(
+    query,
+    isSearching,
+    searchFailed,
+    users.length
+  );
 
   return (
     <div className="mt-2 max-w-md">
@@ -641,7 +635,9 @@ function ClusterCaoEditor({
         <div className="mt-3 space-y-3">
           <div className="relative">
             <input
+              aria-label="Search people"
               className="input input-bordered w-full"
+              maxLength={128}
               onChange={(event) => onChangeQuery(event.target.value)}
               onFocus={() => {
                 if (query.trim().length > 0) {
@@ -654,29 +650,37 @@ function ClusterCaoEditor({
             />
             {showResults ? (
               <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg">
-                {filteredUsers.slice(0, 8).map((user) => (
-                  <button
-                    className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-base-200 ${
-                      user.id === selectedUserId ? 'bg-base-200' : ''
-                    }`}
-                    key={user.id}
-                    onClick={() => onSelectUser(user)}
-                    onMouseDown={(event) => event.preventDefault()}
-                    type="button"
-                  >
-                    <span>
-                      <span className="block font-semibold text-base-content">
-                        {user.name}
+                {searchMessage ? (
+                  <p className="px-4 py-3 text-sm" role="status">
+                    {searchMessage}
+                  </p>
+                ) : null}
+                {!isSearching &&
+                  !searchFailed &&
+                  query.trim().length >= 2 &&
+                  users.map((user) => (
+                    <button
+                      className={`flex w-full items-start justify-between gap-4 px-4 py-3 text-left hover:bg-base-200 ${
+                        user.id === selectedUserId ? 'bg-base-200' : ''
+                      }`}
+                      key={user.id}
+                      onClick={() => onSelectUser(user)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      type="button"
+                    >
+                      <span>
+                        <span className="block font-semibold text-base-content">
+                          {user.name}
+                        </span>
+                        <span className="block text-xs text-base-content/70">
+                          {user.email || user.id}
+                        </span>
                       </span>
-                      <span className="block text-xs text-base-content/70">
-                        {user.email || user.id}
+                      <span className="text-right text-xs text-base-content/70">
+                        {user.id}
                       </span>
-                    </span>
-                    <span className="text-right text-xs text-base-content/70">
-                      {user.id}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  ))}
               </div>
             ) : null}
           </div>

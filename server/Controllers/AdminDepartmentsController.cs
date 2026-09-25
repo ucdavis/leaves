@@ -39,6 +39,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.GetDepartmentsAsync(cancellationToken));
     }
 
+    [HttpGet("cao-candidates")]
+    public async Task<IActionResult> SearchCaoCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    {
+        return Ok(await _adminDirectoryService.SearchCaoCandidatesAsync(query, cancellationToken));
+    }
+
     [HttpPost("clusters")]
     public async Task<IActionResult> CreateCluster([FromBody] CreateClusterRequest request, CancellationToken cancellationToken)
     {
