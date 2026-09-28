@@ -1,6 +1,7 @@
 import { getDirectorySearchMessage } from '@/shared/admin/directorySearch.ts';
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
+import { z } from 'zod';
 import {
   useMutation,
   useQuery,
@@ -34,7 +35,20 @@ import {
 } from '@heroicons/react/24/outline';
 import { statusTextColors } from '@/shared/statusColors.ts';
 
+const departmentSearchSchema = z.object({
+  peopleFor: z.string().trim().min(1).optional(),
+});
+
+const departmentRouteSearchOptions = {
+  validateSearch: (search: Record<string, unknown>) => {
+    const result = departmentSearchSchema.safeParse(search);
+
+    return result.success ? result.data : {};
+  },
+};
+
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
+  ...departmentRouteSearchOptions,
   component: AdminDepartmentsRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
@@ -53,6 +67,8 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
 });
 
 function AdminDepartmentsRoute() {
+  const { peopleFor } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
   const { caoUsers, clusters, departments, facultyUsers } = data;
@@ -93,10 +109,23 @@ function AdminDepartmentsRoute() {
   const [pendingChairChangeError, setPendingChairChangeError] = useState<
     string | null
   >(null);
-  const [viewDepartmentId, setViewDepartmentId] = useState<string | null>(null);
   const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
     string | null
   >(null);
+  const viewDepartmentId = peopleFor ?? null;
+
+  const openRoster = (departmentId: string) => {
+    void navigate({
+      search: { peopleFor: departmentId },
+    });
+  };
+
+  const closeRoster = () => {
+    void navigate({
+      replace: true,
+      search: {},
+    });
+  };
 
   const invalidateDepartments = async () => {
     await queryClient.invalidateQueries({
@@ -161,7 +190,7 @@ function AdminDepartmentsRoute() {
         <div className="space-y-5">
           <button
             className="btn btn-ghost"
-            onClick={() => setViewDepartmentId(null)}
+            onClick={closeRoster}
             type="button"
           >
             <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
@@ -420,7 +449,7 @@ function AdminDepartmentsRoute() {
                     department={department}
                     key={department.id}
                     linkedUserCount={linkedUserCount}
-                    onOpenRoster={() => setViewDepartmentId(department.id)}
+                    onOpenRoster={() => openRoster(department.id)}
                     onOpenSettings={() => setEditingDepartmentId(department.id)}
                   />
                 );
@@ -452,7 +481,7 @@ function AdminDepartmentsRoute() {
                         user.departmentId === department.id && user.active
                     ).length
                   }
-                  onOpenRoster={() => setViewDepartmentId(department.id)}
+                  onOpenRoster={() => openRoster(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
                 />
               ))}
@@ -476,7 +505,7 @@ function AdminDepartmentsRoute() {
               .then(() => {
                 setEditingDepartmentId(null);
                 if (viewDepartmentId === editingDepartment.id) {
-                  setViewDepartmentId(null);
+                  closeRoster();
                 }
               })
           }
