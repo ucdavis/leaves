@@ -26,7 +26,8 @@ export const AuthenticatedShell = ({
   const pathname = location.pathname;
   const isAdmin = hasAdminRole(user.roles);
   const canApproveLeave = canAccessApprovalWorkspace(user.roles);
-  const isLocalDevelopment = import.meta.env.DEV;
+  const isLocalDevelopment =
+    import.meta.env.DEV && import.meta.env.MODE !== 'test';
   const approvalWorkspaceQuery = useQuery({
     ...approvalWorkspaceQueryOptions(),
     enabled: canApproveLeave,
