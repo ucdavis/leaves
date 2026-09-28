@@ -45,6 +45,7 @@ export interface FacultyLeaveRequest {
   departmentName: string;
   endDate: string;
   id: number;
+  leaveDates?: string[];
   leaveType: string;
   note?: string | null;
   payLeaveType?: string | null;
@@ -64,6 +65,8 @@ export interface FacultyLeaveType {
 export interface CreateFacultyLeaveRequest {
   coveragePlan?: string | null;
   endDate: string;
+  excludeUniversityHolidays: boolean;
+  excludeWeekends: boolean;
   leaveTypeId: number;
   note?: string | null;
   payLeaveTypeId?: number | null;

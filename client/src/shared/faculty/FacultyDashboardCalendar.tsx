@@ -350,14 +350,16 @@ function mapRequestsByDate(requests: FacultyLeaveRequest[]) {
   const map = new Map<string, FacultyLeaveRequest[]>();
 
   for (const request of requests) {
-    const dates = eachDayOfInterval({
-      end: parseISO(request.endDate),
-      start: parseISO(request.startDate),
-    });
+    const dates =
+      request.leaveDates && request.leaveDates.length > 0
+        ? request.leaveDates
+        : eachDayOfInterval({
+            end: parseISO(request.endDate),
+            start: parseISO(request.startDate),
+          }).map((date) => format(date, 'yyyy-MM-dd'));
 
     for (const date of dates) {
-      const key = format(date, 'yyyy-MM-dd');
-      map.set(key, [...(map.get(key) ?? []), request]);
+      map.set(date, [...(map.get(date) ?? []), request]);
     }
   }
 

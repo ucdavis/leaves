@@ -298,6 +298,10 @@ function isWeekend(date: Date) {
 }
 
 function leaveIncludesDay(leave: CalendarLeave, day: MonthDay) {
+  if (leave.leaveDates && leave.leaveDates.length > 0) {
+    return leave.leaveDates.includes(day.isoDate);
+  }
+
   return isWithinInterval(day.date, {
     end: parseISO(leave.endDate),
     start: parseISO(leave.startDate),

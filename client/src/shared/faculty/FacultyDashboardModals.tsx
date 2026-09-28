@@ -140,7 +140,7 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
         if (!value.totalHours) {
           context.addIssue({
             code: 'custom',
-            message: 'Total hours are required.',
+            message: 'Hours are required.',
             path: ['totalHours'],
           });
         } else if (Number(value.totalHours) <= 0) {
@@ -366,11 +366,12 @@ function LeaveRequestForm({
       const usesDateRange =
         selectedLeaveType === sabbaticalLeaveTypeLabel ||
         value.dateSelection === 'range';
-      const totalHours =
+      const hoursPerDay =
         selectedLeaveType === professionalDevelopmentLeaveTypeLabel ||
         selectedLeaveType === sabbaticalLeaveTypeLabel
           ? 0
           : Number(value.totalHours);
+      const totalHours = hoursPerDay * leaveDayCount;
       const payLeaveTypeId =
         value.payLeaveTypeId && value.payLeaveTypeId !== noPayOptionValue
           ? Number(value.payLeaveTypeId)
@@ -379,6 +380,11 @@ function LeaveRequestForm({
         await requestMutation.mutateAsync({
           coveragePlan: null,
           endDate: usesDateRange ? value.endDate : value.startDate,
+          excludeUniversityHolidays:
+            usesDateRange &&
+            holidayDataAvailable &&
+            value.excludeUniversityHolidays,
+          excludeWeekends: usesDateRange && value.excludeWeekends,
           leaveTypeId: Number(value.leaveTypeId),
           note: value.note.trim() || null,
           payLeaveTypeId,
@@ -602,7 +608,6 @@ function LeaveRequestForm({
                     <form.AppField name="excludeWeekends">
                       {(field) => (
                         <field.CheckboxField
-                          description="Do not count Saturdays or Sundays in the range calculation."
                           label="Exclude weekends"
                         />
                       )}
@@ -642,7 +647,7 @@ function LeaveRequestForm({
               <form.AppField name="totalHours">
                 {(field) => (
                   <field.TextField
-                    label="Total Hours"
+                    label="Hours"
                     placeholder="e.g., 8"
                     required
                   />
@@ -711,7 +716,6 @@ function LeaveDayCalculation({
       {leaveDayCount} {leaveDayCount === 1 ? 'leave day' : 'leave days'} in this
       range
       {getExclusionDescription(excludesWeekends, excludesUniversityHolidays)}.
-      At 8 hours per day, that is {leaveDayCount * 8} suggested hours.
     </p>
   );
 }
@@ -740,7 +744,7 @@ function getHolidayExclusionDescription(
   isLoadingHolidays: boolean
 ) {
   if (holidayCoverageEnd) {
-    return `Do not count UC Davis holidays or academic breaks in the range calculation. Holiday dates are currently available through ${formatLongDate(holidayCoverageEnd)}.`;
+    return `Holiday dates are currently available through ${formatLongDate(holidayCoverageEnd)}.`;
   }
 
   return isLoadingHolidays
