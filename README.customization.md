@@ -98,71 +98,109 @@ Optional GitHub Environment variables and secrets used by the manual `Configure 
 - Auth: `AUTH_CLIENT_ID`, `AUTH_TENANT_ID`, `AUTH_DOMAIN`, `AUTH_INSTANCE`, `AUTH_CALLBACK_PATH`
 - Notifications and SMTP: `NOTIFICATION_BASE_URL`, `NOTIFICATION_DEFAULT_APP_NAME`, `NOTIFICATION_DEFAULT_BUTTON_TEXT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_TIMEOUT`, `SMTP_USE_SSL`, `SMTP_USERNAME`, `SMTP_PASSWORD` secret, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, `SMTP_REPLY_TO_EMAIL`, `SMTP_BCC_EMAIL`
 - Observability: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_HEADERS` secret, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`
-- SKUs and database names: `WEB_SKU_NAME`, `WEB_SKU_TIER`, `SQL_DATABASE_NAME`, `SQL_SKU_NAME`, `SQL_SKU_TIER`, `SQL_ADMIN_LOGIN`
+- Existing App Service plan overrides: `WEB_PLAN_NAME`, `WEB_PLAN_RESOURCE_GROUP`
+- SQL configuration: `SQL_DATABASE_NAME`, `SQL_SKU_NAME`, `SQL_SKU_TIER`, `SQL_ADMIN_LOGIN`
+
+### Shared App Service plans and existing apps
+
+Infrastructure deployments reference these existing Linux plans in the target environment's subscription. Both plans are in `westus2`; the App Service location must match the selected plan. Leaves does not create, resize, or manage the shared plans.
+
+| Environment | Plan | Plan resource group | Subscription |
+| --- | --- | --- | --- |
+| `test` | `DefaultPlan2` | `Default-Web-WestUS` | `105dede4-4731-492e-8c28-5121226319b0` |
+| `prod` | `Nibbler` | `service-plans-linux` | `003283b1-cc5e-417a-b037-01ff3c05537b` |
+
+The defaults match web-app-template's shared plans. Optional `WEB_PLAN_NAME` and `WEB_PLAN_RESOURCE_GROUP` values are passed by Configure Azure and the local deployment script to `webPlanName` and `webPlanResourceGroup`. If overriding them, pass the same values to the OIDC bootstrap so its permissions cover the plan used by the app. The previous web SKU parameters and environment variables are no longer used.
+
+**Existing-app prerequisite:** as of September 28, 2026, `web-leaves-test-nlklon` uses `asp-leaves-test-nlklon` in `rg-leaves-test`, and `web-leaves-prod-bufiak` uses `asp-leaves-prod-bufiak` in `rg-leaves-prod`. Updating `serverFarmId` is not a guaranteed in-place migration. Azure restricts plan moves by resource group, region, OS, and deployment unit (webspace); moving a plan's resource group does not change its webspace. Check [Microsoft's plan-move requirements](https://learn.microsoft.com/en-us/azure/app-service/app-service-plan-manage#move-an-app-to-another-app-service-plan) before running Configure Azure or a local infrastructure deployment. If the existing app cannot join the target plan, stop and handle any app recreation or relocation as a separate operator task.
+
+Use incremental infrastructure deployments. Removing the dedicated plan declaration does not delete an existing plan in incremental mode. Cleanup of old plans, deployment app registrations, service principals, and their role assignments is separate from this change.
 
 ### One-time OIDC bootstrap
 
-Run `infrastructure/azure/github-oidc.bicep` once per environment before the first GitHub deployment. Run it again after repository, organization, GitHub Environment, resource group, subscription, or identity changes, or if the generated Entra app/service principal is deleted.
+Run `infrastructure/azure/github-oidc.bicep` once per environment before GitHub infrastructure deployment. Run it again after repository, organization, GitHub Environment, resource group, subscription, shared plan, or identity changes, or if the managed identity is deleted.
 
-Why OIDC is used: GitHub Actions receives short-lived Azure tokens scoped to this repository and GitHub Environment. That removes the need to store long-lived Azure client secrets in GitHub.
+The bootstrap creates a user-assigned managed identity in the Leaves environment resource group and a federated credential for `repo:ucdavis/leaves:environment:<env>`. It trusts issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. GitHub Actions uses short-lived tokens without an Azure client secret. This deployment identity is separate from the Microsoft Identity Web app registration used for user sign-in: keep `AUTH_CLIENT_ID` and `Auth:ClientId` unchanged.
 
-This bootstrap is only for deployment authentication from GitHub Actions to Azure. It does not create or configure the Microsoft Identity Web app registration used for end-user sign-in in section 3.
+Default identity names are `id-leaves-test-deploy` and `id-leaves-prod-deploy`. The `deploymentIdentityName` parameter/output replaces `applicationName`; update any external bootstrap callers. The bootstrap no longer requires the Microsoft Graph Bicep extension or permission to create Entra app registrations.
 
-Example for `test`:
+With `assignRbac=true`, the identity receives Contributor on the Leaves resource group and Website Contributor on the exact shared plan. The operator needs permission to create the resource group, managed identity, and federated credential, plus role-assignment permissions at both scopes. Subscription Owner is sufficient; narrower permissions can combine resource creation rights with User Access Administrator or Role Based Access Control Administrator at the relevant scopes. With `assignRbac=false`, the identity and credential are created, but an authorized operator must grant both roles to the emitted `principalId` before GitHub infrastructure deployment. Contributor on the Leaves resource group allows the identity to manage its own identity resource and federation, but not Azure RBAC assignments.
+
+Run the following commands yourself, one environment at a time. Select the **test** values first:
 
 ```bash
-az login
-az account set --subscription "<subscription-id>"
-deployment_name="github-oidc-<app-name>"
+env="test"
+subscription_id="105dede4-4731-492e-8c28-5121226319b0"
+resource_group="rg-leaves-test"
+web_plan_name="DefaultPlan2"
+web_plan_resource_group="Default-Web-WestUS"
+```
+
+After test verification, repeat with the **production** values:
+
+```bash
+env="prod"
+subscription_id="003283b1-cc5e-417a-b037-01ff3c05537b"
+resource_group="rg-leaves-prod"
+web_plan_name="Nibbler"
+web_plan_resource_group="service-plans-linux"
+```
+
+For the selected environment, prepare the common arguments and validate:
+
+```bash
+deployment_name="github-oidc-leaves-${env}"
+bootstrap_args=(
+  --subscription "$subscription_id"
+  --location westus2
+  --template-file infrastructure/azure/github-oidc.bicep
+  --parameters
+  "appName=leaves"
+  "repository=ucdavis/leaves"
+  "env=$env"
+  "expectedSubscriptionId=$subscription_id"
+  "resourceGroupName=$resource_group"
+  "location=westus2"
+  "webPlanName=$web_plan_name"
+  "webPlanResourceGroup=$web_plan_resource_group"
+)
+az deployment sub validate "${bootstrap_args[@]}"
+az deployment sub what-if "${bootstrap_args[@]}"
+```
+
+Review the preview, then apply the bootstrap:
+
+```bash
 az deployment sub create \
   --name "$deployment_name" \
-  --location westus2 \
-  --template-file infrastructure/azure/github-oidc.bicep \
-  --parameters \
-    appName="<app-name>" \
-    repository="<owner>/<repo>" \
-    env="test" \
-    expectedSubscriptionId="<subscription-id>" \
-    resourceGroupName="rg-<app-name>-test"
+  "${bootstrap_args[@]}" \
+  --query properties.outputs
 ```
 
-For example, with the default `APP_NAME=leaves`, use `deployment_name="github-oidc-leaves"`. Repeat with `env="prod"`, a production deployment name such as `deployment_name="github-oidc-leaves-prod"`, and a `-prod` resource group for production. The bootstrap output should include `deploymentGuardPassed=true`, `clientId`, `tenantId`, `subscriptionId`, `principalId`, `resourceGroupName`, and `federatedCredentialSubject`.
+Require `deploymentGuardPassed=true` and populated `deploymentIdentityName`, `clientId`, `principalId`, `tenantId`, `subscriptionId`, `resourceGroupName`, and `federatedCredentialSubject` outputs. The subject must match `repo:ucdavis/leaves:environment:test` or `repo:ucdavis/leaves:environment:prod`. With `assignRbac=true`, also require `roleAssignmentId` and `webPlanRoleAssignmentId`. A false guard creates no resources and emits empty identity outputs; a successful CLI exit alone is insufficient. Check the subscription, repository, and resource-group suffix before proceeding.
 
-If you did not set `--name`, Azure CLI usually names the deployment after the template file, for example `github-oidc`. Find recent subscription deployments with:
+### Operator-managed identity cutover and deployment
+
+Repository changes do not switch the GitHub deployment identity. You control bootstrap execution and cutover separately for each environment:
+
+1. Record its current `AZURE_CLIENT_ID` for rollback. Confirm the existing-app prerequisite above before applying infrastructure changes.
+2. Validate, preview, and apply the bootstrap, then check its outputs. It adds a managed identity and role assignments without deleting the old deployment app registration or its permissions.
+3. Set the GitHub Environment variables from the outputs using the commands below. Verify the subscription, tenant, and resource group. Keep user sign-in configuration unchanged.
+4. Ensure the environment has `SQL_ADMIN_PASSWORD` and its existing auth, SQL, SMTP, notification, and telemetry configuration. Set `AZURE_LOCATION=westus2`. If overriding the plan, configure both plan variables consistently with the bootstrap.
+5. Run **Configure Azure** for the selected environment from the branch containing this change. It applies infrastructure and app settings. Wait for it to finish before starting the **CI/CD** package deployment for that environment.
+6. Verify Azure login, configuration, package deployment, the app's target plan association, `/health`, user sign-in, and a database-backed Leaves operation. Complete test verification before repeating for production.
+
+From the repository root, after checking the bootstrap outputs:
 
 ```bash
-az deployment sub list \
-  --query "sort_by([].{name:name,timestamp:properties.timestamp,provisioningState:properties.provisioningState}, &timestamp)[-5:]" \
-  --output table
+gh variable set AZURE_CLIENT_ID --repo ucdavis/leaves --env "$env" --body "$(az deployment sub show --subscription "$subscription_id" --name "$deployment_name" --query properties.outputs.clientId.value --output tsv)"
+gh variable set AZURE_TENANT_ID --repo ucdavis/leaves --env "$env" --body "$(az deployment sub show --subscription "$subscription_id" --name "$deployment_name" --query properties.outputs.tenantId.value --output tsv)"
+gh variable set AZURE_SUBSCRIPTION_ID --repo ucdavis/leaves --env "$env" --body "$(az deployment sub show --subscription "$subscription_id" --name "$deployment_name" --query properties.outputs.subscriptionId.value --output tsv)"
+gh variable set RESOURCE_GROUP --repo ucdavis/leaves --env "$env" --body "$(az deployment sub show --subscription "$subscription_id" --name "$deployment_name" --query properties.outputs.resourceGroupName.value --output tsv)"
+gh variable set AZURE_LOCATION --repo ucdavis/leaves --env "$env" --body westus2
 ```
 
-Get the GitHub Environment variable values from the deployment outputs:
-
-```bash
-az deployment sub show \
-  --name "$deployment_name" \
-  --query "properties.outputs.{AZURE_CLIENT_ID:clientId.value,AZURE_TENANT_ID:tenantId.value,AZURE_SUBSCRIPTION_ID:subscriptionId.value,RESOURCE_GROUP:resourceGroupName.value,federatedCredentialSubject:federatedCredentialSubject.value}" \
-  --output table
-```
-
-Configure the GitHub Environment with those values:
-
-```bash
-gh variable set AZURE_CLIENT_ID --env test --body "$(az deployment sub show --name "$deployment_name" --query properties.outputs.clientId.value --output tsv)"
-gh variable set AZURE_TENANT_ID --env test --body "$(az deployment sub show --name "$deployment_name" --query properties.outputs.tenantId.value --output tsv)"
-gh variable set AZURE_SUBSCRIPTION_ID --env test --body "$(az deployment sub show --name "$deployment_name" --query properties.outputs.subscriptionId.value --output tsv)"
-gh variable set RESOURCE_GROUP --env test --body "$(az deployment sub show --name "$deployment_name" --query properties.outputs.resourceGroupName.value --output tsv)"
-```
-
-Then add the SQL admin password as a GitHub Environment secret:
-
-```bash
-gh secret set SQL_ADMIN_PASSWORD --env test
-```
-
-The operator needs permission to create Entra applications/service principals. With the default `assignRbac=true`, the operator also needs Owner or User Access Administrator at the target resource group scope. If they do not have that permission, run with `assignRbac=false`, then have an Azure owner assign Contributor to the emitted `principalId` on the target resource group.
-
-The first Bicep build or deployment may restore the Microsoft Graph extension configured in `infrastructure/azure/bicepconfig.json`.
+If identity cutover fails, restore the previous `AZURE_CLIENT_ID` to resume use of the old identity. This restores authentication only; it does not revert infrastructure changes or grant the old identity access to the shared plan. Leave both identities and their assignments in place while resolving the issue. Coordinate cutover with pushes to `main`, which deploy the test app package; production remains a manual deployment.
 
 ### First deployment
 
@@ -311,8 +349,8 @@ Discard unused assets, tests, and mock data that referenced the template demos.
 
 - [ ] `npm start` launches both servers on the expected ports.
 - [ ] `dotnet test` and `cd client && npm test` succeed.
-- [ ] `az bicep build --file infrastructure/azure/main.bicep` succeeds.
-- [ ] `az bicep build --file infrastructure/azure/github-oidc.bicep` succeeds.
+- [ ] `az bicep build --file infrastructure/azure/main.bicep --stdout > /tmp/leaves-main.json` succeeds.
+- [ ] `az bicep build --file infrastructure/azure/github-oidc.bicep --stdout > /tmp/leaves-github-oidc.json` succeeds.
 - [ ] GitHub Environment variables/secrets are configured from the OIDC bootstrap outputs.
 - [ ] Logging and OTLP exports reach your observability backend.
 - [ ] Signing in via Microsoft Entra succeeds locally (and in cloud environments, once deployed).

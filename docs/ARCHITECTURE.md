@@ -119,7 +119,8 @@ Responsibilities:
 
 Responsibilities:
 
-- Creates Azure SQL, Linux App Service, Log Analytics, and workspace-based Application Insights
+- Creates Azure SQL, Linux App Service on an existing shared plan, Log Analytics, and workspace-based Application Insights
+- References `DefaultPlan2` in `Default-Web-WestUS` for test and `Nibbler` in `service-plans-linux` for production; both plans are in `westus2`
 - Applies generic runtime settings for auth, notifications, SMTP, database connectivity, and optional OTLP export
 - Emits deployment outputs consumed by scripts and GitHub Actions
 
@@ -127,9 +128,9 @@ Responsibilities:
 
 Responsibilities:
 
-- Creates the per-environment GitHub OIDC deployment identity
+- Creates the per-environment user-assigned managed identity for GitHub OIDC deployment
 - Adds the federated credential for `repo:<owner>/<repo>:environment:<env>`
-- Optionally assigns Contributor on the target resource group
+- Optionally assigns Contributor on the target resource group and Website Contributor on the exact shared App Service plan
 
 ### `.github/workflows/ci-cd.yml`
 
@@ -156,6 +157,7 @@ Responsibilities:
 
 - Provides the manual `Configure Azure` workflow for `test` and `prod`
 - Applies Bicep-managed infrastructure and App Service settings
+- Accepts optional `WEB_PLAN_NAME` and `WEB_PLAN_RESOURCE_GROUP` overrides matching the OIDC bootstrap
 - Waits for the SCM restart to finish
 - Uses the same environment concurrency group as package deployment, so configuration and package deployment cannot overlap
 
