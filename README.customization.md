@@ -44,7 +44,7 @@ Then update `server/appsettings.json`:
 
 If you change `CallbackPath`, remember to mirror it in the Entra redirect URIs.
 
-The Azure deployment bootstrap in section 5 automates a different Entra application/service principal for GitHub Actions OIDC. Do not use that bootstrap `clientId` as `Auth:ClientId` unless you intentionally combined the deployment identity and the user sign-in app registration, which is not the default setup.
+The Azure deployment bootstrap in section 5 creates a separate user-assigned managed identity for GitHub Actions OIDC. Do not use that bootstrap `clientId` as `Auth:ClientId`; use the client ID of the user sign-in app registration.
 
 ## 4. Secrets, Connection Strings, & Environment Files
 
