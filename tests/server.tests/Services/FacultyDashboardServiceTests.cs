@@ -95,6 +95,8 @@ public class FacultyDashboardServiceTests
         var requestWithDays = new LeaveRequest
         {
             IamId = "faculty",
+            ReportingDepartmentCodeSnapshot = "TEST",
+            ReportingDepartmentNameSnapshot = "Test Department",
             StartDate = new DateOnly(2026, 10, 1),
             EndDate = new DateOnly(2026, 10, 5),
             Status = LeaveRequestStatus.Approved,
@@ -114,6 +116,8 @@ public class FacultyDashboardServiceTests
         db.LeaveRequests.Add(new LeaveRequest
         {
             IamId = "faculty",
+            ReportingDepartmentCodeSnapshot = "TEST",
+            ReportingDepartmentNameSnapshot = "Test Department",
             StartDate = new DateOnly(2026, 10, 1),
             EndDate = new DateOnly(2026, 10, 5),
             Status = LeaveRequestStatus.Approved,

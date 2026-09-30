@@ -57,9 +57,17 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
   pendingComponent: () => (
     <section className="card border border-main-border bg-base-100">
       <div className="card-body p-6">
-        <h2 className="text-lg font-semibold text-primary">
-          Loading department data
-        </h2>
+        <div className="flex items-center gap-4">
+          <span
+            aria-hidden="true"
+            className="loading loading-spinner loading-lg text-primary"
+          />
+          <div>
+            <h2 className="text-lg font-semibold text-primary">
+              Loading department data
+            </h2>
+          </div>
+        </div>
       </div>
     </section>
   ),
