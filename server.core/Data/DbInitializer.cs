@@ -533,13 +533,45 @@ public class DbInitializer : IDbInitializer
         DateTime nowUtc,
         CancellationToken ct)
     {
-        var existingKeys = await _db.ClusterCaoAssignments
-            .Select(assignment => new { assignment.ClusterId, assignment.IamId, assignment.EffectiveStartDate })
-            .ToListAsync(ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var existingAssignments = await _db.ClusterCaoAssignments.ToListAsync(ct);
 
-        var existing = existingKeys
+        var existing = existingAssignments
             .Select(assignment => CreateAssignmentKey(assignment.ClusterId.ToString(), assignment.IamId, assignment.EffectiveStartDate))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var seededAssignmentKeys = DevClusterCaoAssignments
+            .Select(assignment => CreateAssignmentKey(
+                clustersByName[assignment.ClusterName].Id.ToString(),
+                assignment.IamId,
+                ParseDateOnly(assignment.EffectiveStartDate)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var assignmentsToReactivate = existingAssignments
+            .Where(assignment =>
+                seededAssignmentKeys.Contains(CreateAssignmentKey(
+                    assignment.ClusterId.ToString(),
+                    assignment.IamId,
+                    assignment.EffectiveStartDate)) &&
+                (assignment.ClosedUtc != null ||
+                    (assignment.EffectiveEndDateExclusive.HasValue &&
+                        assignment.EffectiveEndDateExclusive.Value <= today)))
+            .ToArray();
+
+        foreach (var assignment in assignmentsToReactivate)
+        {
+            assignment.ClosedByAppUserId = null;
+            assignment.ClosedUtc = null;
+            assignment.EffectiveEndDateExclusive = null;
+        }
+
+        if (assignmentsToReactivate.Length > 0)
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation(
+                "Reactivated {Count} development ClusterCaoAssignment rows.",
+                assignmentsToReactivate.Length);
+        }
 
         var missingAssignments = DevClusterCaoAssignments
             .Where(assignment =>
