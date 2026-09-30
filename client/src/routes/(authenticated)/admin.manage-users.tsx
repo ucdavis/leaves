@@ -17,7 +17,10 @@ import {
   type AdminRoleAssignment,
 } from '@/queries/adminRoles.ts';
 import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
+import { useUser } from '@/shared/auth/UserContext.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
+import { Tooltip } from '@/shared/Tooltip.tsx';
+import { tooltipDefinitions } from '@/shared/tooltips.ts';
 import { WarningModal } from '@/shared/WarningModal.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
@@ -27,12 +30,14 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
   pendingComponent: () => (
     <section className="card border border-main-border bg-base-100">
       <div className="card-body p-6">
-        <h2 className="text-lg font-semibold text-primary">
-          Loading role assignments
-        </h2>
-        <p className="mt-2 text-sm text-base-content/70">
-          Pulling application admins from the database.
-        </p>
+        <div className="flex items-center gap-4">
+          <span
+            aria-hidden="true"
+            className="loading loading-spinner loading-lg text-primary"
+          />
+          <div>
+          </div>
+        </div>
       </div>
     </section>
   ),
@@ -70,6 +75,7 @@ export type AdminRolePersonOption = {
 };
 
 function AdminUsersRoute() {
+  const currentUser = useUser();
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminRolesQueryOptions());
   const [selectedUser, setSelectedUser] =
@@ -105,10 +111,14 @@ function AdminUsersRoute() {
   const isSaving = addAdminMutation.isPending || removeMutation.isPending;
 
   const selectedUserName = selectedUser?.name ?? iamId;
+  const currentUserIamId = currentUser.iamId?.trim().toLowerCase();
   const assignmentRows = data.assignments.filter(
     (assignment) =>
       assignment.type === 'admin' &&
       (showInactiveAssignments || assignment.active)
+  );
+  const activeAdminAssignments = data.assignments.filter(
+    (assignment) => assignment.type === 'admin' && assignment.active
   );
   const resetForm = () => {
     setSelectedUser(null);
@@ -198,25 +208,42 @@ function AdminUsersRoute() {
       header: 'Status',
     },
     {
-      cell: ({ row }) => (
-        <button
-          className={`btn btn-ghost btn-sm ${
-            row.original.active
-              ? 'text-rose-700'
-              : 'cursor-not-allowed text-slate-400'
-          }`}
-          disabled={removeMutation.isPending || !row.original.active}
-          onClick={() =>
-            setPendingAction({
-              assignment: row.original,
-              kind: 'remove',
-            })
-          }
-          type="button"
-        >
-          Remove
-        </button>
-      ),
+      cell: ({ row }) => {
+        const isLastActiveAdmin =
+          row.original.active && activeAdminAssignments.length === 1;
+        const isRemovalDisabled =
+          removeMutation.isPending || !row.original.active || isLastActiveAdmin;
+        const removeButton = (
+          <button
+            className={`btn btn-ghost btn-sm ${
+              isRemovalDisabled
+                ? 'cursor-not-allowed text-slate-400'
+                : 'text-rose-700'
+            }`}
+            disabled={isRemovalDisabled}
+            onClick={() =>
+              setPendingAction({
+                assignment: row.original,
+                kind: 'remove',
+              })
+            }
+            type="button"
+          >
+            Remove
+          </button>
+        );
+
+        return isLastActiveAdmin ? (
+          <Tooltip
+            content={tooltipDefinitions.lastApplicationAdministrator}
+            placement="left"
+          >
+            {removeButton}
+          </Tooltip>
+        ) : (
+          removeButton
+        );
+      },
       header: 'Actions',
       id: 'actions',
     },
@@ -322,6 +349,12 @@ function AdminUsersRoute() {
         <RoleWarningModal
           action={pendingAction}
           errorMessage={error}
+          isRemovingSelf={
+            pendingAction.kind === 'remove' &&
+            Boolean(currentUserIamId) &&
+            pendingAction.assignment.iamId.trim().toLowerCase() ===
+              currentUserIamId
+          }
           isSaving={isSaving}
           onCancel={() => {
             setPendingAction(null);
@@ -389,12 +422,14 @@ function getRoleWarningModalText(action: PendingRoleAction) {
 function RoleWarningModal({
   action,
   errorMessage,
+  isRemovingSelf,
   isSaving,
   onCancel,
   onConfirm,
 }: {
   action: PendingRoleAction;
   errorMessage: string | null;
+  isRemovingSelf: boolean;
   isSaving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -412,6 +447,12 @@ function RoleWarningModal({
       title={title}
     >
       {message}
+      {isRemovingSelf ? (
+        <p className="mt-3 font-semibold">
+          You are removing your own application admin access. You will no
+          longer be able to access this administrative area.
+        </p>
+      ) : null}
     </WarningModal>
   );
 }

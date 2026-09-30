@@ -1,6 +1,7 @@
 import { getDirectorySearchMessage } from '@/shared/admin/directorySearch.ts';
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
+import { z } from 'zod';
 import {
   useMutation,
   useQuery,
@@ -34,25 +35,47 @@ import {
 } from '@heroicons/react/24/outline';
 import { statusTextColors } from '@/shared/statusColors.ts';
 
+const departmentSearchSchema = z.object({
+  peopleFor: z.string().trim().min(1).optional(),
+});
+
+const departmentRouteSearchOptions = {
+  validateSearch: (
+    search: Record<string, unknown>
+  ): z.infer<typeof departmentSearchSchema> => {
+    const result = departmentSearchSchema.safeParse(search);
+
+    return result.success ? result.data : {};
+  },
+};
+
 export const Route = createFileRoute('/(authenticated)/admin/departments')({
+  ...departmentRouteSearchOptions,
   component: AdminDepartmentsRoute,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(adminDepartmentsQueryOptions()),
   pendingComponent: () => (
     <section className="card border border-main-border bg-base-100">
       <div className="card-body p-6">
-        <h2 className="text-lg font-semibold text-primary">
-          Loading department data
-        </h2>
-        <p className="mt-2 text-sm text-base-content/70">
-          Pulling the current department and cluster records from the database.
-        </p>
+        <div className="flex items-center gap-4">
+          <span
+            aria-hidden="true"
+            className="loading loading-spinner loading-lg text-primary"
+          />
+          <div>
+            <h2 className="text-lg font-semibold text-primary">
+              Loading department data
+            </h2>
+          </div>
+        </div>
       </div>
     </section>
   ),
 });
 
 function AdminDepartmentsRoute() {
+  const { peopleFor } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
   const { caoUsers, clusters, departments, facultyUsers } = data;
@@ -93,10 +116,23 @@ function AdminDepartmentsRoute() {
   const [pendingChairChangeError, setPendingChairChangeError] = useState<
     string | null
   >(null);
-  const [viewDepartmentId, setViewDepartmentId] = useState<string | null>(null);
   const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
     string | null
   >(null);
+  const viewDepartmentId = peopleFor ?? null;
+
+  const openRoster = (departmentId: string) => {
+    void navigate({
+      search: { peopleFor: departmentId },
+    });
+  };
+
+  const closeRoster = () => {
+    void navigate({
+      replace: true,
+      search: {},
+    });
+  };
 
   const invalidateDepartments = async () => {
     await queryClient.invalidateQueries({
@@ -159,11 +195,7 @@ function AdminDepartmentsRoute() {
 
       return (
         <div className="space-y-5">
-          <button
-            className="btn btn-ghost"
-            onClick={() => setViewDepartmentId(null)}
-            type="button"
-          >
+          <button className="btn btn-ghost" onClick={closeRoster} type="button">
             <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
             Back to departments
           </button>
@@ -420,7 +452,7 @@ function AdminDepartmentsRoute() {
                     department={department}
                     key={department.id}
                     linkedUserCount={linkedUserCount}
-                    onOpenRoster={() => setViewDepartmentId(department.id)}
+                    onOpenRoster={() => openRoster(department.id)}
                     onOpenSettings={() => setEditingDepartmentId(department.id)}
                   />
                 );
@@ -452,7 +484,7 @@ function AdminDepartmentsRoute() {
                         user.departmentId === department.id && user.active
                     ).length
                   }
-                  onOpenRoster={() => setViewDepartmentId(department.id)}
+                  onOpenRoster={() => openRoster(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
                 />
               ))}
@@ -476,7 +508,7 @@ function AdminDepartmentsRoute() {
               .then(() => {
                 setEditingDepartmentId(null);
                 if (viewDepartmentId === editingDepartment.id) {
-                  setViewDepartmentId(null);
+                  closeRoster();
                 }
               })
           }

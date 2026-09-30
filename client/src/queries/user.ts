@@ -4,6 +4,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query';
 export type User = {
   email: string;
   entraObjectId?: string;
+  iamId?: string;
   id: string;
   isEmulating: boolean;
   name: string;

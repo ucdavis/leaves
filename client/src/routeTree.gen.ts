@@ -15,6 +15,7 @@ import { Route as authenticatedTeamCalendarRouteImport } from './routes/(authent
 import { Route as authenticatedHistoryRouteImport } from './routes/(authenticated)/history'
 import { Route as authenticatedApprovalsRouteImport } from './routes/(authenticated)/approvals'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
+import { Route as authenticatedAccessDeniedRouteImport } from './routes/(authenticated)/access-denied'
 import { Route as authenticatedAdminIndexRouteImport } from './routes/(authenticated)/admin.index'
 import { Route as authenticatedFacultyIamIdRouteImport } from './routes/(authenticated)/faculty.$iamId'
 import { Route as authenticatedAdminStatusRouteImport } from './routes/(authenticated)/admin.status'
@@ -52,6 +53,12 @@ const authenticatedAdminRoute = authenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
+const authenticatedAccessDeniedRoute =
+  authenticatedAccessDeniedRouteImport.update({
+    id: '/access-denied',
+    path: '/access-denied',
+    getParentRoute: () => authenticatedRouteRoute,
+  } as any)
 const authenticatedAdminIndexRoute = authenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -89,6 +96,7 @@ const authenticatedAdminDepartmentsRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/access-denied': typeof authenticatedAccessDeniedRoute
   '/admin': typeof authenticatedAdminRouteWithChildren
   '/approvals': typeof authenticatedApprovalsRoute
   '/history': typeof authenticatedHistoryRoute
@@ -102,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof authenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
+  '/access-denied': typeof authenticatedAccessDeniedRoute
   '/approvals': typeof authenticatedApprovalsRoute
   '/history': typeof authenticatedHistoryRoute
   '/team-calendar': typeof authenticatedTeamCalendarRoute
@@ -116,6 +125,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(authenticated)': typeof authenticatedRouteRouteWithChildren
+  '/(authenticated)/access-denied': typeof authenticatedAccessDeniedRoute
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
   '/(authenticated)/approvals': typeof authenticatedApprovalsRoute
   '/(authenticated)/history': typeof authenticatedHistoryRoute
@@ -131,6 +141,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/access-denied'
     | '/admin'
     | '/approvals'
     | '/history'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/access-denied'
     | '/approvals'
     | '/history'
     | '/team-calendar'
@@ -157,6 +169,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/(authenticated)'
+    | '/(authenticated)/access-denied'
     | '/(authenticated)/admin'
     | '/(authenticated)/approvals'
     | '/(authenticated)/history'
@@ -216,6 +229,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof authenticatedAdminRouteImport
+      parentRoute: typeof authenticatedRouteRoute
+    }
+    '/(authenticated)/access-denied': {
+      id: '/(authenticated)/access-denied'
+      path: '/access-denied'
+      fullPath: '/access-denied'
+      preLoaderRoute: typeof authenticatedAccessDeniedRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/admin/': {
@@ -283,6 +303,7 @@ const authenticatedAdminRouteWithChildren =
   authenticatedAdminRoute._addFileChildren(authenticatedAdminRouteChildren)
 
 interface authenticatedRouteRouteChildren {
+  authenticatedAccessDeniedRoute: typeof authenticatedAccessDeniedRoute
   authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
   authenticatedApprovalsRoute: typeof authenticatedApprovalsRoute
   authenticatedHistoryRoute: typeof authenticatedHistoryRoute
@@ -292,6 +313,7 @@ interface authenticatedRouteRouteChildren {
 }
 
 const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
+  authenticatedAccessDeniedRoute: authenticatedAccessDeniedRoute,
   authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
   authenticatedApprovalsRoute: authenticatedApprovalsRoute,
   authenticatedHistoryRoute: authenticatedHistoryRoute,

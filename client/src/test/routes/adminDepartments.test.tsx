@@ -8,11 +8,16 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { afterEach, beforeAll, expect, test } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mswUtils.ts';
-import { Route } from '@/routes/(authenticated)/admin.departments.tsx';
 import { adminDepartmentsQueryOptions } from '@/queries/adminDepartments.ts';
+import { routeTree } from '@/routeTree.gen.ts';
 import type { AdminUser } from '@/shared/admin/adminData.ts';
 
 const facultyUser = (id: string, role: AdminUser['role']): AdminUser => ({
@@ -121,6 +126,15 @@ afterEach(() => {
 
 function renderDepartments() {
   server.use(
+    http.get('/api/user/me', () =>
+      HttpResponse.json({
+        email: 'admin@example.test',
+        id: 'admin',
+        isEmulating: false,
+        name: 'Test Admin',
+        roles: ['Admin'],
+      })
+    ),
     http.get('/api/admin/departments', () =>
       HttpResponse.json({
         ...response,
@@ -138,10 +152,17 @@ function renderDepartments() {
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const Component = Route.options.component!;
+  const router = createRouter({
+    context: { queryClient },
+    history: createMemoryHistory({
+      initialEntries: ['/admin/departments'],
+    }),
+    routeTree,
+  });
+
   render(
     <QueryClientProvider client={queryClient}>
-      <Component />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
 }
@@ -151,7 +172,7 @@ test('department roster includes faculty admins and CAOs, and excludes directory
   expect(await screen.findByText('CAO: Staff current CAO')).toBeInTheDocument();
   expect(screen.getByText('3 active users')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Linked users' }));
-  const roster = screen.getByRole('table');
+  const roster = await screen.findByRole('table');
   for (const role of ['faculty', 'admin', 'cao']) {
     expect(within(roster).getByText(`Faculty ${role}`)).toBeInTheDocument();
   }

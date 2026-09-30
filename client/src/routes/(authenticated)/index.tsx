@@ -41,6 +41,10 @@ export const Route = createFileRoute('/(authenticated)/')({
       throw redirect({ replace: true, to: '/team-calendar' });
     }
 
+    if (user.roles.length === 0) {
+      throw redirect({ replace: true, to: '/access-denied' });
+    }
+
     if (!canAccessFacultyWorkspace(user.roles)) {
       throw new HttpError(403, '/api/faculty/dashboard');
     }

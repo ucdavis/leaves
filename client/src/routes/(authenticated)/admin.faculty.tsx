@@ -19,12 +19,17 @@ export const Route = createFileRoute('/(authenticated)/admin/faculty')({
 
   pendingComponent: () => (
     <section className="rounded-[1.25rem] border border-[var(--admin-border)] bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-        Loading faculty data
-      </h2>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-        Pulling the current faculty records from the database.
-      </p>
+      <div className="flex items-center gap-4">
+        <span
+          aria-hidden="true"
+          className="loading loading-spinner loading-lg text-primary"
+        />
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+            Loading faculty data
+          </h2>
+        </div>
+      </div>
     </section>
   ),
 });

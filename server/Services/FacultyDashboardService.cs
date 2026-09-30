@@ -37,6 +37,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     private const string FmlaLeaveTypeLabel = "FMLA";
     private const string ProfessionalDevelopmentLeaveTypeKey = "ProfessionalDevelopment";
     private const string SabbaticalLeaveTypeKey = "Sabbatical";
+    private const decimal MaximumHoursPerLeaveDay = 24m;
 
     private static readonly string[] DesiredLeaveTypeLabels =
     [
@@ -51,17 +52,20 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     private readonly ILeaveRequestNotificationQueue _notificationQueue;
     private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
     private readonly ILogger<FacultyDashboardService> _logger;
+    private readonly IUniversityHolidayCache? _holidayCache;
 
     public FacultyDashboardService(
         AppDbContext db,
         ILeaveRequestNotificationQueue notificationQueue,
         IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
-        ILogger<FacultyDashboardService> logger)
+        ILogger<FacultyDashboardService> logger,
+        IUniversityHolidayCache? holidayCache = null)
     {
         _db = db;
         _notificationQueue = notificationQueue;
         _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
         _logger = logger;
+        _holidayCache = holidayCache;
     }
 
     public async Task<FacultyDashboardResponse?> GetDashboardAsync(
@@ -232,6 +236,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
         var request = await _db.LeaveRequests
             .AsNoTracking()
+            .Include(leaveRequest => leaveRequest.Days)
             .Where(leaveRequest => leaveRequest.AppUserId == appUser.Id && leaveRequest.Id == leaveRequestId)
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -270,6 +275,21 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             return CreateLeaveRequestResult.Invalid(validationErrors);
         }
 
+        var leaveDates = GetLeaveDates(request);
+        if (leaveDates.Count == 0)
+        {
+            return CreateLeaveRequestResult.Invalid(
+                "startDate",
+                "Select at least one leave date after applying exclusions.");
+        }
+
+        if (request.TotalHours > leaveDates.Count * MaximumHoursPerLeaveDay)
+        {
+            return CreateLeaveRequestResult.Invalid(
+                "totalHours",
+                "Hours must be 24 or fewer per leave day.");
+        }
+
         LeaveType? payLeaveType = null;
         if (request.PayLeaveTypeId.HasValue)
         {
@@ -287,8 +307,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var iamId = NormalizeIamId(appUser.IamId);
         var hasActiveOverlap = await HasActiveOverlappingLeaveRequestAsync(
             iamId,
-            request.StartDate,
-            request.EndDate,
+            leaveDates,
             cancellationToken);
 
         if (hasActiveOverlap)
@@ -338,6 +357,24 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             CreatedUtc = submittedAt,
             UpdatedUtc = submittedAt,
         };
+        var hoursPerDay = decimal.Round(
+            request.TotalHours / leaveDates.Count,
+            2,
+            MidpointRounding.AwayFromZero);
+        var allocatedHours = 0m;
+
+        for (var index = 0; index < leaveDates.Count; index++)
+        {
+            var hours = index == leaveDates.Count - 1
+                ? request.TotalHours - allocatedHours
+                : hoursPerDay;
+            leaveRequest.Days.Add(new LeaveRequestDay
+            {
+                LeaveDate = leaveDates[index],
+                Hours = hours,
+            });
+            allocatedHours += hours;
+        }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         _db.LeaveRequests.Add(leaveRequest);
@@ -357,20 +394,28 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
     internal async Task<bool> HasActiveOverlappingLeaveRequestAsync(
         string iamId,
-        DateOnly startDate,
-        DateOnly endDate,
+        IReadOnlyCollection<DateOnly> leaveDates,
         CancellationToken cancellationToken)
     {
-        return await _db.LeaveRequests
+        if (leaveDates.Count == 0)
+        {
+            return false;
+        }
+
+        var activeRequests = await _db.LeaveRequests
             .AsNoTracking()
-            .AnyAsync(
-                existing =>
-                    existing.IamId == iamId &&
-                    (existing.Status == LeaveRequestStatus.PendingApproval ||
-                        existing.Status == LeaveRequestStatus.Approved) &&
-                    existing.StartDate <= endDate &&
-                    existing.EndDate >= startDate,
-                cancellationToken);
+            .Include(request => request.Days)
+            .Where(existing =>
+                existing.IamId == iamId &&
+                (existing.Status == LeaveRequestStatus.PendingApproval ||
+                    existing.Status == LeaveRequestStatus.Approved))
+            .ToListAsync(cancellationToken);
+
+        return activeRequests.Any(existing =>
+            existing.Days.Count > 0
+                ? existing.Days.Any(day => leaveDates.Contains(day.LeaveDate))
+                : leaveDates.Any(date =>
+                    existing.StartDate <= date && existing.EndDate >= date));
     }
 
     private async Task<AppUser?> ResolveAppUserAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
@@ -502,6 +547,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     {
         IQueryable<LeaveRequest> query = _db.LeaveRequests
             .AsNoTracking()
+            .Include(request => request.Days)
             .Where(request => request.AppUserId == appUserId)
             .OrderByDescending(request => request.SubmittedAt)
             .ThenByDescending(request => request.Id);
@@ -566,6 +612,10 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             StartDate: request.StartDate,
             EndDate: request.EndDate,
             TotalHours: request.TotalHours,
+            LeaveDates: request.Days
+                .OrderBy(day => day.LeaveDate)
+                .Select(day => day.LeaveDate)
+                .ToArray(),
             SubmittedAt: request.SubmittedAt,
             WorkflowMode: request.WorkflowModeSnapshot.ToString(),
             DepartmentName: request.ReportingDepartmentNameSnapshot,
@@ -712,12 +762,31 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             errors["totalHours"] = ["Total hours must be greater than zero."];
         }
 
-        if (request.TotalHours > 240)
+        return errors;
+    }
+
+    private IReadOnlyList<DateOnly> GetLeaveDates(CreateFacultyLeaveRequest request)
+    {
+        var universityHolidayDates = request.ExcludeUniversityHolidays
+            ? _holidayCache?.GetHolidays()
+                .Select(holiday => DateOnly.Parse(holiday.Date))
+                .ToHashSet() ?? []
+            : [];
+        var leaveDates = new List<DateOnly>();
+
+        for (var date = request.StartDate; date <= request.EndDate; date = date.AddDays(1))
         {
-            errors["totalHours"] = ["Total hours must be 240 or fewer for one request."];
+            var isWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            if ((request.ExcludeWeekends && isWeekend) ||
+                (request.ExcludeUniversityHolidays && universityHolidayDates.Contains(date)))
+            {
+                continue;
+            }
+
+            leaveDates.Add(date);
         }
 
-        return errors;
+        return leaveDates;
     }
 
     private static FacultyBalanceSummary BuildBalanceSummary(IReadOnlyCollection<CurrentFacultyAccrualBalance> balances)
@@ -815,6 +884,7 @@ public sealed record FacultyLeaveRequestResponse(
     DateOnly StartDate,
     DateOnly EndDate,
     decimal TotalHours,
+    IReadOnlyList<DateOnly> LeaveDates,
     DateTime SubmittedAt,
     string WorkflowMode,
     string DepartmentName,
@@ -832,7 +902,9 @@ public sealed record CreateFacultyLeaveRequest(
     DateOnly EndDate,
     decimal TotalHours,
     string? Note,
-    string? CoveragePlan);
+    string? CoveragePlan,
+    bool ExcludeWeekends = false,
+    bool ExcludeUniversityHolidays = false);
 
 public sealed record CreateLeaveRequestResult(
     bool Succeeded,

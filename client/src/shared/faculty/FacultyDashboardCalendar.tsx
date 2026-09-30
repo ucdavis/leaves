@@ -30,14 +30,6 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 export const calendarLegend = [
-  {
-    className: 'border-sky-300 bg-sky-100 text-sky-800',
-    label: 'University holiday or break',
-  },
-  {
-    className: 'border-base-300 bg-base-300/50 text-base-content/70',
-    label: 'Weekend',
-  },
   { className: 'border-blue-500 bg-blue-100 text-blue-800', label: 'Vacation' },
   {
     className: 'border-emerald-500 bg-emerald-100 text-emerald-800',
@@ -54,10 +46,6 @@ export const calendarLegend = [
   {
     className: 'border-orange-500 bg-orange-100 text-orange-800',
     label: 'FMLA',
-  },
-  {
-    className: 'border-dashed border-warning/70 bg-warning/15 text-warning',
-    label: 'Pending',
   },
 ] as const;
 
@@ -350,14 +338,10 @@ function mapRequestsByDate(requests: FacultyLeaveRequest[]) {
   const map = new Map<string, FacultyLeaveRequest[]>();
 
   for (const request of requests) {
-    const dates = eachDayOfInterval({
-      end: parseISO(request.endDate),
-      start: parseISO(request.startDate),
-    });
+    const dates = request.leaveDates;
 
     for (const date of dates) {
-      const key = format(date, 'yyyy-MM-dd');
-      map.set(key, [...(map.get(key) ?? []), request]);
+      map.set(date, [...(map.get(date) ?? []), request]);
     }
   }
 

@@ -7,7 +7,6 @@ import {
   endOfDay,
   endOfMonth,
   format,
-  isWithinInterval,
   parseISO,
   startOfMonth,
 } from 'date-fns';
@@ -27,7 +26,6 @@ import type {
 import { formatDateRange, getLeaveTone } from './approvalDisplay.ts';
 
 const leaveLegend: LeaveCategory[] = [
-  'Compensatory Time',
   'Vacation',
   'Sick Leave',
   'Professional Development',
@@ -268,16 +266,6 @@ function CalendarLegend() {
           </div>
         );
       })}
-      <div className="flex items-center gap-2">
-        <span
-          className="h-3 w-3 rounded-sm border border-primary/60 bg-blue-100"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.45) 0 3px, transparent 3px 7px)',
-          }}
-        />
-        Pending
-      </div>
     </div>
   );
 }
@@ -298,10 +286,7 @@ function isWeekend(date: Date) {
 }
 
 function leaveIncludesDay(leave: CalendarLeave, day: MonthDay) {
-  return isWithinInterval(day.date, {
-    end: parseISO(leave.endDate),
-    start: parseISO(leave.startDate),
-  });
+  return leave.leaveDates.includes(day.isoDate);
 }
 
 export function getInitialCalendarMonth(leaves: CalendarLeave[]) {

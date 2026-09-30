@@ -84,6 +84,10 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),
                 FacultyId: request.IamId.Trim(),
                 Id: request.Id,
+                LeaveDates: request.Days
+                    .OrderBy(day => day.LeaveDate)
+                    .Select(day => day.LeaveDate.ToString("yyyy-MM-dd"))
+                    .ToArray(),
                 LeaveType: GetLeaveTypeName(request, leaveTypesById),
                 StartDate: request.StartDate.ToString("yyyy-MM-dd"),
                 Status: request.Status.ToString()))
@@ -339,6 +343,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         var facultyIds = scopedFacultyIds.ToArray();
         var query = _db.LeaveRequests
             .AsNoTracking()
+            .Include(request => request.Days)
             .Where(request =>
                 (request.Status == LeaveRequestStatus.Approved && facultyIds.Contains(request.IamId)) ||
                 (request.Status == LeaveRequestStatus.PendingApproval &&
@@ -512,6 +517,7 @@ public sealed record ApprovalWorkspaceLeaveResponse(
     string EndDate,
     string FacultyId,
     int Id,
+    IReadOnlyList<string> LeaveDates,
     string LeaveType,
     string StartDate,
     string Status);

@@ -126,6 +126,21 @@ public class AdminRoleMembershipTests
         db.ClusterCaoAssignments.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Removing_the_last_application_admin_is_rejected_by_the_API()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var controller = await CreateControllerAsync(db);
+        var assignment = new AppAdminAssignment { IamId = "onlyadmin" };
+        db.AppAdminAssignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var result = await controller.RemoveAdminAsync(assignment.Id, CancellationToken.None);
+
+        result.Should().BeOfType<ConflictObjectResult>();
+        db.AppAdminAssignments.Should().ContainSingle();
+    }
+
     private static void AssertValidationProblem(IActionResult result, string expectedDetail)
     {
         var problem = result.Should().BeAssignableTo<ObjectResult>().Which.Value
