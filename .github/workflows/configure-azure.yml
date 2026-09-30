@@ -60,8 +60,8 @@ jobs:
       SQL_DATABASE_NAME: ${{ vars.SQL_DATABASE_NAME }}
       SQL_SKU_NAME: ${{ vars.SQL_SKU_NAME }}
       SQL_SKU_TIER: ${{ vars.SQL_SKU_TIER }}
-      WEB_SKU_NAME: ${{ vars.WEB_SKU_NAME }}
-      WEB_SKU_TIER: ${{ vars.WEB_SKU_TIER }}
+      WEB_PLAN_NAME: ${{ vars.WEB_PLAN_NAME }}
+      WEB_PLAN_RESOURCE_GROUP: ${{ vars.WEB_PLAN_RESOURCE_GROUP }}
 
     steps:
       - name: Checkout
@@ -124,8 +124,8 @@ jobs:
 
           add_param "location" "$AZURE_LOCATION"
           add_param "sqlDatabaseName" "$SQL_DATABASE_NAME"
-          add_param "webSkuName" "$WEB_SKU_NAME"
-          add_param "webSkuTier" "$WEB_SKU_TIER"
+          add_param "webPlanName" "$WEB_PLAN_NAME"
+          add_param "webPlanResourceGroup" "$WEB_PLAN_RESOURCE_GROUP"
           add_param "sqlSkuName" "$SQL_SKU_NAME"
           add_param "sqlSkuTier" "$SQL_SKU_TIER"
           add_param "notificationBaseUrl" "$NOTIFICATION_BASE_URL"
