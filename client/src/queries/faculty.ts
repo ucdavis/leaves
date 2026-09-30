@@ -45,7 +45,7 @@ export interface FacultyLeaveRequest {
   departmentName: string;
   endDate: string;
   id: number;
-  leaveDates?: string[];
+  leaveDates: string[];
   leaveType: string;
   note?: string | null;
   payLeaveType?: string | null;

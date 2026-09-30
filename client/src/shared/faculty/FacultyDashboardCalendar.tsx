@@ -350,13 +350,7 @@ function mapRequestsByDate(requests: FacultyLeaveRequest[]) {
   const map = new Map<string, FacultyLeaveRequest[]>();
 
   for (const request of requests) {
-    const dates =
-      request.leaveDates && request.leaveDates.length > 0
-        ? request.leaveDates
-        : eachDayOfInterval({
-            end: parseISO(request.endDate),
-            start: parseISO(request.startDate),
-          }).map((date) => format(date, 'yyyy-MM-dd'));
+    const dates = request.leaveDates;
 
     for (const date of dates) {
       map.set(date, [...(map.get(date) ?? []), request]);

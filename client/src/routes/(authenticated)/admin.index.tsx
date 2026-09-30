@@ -12,9 +12,6 @@ export const Route = createFileRoute('/(authenticated)/admin/')({
       <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
         Loading status data
       </h2>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-        Pulling the current admin status summary from the database.
-      </p>
     </section>
   ),
 });

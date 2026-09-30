@@ -40,7 +40,9 @@ const departmentSearchSchema = z.object({
 });
 
 const departmentRouteSearchOptions = {
-  validateSearch: (search: Record<string, unknown>) => {
+  validateSearch: (
+    search: Record<string, unknown>
+  ): z.infer<typeof departmentSearchSchema> => {
     const result = departmentSearchSchema.safeParse(search);
 
     return result.success ? result.data : {};
@@ -58,9 +60,6 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
         <h2 className="text-lg font-semibold text-primary">
           Loading department data
         </h2>
-        <p className="mt-2 text-sm text-base-content/70">
-          Pulling the current department and cluster records from the database.
-        </p>
       </div>
     </section>
   ),
@@ -188,11 +187,7 @@ function AdminDepartmentsRoute() {
 
       return (
         <div className="space-y-5">
-          <button
-            className="btn btn-ghost"
-            onClick={closeRoster}
-            type="button"
-          >
+          <button className="btn btn-ghost" onClick={closeRoster} type="button">
             <ArrowLeftIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
             Back to departments
           </button>

@@ -24,7 +24,7 @@ export type CalendarLeave = {
   endDate: string;
   facultyId: string;
   id: number;
-  leaveDates?: string[];
+  leaveDates: string[];
   leaveType: LeaveCategory;
   startDate: string;
   status: 'Approved' | 'PendingApproval';

@@ -31,8 +31,10 @@ import {
 } from './FacultyDashboardPanels.tsx';
 import { RequestStatusBadge } from './FacultyDashboardPanels.tsx';
 import {
+  getLeaveDates,
   getLeaveDayCount,
   getUniversityHolidayCoverageEnd,
+  type UniversityHoliday,
 } from '@/shared/calendar/universityHolidays.ts';
 import { getValidationErrorMessage } from '@/shared/forms/validationError.ts';
 
@@ -149,10 +151,10 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
             message: 'Hours must be greater than zero.',
             path: ['totalHours'],
           });
-        } else if (Number(value.totalHours) > 240) {
+        } else if (Number(value.totalHours) > 24) {
           context.addIssue({
             code: 'custom',
-            message: 'Hours must be 240 or fewer.',
+            message: 'Hours must be 24 or fewer per leave day.',
             path: ['totalHours'],
           });
         }
@@ -304,10 +306,9 @@ function LeaveRequestForm({
   onTitleChange: (title: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const {
-    data: holidays = [],
-    isPending: isLoadingHolidays,
-  } = useQuery(universityHolidaysQueryOptions());
+  const { data: holidays = [], isPending: isLoadingHolidays } = useQuery(
+    universityHolidaysQueryOptions()
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const leaveTypeOptions = getReportLeaveTypeOptions(data.leaveTypes);
   const leaveTypeLabelById = new Map(
@@ -349,7 +350,9 @@ function LeaveRequestForm({
       const overlapError = getOverlapValidationError(
         value,
         data.recentRequests,
-        leaveTypeLabelById
+        leaveTypeLabelById,
+        holidays,
+        holidayDataAvailable
       );
 
       if (overlapError) {
@@ -366,6 +369,8 @@ function LeaveRequestForm({
       const usesDateRange =
         selectedLeaveType === sabbaticalLeaveTypeLabel ||
         value.dateSelection === 'range';
+      const allowsDateExclusions =
+        usesDateRange && selectedLeaveType !== sabbaticalLeaveTypeLabel;
       const hoursPerDay =
         selectedLeaveType === professionalDevelopmentLeaveTypeLabel ||
         selectedLeaveType === sabbaticalLeaveTypeLabel
@@ -381,10 +386,10 @@ function LeaveRequestForm({
           coveragePlan: null,
           endDate: usesDateRange ? value.endDate : value.startDate,
           excludeUniversityHolidays:
-            usesDateRange &&
+            allowsDateExclusions &&
             holidayDataAvailable &&
             value.excludeUniversityHolidays,
-          excludeWeekends: usesDateRange && value.excludeWeekends,
+          excludeWeekends: allowsDateExclusions && value.excludeWeekends,
           leaveTypeId: Number(value.leaveTypeId),
           note: value.note.trim() || null,
           payLeaveTypeId,
@@ -414,6 +419,8 @@ function LeaveRequestForm({
   const usesDateRange =
     selectedLeaveType === sabbaticalLeaveTypeLabel ||
     formValues.dateSelection === 'range';
+  const allowsDateExclusions =
+    usesDateRange && selectedLeaveType !== sabbaticalLeaveTypeLabel;
   const requiresHours =
     selectedLeaveType !== professionalDevelopmentLeaveTypeLabel &&
     selectedLeaveType !== sabbaticalLeaveTypeLabel;
@@ -423,8 +430,8 @@ function LeaveRequestForm({
     holidays,
     formValues.startDate,
     usesDateRange ? formValues.endDate : formValues.startDate,
-    usesDateRange && formValues.excludeWeekends,
-    usesDateRange &&
+    allowsDateExclusions && formValues.excludeWeekends,
+    allowsDateExclusions &&
       holidayDataAvailable &&
       formValues.excludeUniversityHolidays
   );
@@ -607,9 +614,7 @@ function LeaveRequestForm({
                   <>
                     <form.AppField name="excludeWeekends">
                       {(field) => (
-                        <field.CheckboxField
-                          label="Exclude weekends"
-                        />
+                        <field.CheckboxField label="Exclude weekends" />
                       )}
                     </form.AppField>
                     <form.AppField name="excludeUniversityHolidays">
@@ -647,7 +652,7 @@ function LeaveRequestForm({
               <form.AppField name="totalHours">
                 {(field) => (
                   <field.TextField
-                    label="Hours"
+                    label="Hours per day"
                     placeholder="e.g., 8"
                     required
                   />
@@ -811,7 +816,9 @@ function getSubmitLabel(selectedLeaveType: string) {
 function getOverlapValidationError(
   value: LeaveRequestFormValues,
   requests: FacultyLeaveRequest[],
-  leaveTypeLabelById: Map<string, string>
+  leaveTypeLabelById: Map<string, string>,
+  holidays: readonly UniversityHoliday[],
+  holidayDataAvailable: boolean
 ): { form: string } | undefined {
   const selectedLeaveType = getSelectedLeaveTypeLabel(
     value.leaveTypeId,
@@ -820,10 +827,20 @@ function getOverlapValidationError(
   const usesDateRange =
     selectedLeaveType === sabbaticalLeaveTypeLabel ||
     value.dateSelection === 'range';
+  const allowsDateExclusions =
+    usesDateRange && selectedLeaveType !== sabbaticalLeaveTypeLabel;
+  const selectedLeaveDates = getLeaveDates(
+    holidays,
+    value.startDate,
+    usesDateRange ? value.endDate : value.startDate,
+    allowsDateExclusions && value.excludeWeekends,
+    allowsDateExclusions &&
+      holidayDataAvailable &&
+      value.excludeUniversityHolidays
+  );
   const overlapRequest = findOverlappingActiveRequest(
     requests,
-    value.startDate,
-    usesDateRange ? value.endDate : value.startDate
+    selectedLeaveDates
   );
 
   if (!overlapRequest) {
@@ -961,14 +978,16 @@ function getFirstValidationMessage(errors: Record<string, string[]>) {
 
 function findOverlappingActiveRequest(
   requests: FacultyLeaveRequest[],
-  startDate: string,
-  endDate: string
+  selectedLeaveDates: string[]
 ) {
   return requests.find(
     (request) =>
       isActiveRequestStatus(request.status) &&
-      request.startDate <= endDate &&
-      request.endDate >= startDate
+      (request.leaveDates.length > 0
+        ? request.leaveDates.some((date) => selectedLeaveDates.includes(date))
+        : selectedLeaveDates.some(
+            (date) => request.startDate <= date && request.endDate >= date
+          ))
   );
 }
 

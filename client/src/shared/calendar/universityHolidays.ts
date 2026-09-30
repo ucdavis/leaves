@@ -27,14 +27,30 @@ export function getLeaveDayCount(
   excludeWeekends: boolean,
   excludeUniversityHolidays: boolean
 ) {
+  return getLeaveDates(
+    holidays,
+    startDate,
+    endDate,
+    excludeWeekends,
+    excludeUniversityHolidays
+  ).length;
+}
+
+export function getLeaveDates(
+  holidays: readonly UniversityHoliday[],
+  startDate: string,
+  endDate: string,
+  excludeWeekends: boolean,
+  excludeUniversityHolidays: boolean
+) {
   const start = parseIsoDate(startDate);
   const end = parseIsoDate(endDate);
 
   if (!start || !end || end < start) {
-    return 0;
+    return [];
   }
 
-  let count = 0;
+  const leaveDates: string[] = [];
   const day = new Date(start);
 
   while (day <= end) {
@@ -45,13 +61,13 @@ export function getLeaveDayCount(
       (!excludeWeekends || !weekend) &&
       (!excludeUniversityHolidays || !getUniversityHoliday(holidays, isoDate))
     ) {
-      count += 1;
+      leaveDates.push(isoDate);
     }
 
     day.setUTCDate(day.getUTCDate() + 1);
   }
 
-  return count;
+  return leaveDates;
 }
 
 function parseIsoDate(value: string) {

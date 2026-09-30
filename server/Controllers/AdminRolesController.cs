@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Helpers;
@@ -188,14 +189,27 @@ public sealed class AdminRolesController : ApiControllerBase
     [HttpDelete("admins/{id:int}")]
     public async Task<IActionResult> RemoveAdminAsync(int id, CancellationToken cancellationToken)
     {
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
         var assignment = await _db.AppAdminAssignments.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (assignment == null)
         {
             return NotFound();
         }
 
+        var activeAdminCount = await _db.AppAdminAssignments.CountAsync(cancellationToken);
+        if (activeAdminCount <= 1)
+        {
+            return Conflict("At least one application administrator must remain assigned.");
+        }
+
         _db.AppAdminAssignments.Remove(assignment);
         await _db.SaveChangesAsync(cancellationToken);
+        if (transaction != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
         return NoContent();
     }
 

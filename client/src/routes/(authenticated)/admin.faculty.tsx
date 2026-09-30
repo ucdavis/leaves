@@ -22,9 +22,6 @@ export const Route = createFileRoute('/(authenticated)/admin/faculty')({
       <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
         Loading faculty data
       </h2>
-      <p className="mt-2 text-sm text-[var(--admin-ink-muted)]">
-        Pulling the current faculty records from the database.
-      </p>
     </section>
   ),
 });

@@ -33,9 +33,6 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
         <h2 className="text-lg font-semibold text-primary">
           Loading role assignments
         </h2>
-        <p className="mt-2 text-sm text-base-content/70">
-          Pulling application admins from the database.
-        </p>
       </div>
     </section>
   ),
