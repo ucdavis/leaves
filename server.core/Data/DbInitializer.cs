@@ -1082,6 +1082,7 @@ public class DbInitializer : IDbInitializer
             Suffix = null,
             FullName = seed.DisplayName,
             Pronouns = null,
+            IsActiveInIam = true,
             IsEmployee = seed.IsEmployee,
             IsHsEmployee = false,
             IsFaculty = seed.IsFaculty,
@@ -1112,6 +1113,7 @@ public class DbInitializer : IDbInitializer
         if (person.EmployeeId == seededPerson.EmployeeId &&
             person.FullName == seededPerson.FullName &&
             person.Email == seededPerson.Email &&
+            person.IsActiveInIam == seededPerson.IsActiveInIam &&
             person.IsEmployee == seededPerson.IsEmployee &&
             person.IsFaculty == seededPerson.IsFaculty &&
             person.IsStaff == seededPerson.IsStaff &&
@@ -1123,6 +1125,7 @@ public class DbInitializer : IDbInitializer
         person.EmployeeId = seededPerson.EmployeeId;
         person.FullName = seededPerson.FullName;
         person.Email = seededPerson.Email;
+        person.IsActiveInIam = seededPerson.IsActiveInIam;
         person.IsEmployee = seededPerson.IsEmployee;
         person.IsFaculty = seededPerson.IsFaculty;
         person.IsStaff = seededPerson.IsStaff;

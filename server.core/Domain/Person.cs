@@ -17,6 +17,7 @@ public class Person
     public string? Suffix { get; set; }
     public string? FullName { get; set; }
     public string? Pronouns { get; set; }
+    public bool IsActiveInIam { get; set; } = true;
     public bool? IsEmployee { get; set; }
     public bool? IsHsEmployee { get; set; }
     public bool? IsFaculty { get; set; }
@@ -52,6 +53,7 @@ public class Person
         entity.Property(e => e.Suffix).HasColumnType("nvarchar(16)").HasMaxLength(16);
         entity.Property(e => e.FullName).HasColumnType("nvarchar(128)").HasMaxLength(128);
         entity.Property(e => e.Pronouns).HasColumnType("nvarchar(64)").HasMaxLength(64);
+        entity.Property(e => e.IsActiveInIam).HasColumnType("bit");
         entity.Property(e => e.IsEmployee).HasColumnType("bit");
         entity.Property(e => e.IsHsEmployee).HasColumnType("bit");
         entity.Property(e => e.IsFaculty).HasColumnType("bit");

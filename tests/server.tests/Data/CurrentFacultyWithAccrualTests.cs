@@ -20,6 +20,7 @@ public class CurrentFacultyWithAccrualTests
         entity.GetViewSchema().Should().Be("dbo");
         entity.FindProperty(nameof(CurrentFacultyWithAccrual.IamId))!.IsNullable.Should().BeFalse();
         entity.FindProperty(nameof(CurrentFacultyWithAccrual.IamId))!.GetColumnType().Should().Be("char(10)");
+        entity.FindProperty(nameof(CurrentFacultyWithAccrual.IsActiveInIam))!.IsNullable.Should().BeFalse();
         entity.FindProperty(nameof(CurrentFacultyWithAccrual.IsFaculty))!.IsNullable.Should().BeTrue();
         entity.FindProperty("HasCurrentAccrualRecord").Should().BeNull();
         entity.FindProperty(nameof(CurrentFacultyWithAccrual.LatestAsOfDate))!.IsNullable.Should().BeTrue();

@@ -10,6 +10,7 @@ public class CurrentFacultyWithAccrual
     public string? DisplayName { get; set; }
     public string? Email { get; set; }
     public DateOnly? LatestAsOfDate { get; set; }
+    public bool IsActiveInIam { get; set; }
     public bool? IsFaculty { get; set; }
     public string? HrStatus { get; set; }
     public string? EmployeeClassCode { get; set; }
