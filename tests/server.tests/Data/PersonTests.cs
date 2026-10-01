@@ -24,6 +24,8 @@ public class PersonTests
         entity.FindProperty(nameof(Person.Suffix))!.GetColumnType().Should().Be("nvarchar(16)");
         entity.FindProperty(nameof(Person.FullName))!.GetColumnType().Should().Be("nvarchar(128)");
         entity.FindProperty(nameof(Person.Pronouns))!.GetColumnType().Should().Be("nvarchar(64)");
+        entity.FindProperty(nameof(Person.IsActiveInIam))!.GetColumnType().Should().Be("bit");
+        entity.FindProperty("IsActive").Should().BeNull();
 
         db.Model.GetEntityTypes()
             .Should().NotContain(modelEntity => modelEntity.GetTableName() == "People_Staging");

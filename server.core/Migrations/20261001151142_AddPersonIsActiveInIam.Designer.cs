@@ -12,8 +12,8 @@ using Server.Core.Data;
 namespace server.core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260930202049_AddPersonIsActive")]
-    partial class AddPersonIsActive
+    [Migration("20261001151142_AddPersonIsActiveInIam")]
+    partial class AddPersonIsActiveInIam
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -289,6 +289,9 @@ namespace server.core.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("char(10)");
+
+                    b.Property<bool>("IsActiveInIam")
+                        .HasColumnType("bit");
 
                     b.Property<bool?>("IsFaculty")
                         .HasColumnType("bit");
@@ -1057,7 +1060,7 @@ namespace server.core.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<bool>("IsActive")
+                    b.Property<bool>("IsActiveInIam")
                         .HasColumnType("bit");
 
                     b.Property<string>("IsCampusEmployee")

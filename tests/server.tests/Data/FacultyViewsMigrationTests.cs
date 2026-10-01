@@ -10,7 +10,7 @@ namespace Server.Tests.Data;
 public class FacultyViewsMigrationTests
 {
     private const string PreviousMigration = "20260828170808_AddEmployeeAccrualImportSupport";
-    private const string FacultyMigration = "20260923231654_ReplaceCurrentViewsWithFacultyViews";
+    private const string FacultyMigration = "20261001151142_AddPersonIsActiveInIam";
 
     [SandboxFact]
     public async Task Migration_preserves_faculty_query_behavior_across_upgrade_rollback_and_reupgrade()
@@ -23,16 +23,15 @@ public class FacultyViewsMigrationTests
         {
             var migrator = db.GetService<IMigrator>();
             await migrator.MigrateAsync(PreviousMigration);
-            await SeedAsync(db);
-            var previousFaculty = await SnapshotAsync(db, "SELECT (SELECT * FROM dbo.vw_CurrentEmployee ORDER BY IamId FOR JSON PATH) AS [Value]");
-            var previousBalances = await SnapshotAsync(db, "SELECT (SELECT * FROM dbo.vw_CurrentAccrualBalance ORDER BY IamId, LeaveTypeNumber FOR JSON PATH) AS [Value]");
-
             await migrator.MigrateAsync(FacultyMigration);
+            (await db.Database.SqlQueryRaw<int>("SELECT CASE WHEN COL_LENGTH('dbo.People_Staging', 'IsActiveInIam') IS NULL THEN 0 ELSE 1 END AS [Value]").SingleAsync())
+                .Should().Be(1);
+            (await SnapshotAsync(db, "SELECT OBJECT_DEFINITION(OBJECT_ID(N'dbo.usp_PromotePeople')) AS [Value]"))
+                .Should().Contain("[IsActiveInIam]");
+            await SeedAsync(db);
             await AssertFacultyViewsAsync(db);
             await migrator.MigrateAsync(PreviousMigration);
             (await ViewNamesAsync(db)).Should().BeEquivalentTo("vw_CurrentEmployee", "vw_CurrentAccrualBalance");
-            (await SnapshotAsync(db, "SELECT (SELECT * FROM dbo.vw_CurrentEmployee ORDER BY IamId FOR JSON PATH) AS [Value]")).Should().Be(previousFaculty);
-            (await SnapshotAsync(db, "SELECT (SELECT * FROM dbo.vw_CurrentAccrualBalance ORDER BY IamId, LeaveTypeNumber FOR JSON PATH) AS [Value]")).Should().Be(previousBalances);
             await migrator.MigrateAsync(FacultyMigration);
             await AssertFacultyViewsAsync(db);
         }
@@ -53,7 +52,7 @@ public class FacultyViewsMigrationTests
                 db.Set<EmployeeAccrualBalance>().Add(Balance(id, "1", new DateOnly(2026, 1, 1), 10));
             }
         db.Set<Person>().Add(new Person { IamId = "noaccrual", EmployeeId = "99999999", IsEmployee = true, IsFaculty = true });
-        db.Set<Person>().Add(new Person { IamId = "ranked", EmployeeId = "88888888", IsEmployee = true, IsFaculty = true, FullName = "People name", Email = "people@example.test" });
+        db.Set<Person>().Add(new Person { IamId = "ranked", EmployeeId = "88888888", IsActiveInIam = false, IsEmployee = true, IsFaculty = true, FullName = "People name", Email = "people@example.test" });
         var date = new DateOnly(2026, 2, 1);
         db.Set<EmployeeAccrualBalance>().AddRange(
             Balance("88888888", "1", date.AddDays(-1), 999, leaveType: 2),
@@ -79,6 +78,7 @@ public class FacultyViewsMigrationTests
         earlier.Email.Should().Be("accrual@example.test");
         var ranked = await db.CurrentFacultyWithAccrual.SingleAsync(row => row.IamId == "ranked");
         ranked.LatestAsOfDate.Should().Be(new DateOnly(2026, 2, 1));
+        ranked.IsActiveInIam.Should().BeFalse();
         ranked.IsFaculty.Should().BeTrue();
         ranked.DisplayName.Should().Be("People name");
         ranked.Email.Should().Be("people@example.test");

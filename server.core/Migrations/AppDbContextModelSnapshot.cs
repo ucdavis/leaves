@@ -287,6 +287,9 @@ namespace server.core.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("char(10)");
 
+                    b.Property<bool>("IsActiveInIam")
+                        .HasColumnType("bit");
+
                     b.Property<bool?>("IsFaculty")
                         .HasColumnType("bit");
 
@@ -1054,7 +1057,7 @@ namespace server.core.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<bool>("IsActive")
+                    b.Property<bool>("IsActiveInIam")
                         .HasColumnType("bit");
 
                     b.Property<string>("IsCampusEmployee")
