@@ -190,22 +190,19 @@ function AdminUsersRoute() {
       header: 'Person',
     },
     {
-      accessorKey: 'targetName',
-      cell: ({ row }) => row.original.targetName ?? 'Application-wide',
-      header: 'Scope',
-    },
-    {
       accessorKey: 'active',
       cell: ({ row }) => (
-        <span
-          className={`badge border-0 px-3 py-3 text-xs font-semibold ${
-            row.original.active ? 'badge-success' : 'badge-neutral'
-          }`}
-        >
-          {row.original.active ? 'Active' : 'Inactive'}
-        </span>
+        <div className="flex justify-center">
+          <span
+            className={`badge border-0 px-3 py-3 text-xs font-semibold ${
+              row.original.active ? 'badge-success' : 'badge-neutral'
+            }`}
+          >
+            {row.original.active ? 'True' : 'False'}
+          </span>
+        </div>
       ),
-      header: 'Status',
+      header: () => <div className="text-center">Active assignment</div>,
     },
     {
       cell: ({ row }) => {
@@ -328,7 +325,7 @@ function AdminUsersRoute() {
               tableActions={
                 <label className="label cursor-pointer gap-3 rounded-lg border border-base-300 px-4 py-2">
                   <span className="label-text text-sm text-base-content">
-                    Show inactive
+                    Show Inactive Assignments
                   </span>
                   <input
                     checked={showInactiveAssignments}
@@ -340,6 +337,7 @@ function AdminUsersRoute() {
                   />
                 </label>
               }
+              tableClassName="table-fixed"
             />
           </div>
         </div>

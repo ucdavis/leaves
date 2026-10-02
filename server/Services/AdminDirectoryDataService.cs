@@ -55,6 +55,68 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<FacultyWithOverride>> LoadFacultyWithOverridesAsync(
+        CancellationToken cancellationToken)
+    {
+        var utcNow = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeBySystemTimeZoneId(utcNow, "Pacific Standard Time"));
+        var currentOverrides = _db.EmployeeReportingDepartmentOverrides
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(overrideRecord => overrideRecord.EffectiveStartDate <= today &&
+                                     (!overrideRecord.EffectiveEndDateExclusive.HasValue ||
+                                      today < overrideRecord.EffectiveEndDateExclusive.Value));
+        return await (
+                from overrideRecord in currentOverrides
+                join person in _db.People on overrideRecord.IamId equals person.IamId
+                join appUser in _db.AppUsers.AsNoTracking()
+                    on person.IamId equals appUser.IamId into appUsers
+                from appUser in appUsers.DefaultIfEmpty()
+                where person.IsEmployee == true &&
+                      person.IsFaculty == true &&
+                      !currentOverrides.Any(candidate =>
+                          candidate.IamId == overrideRecord.IamId &&
+                          (candidate.EffectiveStartDate > overrideRecord.EffectiveStartDate ||
+                           (candidate.EffectiveStartDate == overrideRecord.EffectiveStartDate &&
+                            candidate.Id > overrideRecord.Id)))
+                orderby person.FullName, person.IamId
+                select new FacultyWithOverride(
+                    person.IamId,
+                    person.EmployeeId,
+                    person.FullName,
+                    person.Email,
+                    person.IsActiveInIam,
+                    appUser == null ? null : appUser.IsActive,
+                    appUser == null ? null : appUser.DisplayName,
+                    overrideRecord.DepartmentCode,
+                    overrideRecord.EffectiveStartDate,
+                    overrideRecord.EffectiveEndDateExclusive))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<CurrentRoleAssignmentIds> LoadCurrentRoleAssignmentIdsAsync(
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentChairAssignments = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
+        var currentCaoAssignments = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
+        var adminIamIds = (await _db.AppAdminAssignments
+                .AsNoTracking()
+                .Select(assignment => assignment.IamId.Trim())
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return new CurrentRoleAssignmentIds(
+            AdminIamIds: adminIamIds,
+            ChairIamIds: currentChairAssignments.Values
+                .Select(assignment => assignment.IamId.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase),
+            CaoIamIds: currentCaoAssignments.Values
+                .Select(assignment => assignment.IamId.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+    }
+
     public async Task<IReadOnlyList<string>> SearchEmployeeIdsAsync(
         string? query,
         bool forCao,
@@ -301,6 +363,23 @@ public sealed record AdminRoleOptionsData(
     IReadOnlyList<Department> Departments);
 
 public sealed record CaoDirectoryEmployee(string IamId, string? DisplayName, string? Email, bool? IsFaculty);
+
+public sealed record FacultyWithOverride(
+    string IamId,
+    string? EmployeeId,
+    string? FullName,
+    string? Email,
+    bool IsActiveInIam,
+    bool? AppUserIsActive,
+    string? AppUserDisplayName,
+    string DepartmentCode,
+    DateOnly EffectiveStartDate,
+    DateOnly? EffectiveEndDateExclusive);
+
+public sealed record CurrentRoleAssignmentIds(
+    IReadOnlySet<string> AdminIamIds,
+    IReadOnlySet<string> ChairIamIds,
+    IReadOnlySet<string> CaoIamIds);
 
 public sealed record DirectoryEmployee(string IamId, string? DisplayName, string? Email);
 

@@ -111,7 +111,7 @@ export function ClusterSettingsModal({
               </div>
             ) : null}
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <button
                 className={`btn btn-outline border-rose-300 text-rose-800 hover:border-rose-400 hover:bg-rose-100 ${statusTextColors.danger}`}
                 disabled={isDeleting}
@@ -120,14 +120,20 @@ export function ClusterSettingsModal({
               >
                 Deactivate cluster
               </button>
-              <button className="btn btn-ghost" onClick={onClose} type="button">
-                Cancel
-              </button>
-              <settingsForm.SubscribeButton
-                className="btn btn-primary"
-                label="Save changes"
-                loadingLabel="Saving..."
-              />
+              <div className="flex items-center gap-3">
+                <button
+                  className="btn btn-ghost"
+                  onClick={onClose}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <settingsForm.SubscribeButton
+                  className="btn btn-primary"
+                  label="Save changes"
+                  loadingLabel="Saving..."
+                />
+              </div>
             </div>
           </settingsForm.AppForm>
         </form>

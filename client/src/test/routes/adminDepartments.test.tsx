@@ -32,6 +32,7 @@ const facultyUser = (id: string, role: AdminUser['role']): AdminUser => ({
   hasAppUser: false,
   iamId: id,
   id,
+  isActiveInIam: true,
   name: `Faculty ${role}`,
   position: 'Professor',
   role,
