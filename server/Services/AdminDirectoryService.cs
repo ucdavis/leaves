@@ -43,6 +43,41 @@ public sealed class AdminDirectoryService
         return BuildFacultyResponse(directoryData);
     }
 
+    public async Task<IReadOnlyList<FacultyWithOverrideResponse>> GetFacultyWithOverridesAsync(
+        CancellationToken cancellationToken)
+    {
+        var employees = await _directoryDataService.LoadFacultyWithOverridesAsync(cancellationToken);
+        var roleAssignments = await _directoryDataService.LoadCurrentRoleAssignmentIdsAsync(cancellationToken);
+
+        return employees.Select(employee =>
+            {
+                var iamId = employee.IamId.Trim();
+                var lookupIamId = NormalizeKey(iamId);
+                var role = GetRole(
+                    roleAssignments.AdminIamIds.Contains(lookupIamId),
+                    roleAssignments.ChairIamIds.Contains(lookupIamId),
+                    roleAssignments.CaoIamIds.Contains(lookupIamId));
+
+                return new FacultyWithOverrideResponse(
+                    Id: iamId,
+                    Active: employee.AppUserIsActive ?? true,
+                    DepartmentId: NullIfWhiteSpace(employee.DepartmentCode),
+                    DepartmentOverrideEndDate: employee.EffectiveEndDateExclusive?.ToString("yyyy-MM-dd"),
+                    DepartmentOverrideId: NullIfWhiteSpace(employee.DepartmentCode),
+                    DepartmentOverrideStartDate: employee.EffectiveStartDate.ToString("yyyy-MM-dd"),
+                    Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                    EmployeeId: NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
+                    HasAppUser: employee.AppUserIsActive.HasValue,
+                    IamId: iamId,
+                    IsActiveInIam: employee.IsActiveInIam,
+                    Name: NullIfWhiteSpace(employee.FullName) ??
+                          NullIfWhiteSpace(employee.AppUserDisplayName) ?? iamId,
+                    Position: string.Empty,
+                    Role: role);
+            })
+            .ToList();
+    }
+
     internal static AdminFacultyResponse BuildFacultyResponse(AdminDirectoryData directoryData)
     {
         return new AdminFacultyResponse(
@@ -165,6 +200,7 @@ public sealed class AdminDirectoryService
                     EmployeeId: NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
                     HasAppUser: appUser != null,
                     IamId: iamId,
+                    IsActiveInIam: employee.IsActiveInIam,
                     Name: NullIfWhiteSpace(employee.DisplayName) ?? NullIfWhiteSpace(appUser?.DisplayName) ?? iamId,
                     Position: NullIfWhiteSpace(employee.JobCodeDescription) ?? string.Empty,
                     Role: role);
@@ -255,6 +291,22 @@ public sealed record AdminFacultyResponse(
     IReadOnlyList<AdminDepartmentResponse> Departments,
     IReadOnlyList<AdminUserResponse> FacultyUsers);
 
+public sealed record FacultyWithOverrideResponse(
+    string Id,
+    bool Active,
+    string? DepartmentId,
+    string? DepartmentOverrideEndDate,
+    string? DepartmentOverrideId,
+    string? DepartmentOverrideStartDate,
+    string Email,
+    string EmployeeId,
+    bool HasAppUser,
+    string IamId,
+    bool IsActiveInIam,
+    string Name,
+    string Position,
+    string Role);
+
 public sealed record AdminClusterResponse(string? CaoUserId, string Id, string Name);
 
 public sealed record AdminDepartmentResponse(
@@ -280,6 +332,7 @@ public sealed record AdminUserResponse(
     string EmployeeId,
     bool HasAppUser,
     string IamId,
+    bool IsActiveInIam,
     string Name,
     string Position,
     string Role);

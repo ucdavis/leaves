@@ -41,6 +41,12 @@ public sealed class AdminController : ApiControllerBase
         return Ok(await _adminDirectoryService.GetFacultyAsync(cancellationToken));
     }
 
+    [HttpGet("faculty/with-overrides")]
+    public async Task<IActionResult> GetFacultyWithOverrides(CancellationToken cancellationToken)
+    {
+        return Ok(await _adminDirectoryService.GetFacultyWithOverridesAsync(cancellationToken));
+    }
+
     [HttpPost("users")]
     public async Task<IActionResult> UpdateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {

@@ -32,6 +32,72 @@ public class AdminDirectoryServiceTests
     }
 
     [Fact]
+    public async Task Faculty_with_current_overrides_are_loaded_from_people_not_accruals()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        db.Set<Person>().AddRange(
+            new Person { IamId = "included", IsEmployee = true, IsFaculty = true, IsActiveInIam = false, FullName = "Included" },
+            new Person { IamId = "activeiam", IsEmployee = true, IsFaculty = true, IsActiveInIam = true },
+            new Person { IamId = "staff", IsEmployee = true, IsFaculty = false, IsActiveInIam = false },
+            new Person { IamId = "notemployee", IsEmployee = false, IsFaculty = true, IsActiveInIam = false },
+            new Person { IamId = "expired", IsEmployee = true, IsFaculty = true, IsActiveInIam = false });
+        db.EmployeeReportingDepartmentOverrides.AddRange(
+            new EmployeeReportingDepartmentOverride { Id = 1, IamId = "included", DepartmentCode = "DEPT", EffectiveStartDate = today.AddDays(-2), CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 2, IamId = "included", DepartmentCode = "NEWDEPT", EffectiveStartDate = today.AddDays(-1), CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 3, IamId = "activeiam", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 4, IamId = "staff", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 5, IamId = "notemployee", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 6, IamId = "expired", DepartmentCode = "DEPT", EffectiveStartDate = today.AddDays(-2), EffectiveEndDateExclusive = today, CreatedByAppUserId = 1 });
+        await db.SaveChangesAsync();
+
+        var results = await new AdminDirectoryDataService(db)
+            .LoadFacultyWithOverridesAsync(default);
+
+        results.Select(result => result.IamId).Should().BeEquivalentTo("included", "activeiam");
+        results.Single(result => result.IamId == "included").DepartmentCode.Should().Be("NEWDEPT");
+        results.Single(result => result.IamId == "included").IsActiveInIam.Should().BeFalse();
+        results.Single(result => result.IamId == "activeiam").IsActiveInIam.Should().BeTrue();
+        db.EmployeeAccrualBalances.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Faculty_with_overrides_preserve_current_chair_role()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        db.Set<Person>().Add(new Person
+        {
+            IamId = "testchair",
+            IsEmployee = true,
+            IsFaculty = true,
+            IsActiveInIam = false,
+        });
+        db.Departments.Add(new Department { DepartmentCode = "DEPT", DepartmentName = "Department" });
+        db.EmployeeReportingDepartmentOverrides.Add(new EmployeeReportingDepartmentOverride
+        {
+            IamId = "testchair",
+            DepartmentCode = "DEPT",
+            EffectiveStartDate = today,
+            CreatedByAppUserId = 1,
+        });
+        db.DepartmentChairAssignments.Add(new DepartmentChairAssignment
+        {
+            DepartmentCode = "DEPT",
+            IamId = "testchair",
+            EffectiveStartDate = today,
+            CreatedByAppUserId = 1,
+        });
+        await db.SaveChangesAsync();
+
+        var results = await new AdminDirectoryService(new AdminDirectoryDataService(db))
+            .GetFacultyWithOverridesAsync(default);
+
+        results.Should().ContainSingle();
+        results.Single().Role.Should().Be("chair");
+    }
+
+    [Fact]
     public void Faculty_and_department_rosters_include_faculty_admins_and_Caos()
     {
         var data = CreateData();
@@ -42,6 +108,8 @@ public class AdminDirectoryServiceTests
         departments.FacultyUsers.Should().BeEquivalentTo(faculty.FacultyUsers);
         faculty.FacultyUsers.Single(user => user.Id == "admin").Role.Should().Be("admin");
         faculty.FacultyUsers.Single(user => user.Id == "cao").Role.Should().Be("cao");
+        faculty.FacultyUsers.Single(user => user.Id == "faculty").IsActiveInIam.Should().BeFalse();
+        faculty.FacultyUsers.Where(user => user.Id != "faculty").Should().OnlyContain(user => user.IsActiveInIam);
         faculty.FacultyUsers.Should().OnlyContain(user => user.DepartmentId == "DEPT");
         departments.Clusters.Single(cluster => cluster.Id == "2").CaoUserId.Should().Be("staffcao");
         departments.CaoUsers.Single(user => user.Id == "staffcao").Name.Should().Be("Staff CAO");
@@ -86,6 +154,7 @@ public class AdminDirectoryServiceTests
         {
             IamId = iam,
             DisplayName = $"Faculty {iam}",
+            IsActiveInIam = iam != "faculty",
             ResolvedReportingDepartmentCode = "DEPT",
             IsFaculty = true,
         }).ToList(),

@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { HttpError } from '@/lib/api.ts';
-import { adminFacultyQueryOptions } from '@/queries/adminFaculty.ts';
+import {
+  adminFacultyQueryOptions,
+  facultyWithOverridesQueryOptions,
+} from '@/queries/adminFaculty.ts';
 import { AdminUserModal } from '@/shared/admin/AdminUserModal.tsx';
 import type { AdminUser } from '@/shared/admin/adminData.ts';
 import {
@@ -54,13 +58,23 @@ function AdminPeopleRouteContent() {
     nextActive: boolean;
     userId: string;
   } | null>(null);
+  const [showFacultyWithOverrides, setShowFacultyWithOverrides] =
+    useState(false);
   const [showExcluded, setShowExcluded] = useState(false);
+  const { data: facultyWithOverrides = [] } = useQuery({
+    ...facultyWithOverridesQueryOptions(),
+    enabled: showFacultyWithOverrides,
+  });
 
   const departmentNames = Object.fromEntries(
     departments.map((department) => [department.id, department.name])
   );
 
-  const rows: UserRow[] = facultyUsers
+  const displayedFacultyUsers = showFacultyWithOverrides
+    ? facultyWithOverrides
+    : facultyUsers;
+
+  const rows: UserRow[] = displayedFacultyUsers
     .filter((user) => {
       const effectiveActive =
         pendingExcludeChange?.userId === user.id
@@ -69,7 +83,9 @@ function AdminPeopleRouteContent() {
       const isPendingExcluded =
         pendingExcludeChange?.userId === user.id && effectiveActive === false;
 
-      return showExcluded ? true : effectiveActive || isPendingExcluded;
+      return showFacultyWithOverrides || showExcluded
+        ? true
+        : effectiveActive || isPendingExcluded;
     })
     .filter((user) =>
       filterDepartmentId ? user.departmentId === filterDepartmentId : true
@@ -125,6 +141,16 @@ function AdminPeopleRouteContent() {
         </span>
       ),
       header: 'Role',
+    },
+    {
+      accessorKey: 'isActiveInIam',
+      cell: ({ row }) =>
+        row.original.isActiveInIam ? (
+          <span className={statusTextColors.success}>Active</span>
+        ) : (
+          <span className={statusTextColors.danger}>Inactive</span>
+        ),
+      header: 'Active',
     },
     {
       cell: ({ row }) => (
@@ -199,7 +225,8 @@ function AdminPeopleRouteContent() {
   const editingUser =
     editingUserId === null
       ? null
-      : (facultyUsers.find((user) => user.id === editingUserId) ?? null);
+      : (displayedFacultyUsers.find((user) => user.id === editingUserId) ??
+        null);
 
   return (
     <div className="space-y-6">
@@ -239,6 +266,20 @@ function AdminPeopleRouteContent() {
                     </option>
                   ))}
                 </select>
+
+                <label className="label w-full cursor-pointer gap-3 rounded-xl border border-base-300 px-4 py-2 sm:w-auto sm:flex-none">
+                  <span className="label-text text-sm text-base-content">
+                    Show Active Department Overrides
+                  </span>
+                  <input
+                    checked={showFacultyWithOverrides}
+                    className="toggle toggle-sm"
+                    onChange={(event) =>
+                      setShowFacultyWithOverrides(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                </label>
 
                 <label className="label w-full cursor-pointer gap-3 rounded-xl border border-base-300 px-4 py-2 sm:w-auto sm:flex-none">
                   <span className="label-text text-sm text-base-content">

@@ -217,7 +217,7 @@ function AdminDepartmentsRoute() {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
-                      <th>IAM ID</th>
+                      <th>Active</th>
                       <th>Department chair</th>
                     </tr>
                   </thead>
@@ -237,7 +237,17 @@ function AdminDepartmentsRoute() {
                           )}
                         </td>
                         <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
-                        <td className="font-mono text-xs">{user.iamId}</td>
+                        <td>
+                          {user.isActiveInIam ? (
+                            <span className={statusTextColors.success}>
+                              Active
+                            </span>
+                          ) : (
+                            <span className={statusTextColors.danger}>
+                              Inactive
+                            </span>
+                          )}
+                        </td>
                         <td>
                           {selectedDepartment.chairUserId === user.id ? (
                             <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
@@ -278,7 +288,7 @@ function AdminDepartmentsRoute() {
                       <tr>
                         <td
                           className="py-6 text-sm text-base-content/70"
-                          colSpan={5}
+                          colSpan={6}
                         >
                           There are currently no faculty members assigned to
                           this department.

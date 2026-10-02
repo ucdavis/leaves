@@ -8,11 +8,15 @@ import type {
   UpdateUserInput,
 } from '@/shared/admin/adminData.ts';
 
-type AdminFacultyUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
+type AdminFacultyUserResponse = Omit<
+  AdminUser,
+  'departmentId' | 'designation' | 'role'
+> & {
   departmentId: string | null;
   departmentOverrideEndDate?: string | null;
   departmentOverrideId?: string | null;
   departmentOverrideStartDate?: string | null;
+  designation?: string;
   role: AdminRole;
 };
 
@@ -48,6 +52,20 @@ function normalizeDesignation(designation: string): AdminUser['designation'] {
   return 'fy';
 }
 
+function normalizeFacultyUsers(
+  users: AdminFacultyUserResponse[]
+): AdminUser[] {
+  return users.map((user) => ({
+    ...user,
+    departmentId: user.departmentId ?? '',
+    departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
+    departmentOverrideId: user.departmentOverrideId ?? '',
+    departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
+    designation: normalizeDesignation(user.designation ?? ''),
+    role: user.role,
+  }));
+}
+
 function normalizeFacultyData(
   response: AdminFacultyResponse
 ): AdminFacultyPageData {
@@ -62,15 +80,7 @@ function normalizeFacultyData(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    facultyUsers: response.facultyUsers.map((user) => ({
-      ...user,
-      departmentId: user.departmentId ?? '',
-      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
-      departmentOverrideId: user.departmentOverrideId ?? '',
-      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      designation: normalizeDesignation(user.designation),
-      role: user.role,
-    })),
+    facultyUsers: normalizeFacultyUsers(response.facultyUsers),
   };
 }
 
@@ -90,6 +100,20 @@ export const adminFacultyQueryOptions = () =>
       return normalizeFacultyData(response);
     },
     queryKey: ['admin', 'faculty'] as const,
+  });
+
+export const facultyWithOverridesQueryOptions = () =>
+  queryOptions({
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<AdminUser[]> => {
+      const response = await fetchJson<AdminFacultyUserResponse[]>(
+        '/api/admin/faculty/with-overrides',
+        {},
+        signal
+      );
+
+      return normalizeFacultyUsers(response);
+    },
+    queryKey: ['admin', 'faculty', 'with-overrides'] as const,
   });
 
 export async function updateAdminFacultyUser({

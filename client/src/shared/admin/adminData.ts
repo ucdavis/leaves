@@ -15,6 +15,7 @@ export type AdminUser = {
   hasAppUser: boolean;
   iamId: string;
   id: string;
+  isActiveInIam: boolean;
   name: string;
   position: string;
   role: AdminRole;
