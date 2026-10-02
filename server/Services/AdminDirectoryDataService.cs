@@ -58,7 +58,9 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
     public async Task<IReadOnlyList<FacultyWithOverride>> LoadFacultyWithOverridesAsync(
         CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var utcNow = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeBySystemTimeZoneId(utcNow, "Pacific Standard Time"));
         var currentOverrides = _db.EmployeeReportingDepartmentOverrides
             .IgnoreQueryFilters()
             .AsNoTracking()
