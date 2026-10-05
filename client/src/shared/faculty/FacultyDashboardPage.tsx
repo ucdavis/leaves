@@ -63,7 +63,7 @@ export function FacultyDashboardPage({
               onShowInCalendar={(request) =>
                 void navigate({
                   search: { calendarDate: request.startDate },
-                  to: '/',
+                  to: '/dashboard',
                 })
               }
               requests={recentRequests}

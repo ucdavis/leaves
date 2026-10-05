@@ -13,6 +13,7 @@ import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)
 import { Route as authenticatedIndexRouteImport } from './routes/(authenticated)/index'
 import { Route as authenticatedTeamCalendarRouteImport } from './routes/(authenticated)/team-calendar'
 import { Route as authenticatedHistoryRouteImport } from './routes/(authenticated)/history'
+import { Route as authenticatedDashboardRouteImport } from './routes/(authenticated)/dashboard'
 import { Route as authenticatedApprovalsRouteImport } from './routes/(authenticated)/approvals'
 import { Route as authenticatedAdminRouteImport } from './routes/(authenticated)/admin'
 import { Route as authenticatedAccessDeniedRouteImport } from './routes/(authenticated)/access-denied'
@@ -41,6 +42,11 @@ const authenticatedTeamCalendarRoute =
 const authenticatedHistoryRoute = authenticatedHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => authenticatedRouteRoute,
+} as any)
+const authenticatedDashboardRoute = authenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => authenticatedRouteRoute,
 } as any)
 const authenticatedApprovalsRoute = authenticatedApprovalsRouteImport.update({
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/access-denied': typeof authenticatedAccessDeniedRoute
   '/admin': typeof authenticatedAdminRouteWithChildren
   '/approvals': typeof authenticatedApprovalsRoute
+  '/dashboard': typeof authenticatedDashboardRoute
   '/history': typeof authenticatedHistoryRoute
   '/team-calendar': typeof authenticatedTeamCalendarRoute
   '/': typeof authenticatedIndexRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/access-denied': typeof authenticatedAccessDeniedRoute
   '/approvals': typeof authenticatedApprovalsRoute
+  '/dashboard': typeof authenticatedDashboardRoute
   '/history': typeof authenticatedHistoryRoute
   '/team-calendar': typeof authenticatedTeamCalendarRoute
   '/': typeof authenticatedIndexRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/(authenticated)/access-denied': typeof authenticatedAccessDeniedRoute
   '/(authenticated)/admin': typeof authenticatedAdminRouteWithChildren
   '/(authenticated)/approvals': typeof authenticatedApprovalsRoute
+  '/(authenticated)/dashboard': typeof authenticatedDashboardRoute
   '/(authenticated)/history': typeof authenticatedHistoryRoute
   '/(authenticated)/team-calendar': typeof authenticatedTeamCalendarRoute
   '/(authenticated)/': typeof authenticatedIndexRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/access-denied'
     | '/admin'
     | '/approvals'
+    | '/dashboard'
     | '/history'
     | '/team-calendar'
     | '/'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
   to:
     | '/access-denied'
     | '/approvals'
+    | '/dashboard'
     | '/history'
     | '/team-calendar'
     | '/'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/(authenticated)/access-denied'
     | '/(authenticated)/admin'
     | '/(authenticated)/approvals'
+    | '/(authenticated)/dashboard'
     | '/(authenticated)/history'
     | '/(authenticated)/team-calendar'
     | '/(authenticated)/'
@@ -215,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof authenticatedHistoryRouteImport
+      parentRoute: typeof authenticatedRouteRoute
+    }
+    '/(authenticated)/dashboard': {
+      id: '/(authenticated)/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof authenticatedDashboardRouteImport
       parentRoute: typeof authenticatedRouteRoute
     }
     '/(authenticated)/approvals': {
@@ -306,6 +325,7 @@ interface authenticatedRouteRouteChildren {
   authenticatedAccessDeniedRoute: typeof authenticatedAccessDeniedRoute
   authenticatedAdminRoute: typeof authenticatedAdminRouteWithChildren
   authenticatedApprovalsRoute: typeof authenticatedApprovalsRoute
+  authenticatedDashboardRoute: typeof authenticatedDashboardRoute
   authenticatedHistoryRoute: typeof authenticatedHistoryRoute
   authenticatedTeamCalendarRoute: typeof authenticatedTeamCalendarRoute
   authenticatedIndexRoute: typeof authenticatedIndexRoute
@@ -316,6 +336,7 @@ const authenticatedRouteRouteChildren: authenticatedRouteRouteChildren = {
   authenticatedAccessDeniedRoute: authenticatedAccessDeniedRoute,
   authenticatedAdminRoute: authenticatedAdminRouteWithChildren,
   authenticatedApprovalsRoute: authenticatedApprovalsRoute,
+  authenticatedDashboardRoute: authenticatedDashboardRoute,
   authenticatedHistoryRoute: authenticatedHistoryRoute,
   authenticatedTeamCalendarRoute: authenticatedTeamCalendarRoute,
   authenticatedIndexRoute: authenticatedIndexRoute,
