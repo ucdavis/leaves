@@ -37,23 +37,22 @@ export const AuthenticatedShell = ({
   const calendarLabel = hasCaoRole(user.roles)
     ? 'CAO Calendar'
     : 'Team Calendar';
-  const items = isAdmin
-    ? [{ label: 'Admin', to: '/admin' as const }]
-    : [
-        ...(canAccessFacultyWorkspace(user.roles)
-          ? [
-              { label: 'Dashboard', to: '/' as const },
-              { label: 'History', to: '/history' as const },
-            ]
-          : []),
-        ...(canApproveLeave
-          ? [
-              { label: calendarLabel, to: '/team-calendar' as const },
-              { label: 'Approvals', to: '/approvals' as const },
-            ]
-          : []),
-      ];
-  const showSecondaryNav = !pathname.startsWith('/admin');
+  const items = [
+    ...(canAccessFacultyWorkspace(user.roles)
+      ? [
+          { label: 'Dashboard', to: '/dashboard' as const },
+          { label: 'History', to: '/history' as const },
+        ]
+      : []),
+    ...(canApproveLeave
+      ? [
+          { label: calendarLabel, to: '/team-calendar' as const },
+          { label: 'Approvals', to: '/approvals' as const },
+        ]
+      : []),
+    ...(isAdmin ? [{ label: 'Admin', to: '/admin' as const }] : []),
+  ];
+  const showSecondaryNav = !pathname.startsWith('/admin') || items.length > 1;
   const initials = user.name
     .split(' ')
     .filter(Boolean)

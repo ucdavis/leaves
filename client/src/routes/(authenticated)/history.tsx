@@ -145,7 +145,7 @@ function HistoryContent({
           onShowInCalendar={(request) =>
             void navigate({
               search: { calendarDate: request.startDate },
-              to: '/',
+              to: '/dashboard',
             })
           }
           requests={requests}
