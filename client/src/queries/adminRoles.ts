@@ -8,6 +8,7 @@ export type AdminRoleAssignment = {
   effectiveEndDate: string | null;
   effectiveStartDate: string | null;
   email: string;
+  employeeId: string;
   iamId: string;
   id: string;
   name: string;
@@ -27,6 +28,7 @@ export type AdminRoleUserOption = {
   departmentName: string | null;
   departmentOptions: AdminRoleOption[];
   email: string;
+  employeeId: string;
   iamId: string;
   name: string;
 };

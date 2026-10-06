@@ -73,6 +73,7 @@ test('admin picker searches on demand and retains the selected identity across a
           departmentName: null,
           departmentOptions: [],
           email: 'split@example.test',
+          employeeId: '12345678',
           iamId: 'split00001',
           name: 'Split Appointment',
         },
@@ -90,11 +91,11 @@ test('admin picker searches on demand and retains the selected identity across a
     fireEvent.change(input, { target: { value: 's' } });
   });
   expect(queries).toEqual([]);
-  fireEvent.change(input, { target: { value: 'split00001' } });
+  fireEvent.change(input, { target: { value: '12345678' } });
   fireEvent.click(
     await screen.findByRole('option', { name: /Split Appointment/ })
   );
-  expect(queries).toEqual(['split00001']);
+  expect(queries).toEqual(['12345678']);
   await act(async () => {
     await queryClient.invalidateQueries({
       queryKey: adminRolesQueryOptions().queryKey,

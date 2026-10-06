@@ -99,16 +99,9 @@ function AdminPeopleRouteContent() {
     {
       accessorKey: 'name',
       cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-base-content">
-            {row.original.name}
-          </div>
-          <div className="text-xs text-base-content/70">
-            {row.original.role === 'admin'
-              ? 'Application administrator'
-              : 'Person'}
-          </div>
-        </div>
+        <span className="font-semibold text-base-content">
+          {row.original.name}
+        </span>
       ),
       header: 'Name',
     },
@@ -233,7 +226,7 @@ function AdminPeopleRouteContent() {
           <DataTable
             columns={columns}
             data={rows}
-            filterPlaceholder="Search name, email, IAM ID, or department..."
+            filterPlaceholder="Search name, email, employee ID, or department..."
             globalFilter="left"
             initialState={{
               pagination: {
