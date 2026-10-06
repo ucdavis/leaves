@@ -113,7 +113,7 @@ function AdminUsersRoute() {
   const selectedUserName = selectedUser?.name ?? iamId;
   const currentUserIamId = currentUser.iamId?.trim().toLowerCase();
   const assignmentRows = data.assignments.filter(
-    (assignment) => assignment.type === 'admin' && assignment.active
+    (assignment) => assignment.type === 'admin'
   );
   const activeAdminAssignments = data.assignments.filter(
     (assignment) => assignment.type === 'admin' && assignment.active
@@ -195,26 +195,10 @@ function AdminUsersRoute() {
       header: 'Emp ID',
     },
     {
-      accessorKey: 'active',
-      cell: ({ row }) => (
-        <div className="flex justify-center">
-          <span
-            className={`badge border-0 px-3 py-3 text-xs font-semibold ${
-              row.original.active ? 'badge-success' : 'badge-neutral'
-            }`}
-          >
-            {row.original.active ? 'True' : 'False'}
-          </span>
-        </div>
-      ),
-      header: () => <div className="text-center">Active assignment</div>,
-    },
-    {
       cell: ({ row }) => {
         const isLastActiveAdmin =
           row.original.active && activeAdminAssignments.length === 1;
-        const isRemovalDisabled =
-          removeMutation.isPending || !row.original.active || isLastActiveAdmin;
+        const isRemovalDisabled = removeMutation.isPending || isLastActiveAdmin;
         const removeButton = (
           <button
             className={`btn btn-ghost btn-sm ${

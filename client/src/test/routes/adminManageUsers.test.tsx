@@ -157,6 +157,48 @@ test('prevents removal of the final active application admin', async () => {
   );
 });
 
+test('shows inactive application admins so they can be removed', async () => {
+  server.use(
+    http.get('/api/admin/roles', () =>
+      HttpResponse.json({
+        assignments: [
+          {
+            active: false,
+            effectiveEndDate: null,
+            effectiveStartDate: null,
+            email: 'former@example.test',
+            employeeId: '12345678',
+            iamId: 'former0001',
+            id: '1',
+            name: 'Former Admin',
+            targetId: null,
+            targetName: null,
+            type: 'admin',
+          },
+        ],
+        clusters: [],
+        departments: [],
+        users: [],
+      })
+    ),
+    http.get('/api/user/me', () =>
+      HttpResponse.json({
+        email: 'admin@example.test',
+        iamId: 'admin00001',
+        id: 'admin-id',
+        isEmulating: false,
+        name: 'Admin User',
+        roles: ['Admin'],
+      })
+    )
+  );
+
+  renderRoute();
+
+  expect(await screen.findByText('Former Admin')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled();
+});
+
 test('warns an administrator before removing their own admin access', async () => {
   server.use(
     http.get('/api/admin/roles', () =>
