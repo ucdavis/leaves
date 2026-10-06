@@ -99,16 +99,9 @@ function AdminPeopleRouteContent() {
     {
       accessorKey: 'name',
       cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-base-content">
-            {row.original.name}
-          </div>
-          <div className="text-xs text-base-content/70">
-            {row.original.role === 'admin'
-              ? 'Application administrator'
-              : 'Person'}
-          </div>
-        </div>
+        <span className="font-semibold text-base-content">
+          {row.original.name}
+        </span>
       ),
       header: 'Name',
     },
@@ -141,16 +134,6 @@ function AdminPeopleRouteContent() {
         </span>
       ),
       header: 'Role',
-    },
-    {
-      accessorKey: 'isActiveInIam',
-      cell: ({ row }) =>
-        row.original.isActiveInIam ? (
-          <span className={statusTextColors.success}>Active</span>
-        ) : (
-          <span className={statusTextColors.danger}>Inactive</span>
-        ),
-      header: 'Active',
     },
     {
       cell: ({ row }) => (
@@ -243,7 +226,7 @@ function AdminPeopleRouteContent() {
           <DataTable
             columns={columns}
             data={rows}
-            filterPlaceholder="Search name, email, IAM ID, or department..."
+            filterPlaceholder="Search name, email, employee ID, or department..."
             globalFilter="left"
             initialState={{
               pagination: {
@@ -269,7 +252,7 @@ function AdminPeopleRouteContent() {
 
                 <label className="label w-full cursor-pointer gap-3 rounded-xl border border-base-300 px-4 py-2 sm:w-auto sm:flex-none">
                   <span className="label-text text-sm text-base-content">
-                    Show Active Department Overrides
+                    Show Current Department Overrides
                   </span>
                   <input
                     checked={showFacultyWithOverrides}

@@ -69,24 +69,24 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                                       today < overrideRecord.EffectiveEndDateExclusive.Value));
         return await (
                 from overrideRecord in currentOverrides
-                join person in _db.People on overrideRecord.IamId equals person.IamId
+                join person in _db.People.AsNoTracking()
+                    on overrideRecord.IamId equals person.IamId into people
+                from person in people.DefaultIfEmpty()
                 join appUser in _db.AppUsers.AsNoTracking()
-                    on person.IamId equals appUser.IamId into appUsers
+                    on overrideRecord.IamId equals appUser.IamId into appUsers
                 from appUser in appUsers.DefaultIfEmpty()
-                where person.IsEmployee == true &&
-                      person.IsFaculty == true &&
-                      !currentOverrides.Any(candidate =>
+                where !currentOverrides.Any(candidate =>
                           candidate.IamId == overrideRecord.IamId &&
                           (candidate.EffectiveStartDate > overrideRecord.EffectiveStartDate ||
                            (candidate.EffectiveStartDate == overrideRecord.EffectiveStartDate &&
                             candidate.Id > overrideRecord.Id)))
-                orderby person.FullName, person.IamId
+                orderby person.FullName, overrideRecord.IamId
                 select new FacultyWithOverride(
-                    person.IamId,
+                    overrideRecord.IamId,
                     person.EmployeeId,
                     person.FullName,
                     person.Email,
-                    person.IsActiveInIam,
+                    person != null && person.IsActiveInIam,
                     appUser == null ? null : appUser.IsActive,
                     appUser == null ? null : appUser.DisplayName,
                     overrideRecord.DepartmentCode,
@@ -129,7 +129,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
         }
 
         var people = _db.People.Where(person => person.IsEmployee == true &&
-            (person.IamId.StartsWith(term) ||
+            ((person.EmployeeId != null && person.EmployeeId.StartsWith(term)) ||
              (person.FullName != null && person.FullName.Contains(term)) ||
              (person.Email != null && person.Email.Contains(term))) &&
             !_db.AppAdminAssignments.Any(assignment => assignment.IamId == person.IamId));
@@ -149,10 +149,10 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
 
         // Filter and cap in SQL before materializing any directory entries.
         return await people
-            .OrderBy(person => person.IamId == term ? 0 : 1)
+            .OrderBy(person => person.EmployeeId == term ? 0 : 1)
             .ThenBy(person => person.FullName)
             .ThenBy(person => person.IamId)
-            .Select(person => person.IamId)
+                .Select(person => person.IamId)
             .Take(20)
             .ToListAsync(cancellationToken);
     }
@@ -188,7 +188,11 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 .Where(person => person.IsEmployee == true && ids.Contains(person.IamId))
                 .OrderBy(person => person.FullName)
                 .ThenBy(person => person.IamId)
-                .Select(person => new DirectoryEmployee(person.IamId, person.FullName, person.Email))
+                .Select(person => new DirectoryEmployee(
+                    person.IamId,
+                    person.FullName,
+                    person.Email,
+                    person.EmployeeId))
                 .ToListAsync(cancellationToken),
             CurrentFaculty: await _db.CurrentFacultyWithAccrual
                 .Where(employee => ids.Contains(employee.IamId))
@@ -381,7 +385,11 @@ public sealed record CurrentRoleAssignmentIds(
     IReadOnlySet<string> ChairIamIds,
     IReadOnlySet<string> CaoIamIds);
 
-public sealed record DirectoryEmployee(string IamId, string? DisplayName, string? Email);
+public sealed record DirectoryEmployee(
+    string IamId,
+    string? DisplayName,
+    string? Email,
+    string? EmployeeId = null);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,

@@ -236,6 +236,7 @@ public sealed class AdminRolesService
                     DepartmentName: departmentName,
                     DepartmentOptions: departmentOptions,
                     Email: NullIfWhiteSpace(employee.Email) ?? string.Empty,
+                    EmployeeId: NullIfWhiteSpace(employee.EmployeeId) ?? string.Empty,
                     IamId: iamId,
                     Name: NullIfWhiteSpace(employee.DisplayName) ?? iamId);
             })
@@ -264,6 +265,7 @@ public sealed class AdminRolesService
             EffectiveEndDate: effectiveEndDate,
             EffectiveStartDate: effectiveStartDate,
             Email: NullIfWhiteSpace(employee?.Email) ?? string.Empty,
+            EmployeeId: NullIfWhiteSpace(employee?.EmployeeId) ?? string.Empty,
             Id: id,
             IamId: trimmedIamId,
             Name: NullIfWhiteSpace(employee?.DisplayName) ?? trimmedIamId,
@@ -352,6 +354,7 @@ public sealed record AdminRoleAssignmentResponse(
     string? EffectiveEndDate,
     string? EffectiveStartDate,
     string Email,
+    string EmployeeId,
     string Id,
     string IamId,
     string Name,
@@ -366,5 +369,6 @@ public sealed record AdminRoleUserOption(
     string? DepartmentName,
     IReadOnlyList<AdminRoleOption> DepartmentOptions,
     string Email,
+    string EmployeeId,
     string IamId,
     string Name);

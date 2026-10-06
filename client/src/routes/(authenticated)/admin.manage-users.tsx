@@ -70,6 +70,7 @@ export type AdminRolePersonOption = {
     name: string;
   }>;
   email: string;
+  employeeId: string;
   iamId: string;
   name: string;
 };
@@ -88,7 +89,6 @@ function AdminUsersRoute() {
     enabled: isPersonSearchOpen && personQuery.trim().length >= 2,
   });
   const [error, setError] = useState<string | null>(null);
-  const [showInactiveAssignments, setShowInactiveAssignments] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingRoleAction | null>(
     null
   );
@@ -113,9 +113,7 @@ function AdminUsersRoute() {
   const selectedUserName = selectedUser?.name ?? iamId;
   const currentUserIamId = currentUser.iamId?.trim().toLowerCase();
   const assignmentRows = data.assignments.filter(
-    (assignment) =>
-      assignment.type === 'admin' &&
-      (showInactiveAssignments || assignment.active)
+    (assignment) => assignment.type === 'admin'
   );
   const activeAdminAssignments = data.assignments.filter(
     (assignment) => assignment.type === 'admin' && assignment.active
@@ -190,26 +188,17 @@ function AdminUsersRoute() {
       header: 'Person',
     },
     {
-      accessorKey: 'active',
+      accessorKey: 'employeeId',
       cell: ({ row }) => (
-        <div className="flex justify-center">
-          <span
-            className={`badge border-0 px-3 py-3 text-xs font-semibold ${
-              row.original.active ? 'badge-success' : 'badge-neutral'
-            }`}
-          >
-            {row.original.active ? 'True' : 'False'}
-          </span>
-        </div>
+        <span className="font-mono text-xs">{row.original.employeeId}</span>
       ),
-      header: () => <div className="text-center">Active assignment</div>,
+      header: 'Emp ID',
     },
     {
       cell: ({ row }) => {
         const isLastActiveAdmin =
           row.original.active && activeAdminAssignments.length === 1;
-        const isRemovalDisabled =
-          removeMutation.isPending || !row.original.active || isLastActiveAdmin;
+        const isRemovalDisabled = removeMutation.isPending || isLastActiveAdmin;
         const removeButton = (
           <button
             className={`btn btn-ghost btn-sm ${
@@ -315,28 +304,13 @@ function AdminUsersRoute() {
             <DataTable
               columns={columns}
               data={assignmentRows}
-              filterPlaceholder="Search admin or email..."
+              filterPlaceholder="Search name, email, or employee ID..."
               globalFilter="left"
               initialState={{
                 pagination: {
                   pageSize: 10,
                 },
               }}
-              tableActions={
-                <label className="label cursor-pointer gap-3 rounded-lg border border-base-300 px-4 py-2">
-                  <span className="label-text text-sm text-base-content">
-                    Show Inactive Assignments
-                  </span>
-                  <input
-                    checked={showInactiveAssignments}
-                    className="toggle toggle-sm"
-                    onChange={(event) =>
-                      setShowInactiveAssignments(event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                </label>
-              }
               tableClassName="table-fixed"
             />
           </div>
@@ -523,7 +497,7 @@ export function PersonSearchField({
             onChangeOpen(false);
           }
         }}
-        placeholder="Search name, email or IAM ID"
+        placeholder="Search name, email, or employee ID"
         role="combobox"
         type="text"
         value={query}
@@ -559,7 +533,7 @@ export function PersonSearchField({
                     {user.name}
                   </span>
                   <span className="block text-xs text-base-content/70">
-                    {user.email || user.iamId}
+                    {user.email || user.employeeId}
                   </span>
                 </span>
                 <span className="text-right text-xs text-base-content/70">

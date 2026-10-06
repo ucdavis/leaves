@@ -25,11 +25,11 @@ public class AdminEmployeeSearchTests
     [Theory]
     [InlineData(" Needle ")]
     [InlineData("staff@example.test")]
-    [InlineData("staff00001")]
-    public async Task Search_matches_name_email_or_IamId_without_accruals_or_AppUser(string query)
+    [InlineData("12345678")]
+    public async Task Search_matches_name_email_or_employee_id_without_accruals_or_AppUser(string query)
     {
         using var db = TestDbContextFactory.CreateInMemory();
-        db.Set<Person>().Add(new Person { IamId = "staff00001", FullName = "Needle Faculty", Email = "staff@example.test", IsEmployee = true, IsFaculty = true });
+        db.Set<Person>().Add(new Person { IamId = "staff00001", EmployeeId = "12345678", FullName = "Needle Faculty", Email = "staff@example.test", IsEmployee = true, IsFaculty = true });
         await db.SaveChangesAsync();
         var service = new AdminDirectoryDataService(db);
 
@@ -41,20 +41,20 @@ public class AdminEmployeeSearchTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Candidate_responses_keep_exact_IamId_match_ahead_of_name_matches(bool forCao)
+    public async Task Candidate_responses_keep_exact_employee_id_match_ahead_of_name_matches(bool forCao)
     {
         using var db = TestDbContextFactory.CreateInMemory();
         db.Set<Person>().AddRange(
-            new Person { IamId = "1234567890", FullName = "Zulu Exact", IsEmployee = true },
-            new Person { IamId = "other00001", FullName = "Alpha 1234567890", IsEmployee = true },
-            new Person { IamId = "other00002", FullName = "Beta 1234567890", IsEmployee = true });
+            new Person { IamId = "1234567890", EmployeeId = "12345678", FullName = "Zulu Exact", IsEmployee = true },
+            new Person { IamId = "other00001", FullName = "Alpha 12345678", IsEmployee = true },
+            new Person { IamId = "other00002", FullName = "Beta 12345678", IsEmployee = true });
         await db.SaveChangesAsync();
         var dataService = new AdminDirectoryDataService(db);
 
         var ids = forCao
-            ? (await new AdminDirectoryService(dataService).SearchCaoCandidatesAsync("1234567890", default))
+            ? (await new AdminDirectoryService(dataService).SearchCaoCandidatesAsync("12345678", default))
                 .Select(user => user.Id)
-            : (await new AdminRolesService(dataService).SearchAdminCandidatesAsync("1234567890", default))
+            : (await new AdminRolesService(dataService).SearchAdminCandidatesAsync("12345678", default))
                 .Select(user => user.IamId);
 
         ids.Should().Equal("1234567890", "other00001", "other00002");

@@ -198,8 +198,15 @@ public sealed class AdminRolesController : ApiControllerBase
             return NotFound();
         }
 
-        var activeAdminCount = await _db.AppAdminAssignments.CountAsync(cancellationToken);
-        if (activeAdminCount <= 1)
+        var isActiveAssignment = await _directoryDataService.DirectoryUserExistsAsync(
+            assignment.IamId,
+            cancellationToken);
+        var activeAdminCount = await (
+            from adminAssignment in _db.AppAdminAssignments
+            join person in _db.People on adminAssignment.IamId equals person.IamId
+            where person.IsEmployee == true
+            select adminAssignment.Id).CountAsync(cancellationToken);
+        if (isActiveAssignment && activeAdminCount <= 1)
         {
             return Conflict("At least one application administrator must remain assigned.");
         }

@@ -131,6 +131,7 @@ public class AdminRoleMembershipTests
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var controller = await CreateControllerAsync(db);
+        db.Set<Person>().Add(new Person { IamId = "onlyadmin", IsEmployee = true });
         var assignment = new AppAdminAssignment { IamId = "onlyadmin" };
         db.AppAdminAssignments.Add(assignment);
         await db.SaveChangesAsync();
@@ -139,6 +140,21 @@ public class AdminRoleMembershipTests
 
         result.Should().BeOfType<ConflictObjectResult>();
         db.AppAdminAssignments.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Removing_an_inactive_application_admin_is_allowed()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var controller = await CreateControllerAsync(db);
+        var assignment = new AppAdminAssignment { IamId = "formeradmin" };
+        db.AppAdminAssignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var result = await controller.RemoveAdminAsync(assignment.Id, CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+        db.AppAdminAssignments.Should().BeEmpty();
     }
 
     private static void AssertValidationProblem(IActionResult result, string expectedDetail)
