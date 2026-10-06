@@ -35,7 +35,8 @@ public class AdminDirectoryServiceTests
     public async Task Current_overrides_are_loaded_directly_without_faculty_or_employee_filters()
     {
         using var db = TestDbContextFactory.CreateInMemory();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Pacific Standard Time"));
         db.Set<Person>().AddRange(
             new Person { IamId = "included", IsEmployee = true, IsFaculty = true, IsActiveInIam = false, FullName = "Included" },
             new Person { IamId = "activeiam", IsEmployee = true, IsFaculty = true, IsActiveInIam = true },
