@@ -69,24 +69,24 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                                       today < overrideRecord.EffectiveEndDateExclusive.Value));
         return await (
                 from overrideRecord in currentOverrides
-                join person in _db.People on overrideRecord.IamId equals person.IamId
+                join person in _db.People.AsNoTracking()
+                    on overrideRecord.IamId equals person.IamId into people
+                from person in people.DefaultIfEmpty()
                 join appUser in _db.AppUsers.AsNoTracking()
-                    on person.IamId equals appUser.IamId into appUsers
+                    on overrideRecord.IamId equals appUser.IamId into appUsers
                 from appUser in appUsers.DefaultIfEmpty()
-                where person.IsEmployee == true &&
-                      person.IsFaculty == true &&
-                      !currentOverrides.Any(candidate =>
+                where !currentOverrides.Any(candidate =>
                           candidate.IamId == overrideRecord.IamId &&
                           (candidate.EffectiveStartDate > overrideRecord.EffectiveStartDate ||
                            (candidate.EffectiveStartDate == overrideRecord.EffectiveStartDate &&
                             candidate.Id > overrideRecord.Id)))
-                orderby person.FullName, person.IamId
+                orderby person.FullName, overrideRecord.IamId
                 select new FacultyWithOverride(
-                    person.IamId,
+                    overrideRecord.IamId,
                     person.EmployeeId,
                     person.FullName,
                     person.Email,
-                    person.IsActiveInIam,
+                    person != null && person.IsActiveInIam,
                     appUser == null ? null : appUser.IsActive,
                     appUser == null ? null : appUser.DisplayName,
                     overrideRecord.DepartmentCode,

@@ -143,16 +143,6 @@ function AdminPeopleRouteContent() {
       header: 'Role',
     },
     {
-      accessorKey: 'isActiveInIam',
-      cell: ({ row }) =>
-        row.original.isActiveInIam ? (
-          <span className={statusTextColors.success}>Active</span>
-        ) : (
-          <span className={statusTextColors.danger}>Inactive</span>
-        ),
-      header: 'Active',
-    },
-    {
       cell: ({ row }) => (
         <button
           className="btn btn-ghost btn-sm"
@@ -269,7 +259,7 @@ function AdminPeopleRouteContent() {
 
                 <label className="label w-full cursor-pointer gap-3 rounded-xl border border-base-300 px-4 py-2 sm:w-auto sm:flex-none">
                   <span className="label-text text-sm text-base-content">
-                    Show Active Department Overrides
+                    Show Current Department Overrides
                   </span>
                   <input
                     checked={showFacultyWithOverrides}

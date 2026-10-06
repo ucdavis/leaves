@@ -32,7 +32,7 @@ public class AdminDirectoryServiceTests
     }
 
     [Fact]
-    public async Task Faculty_with_current_overrides_are_loaded_from_people_not_accruals()
+    public async Task Current_overrides_are_loaded_directly_without_faculty_or_employee_filters()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -48,16 +48,19 @@ public class AdminDirectoryServiceTests
             new EmployeeReportingDepartmentOverride { Id = 3, IamId = "activeiam", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
             new EmployeeReportingDepartmentOverride { Id = 4, IamId = "staff", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
             new EmployeeReportingDepartmentOverride { Id = 5, IamId = "notemployee", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 },
-            new EmployeeReportingDepartmentOverride { Id = 6, IamId = "expired", DepartmentCode = "DEPT", EffectiveStartDate = today.AddDays(-2), EffectiveEndDateExclusive = today, CreatedByAppUserId = 1 });
+            new EmployeeReportingDepartmentOverride { Id = 6, IamId = "expired", DepartmentCode = "DEPT", EffectiveStartDate = today.AddDays(-2), EffectiveEndDateExclusive = today, CreatedByAppUserId = 1 },
+            new EmployeeReportingDepartmentOverride { Id = 7, IamId = "former", DepartmentCode = "DEPT", EffectiveStartDate = today, CreatedByAppUserId = 1 });
         await db.SaveChangesAsync();
 
         var results = await new AdminDirectoryDataService(db)
             .LoadFacultyWithOverridesAsync(default);
 
-        results.Select(result => result.IamId).Should().BeEquivalentTo("included", "activeiam");
+        results.Select(result => result.IamId).Should().BeEquivalentTo(
+            "included", "activeiam", "staff", "notemployee", "former");
         results.Single(result => result.IamId == "included").DepartmentCode.Should().Be("NEWDEPT");
         results.Single(result => result.IamId == "included").IsActiveInIam.Should().BeFalse();
         results.Single(result => result.IamId == "activeiam").IsActiveInIam.Should().BeTrue();
+        results.Single(result => result.IamId == "former").FullName.Should().BeNull();
         db.EmployeeAccrualBalances.Should().BeEmpty();
     }
 

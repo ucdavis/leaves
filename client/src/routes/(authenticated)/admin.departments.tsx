@@ -217,7 +217,6 @@ function AdminDepartmentsRoute() {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
-                      <th>Active</th>
                       <th>Department chair</th>
                     </tr>
                   </thead>
@@ -237,17 +236,6 @@ function AdminDepartmentsRoute() {
                           )}
                         </td>
                         <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
-                        <td>
-                          {user.isActiveInIam ? (
-                            <span className={statusTextColors.success}>
-                              Active
-                            </span>
-                          ) : (
-                            <span className={statusTextColors.danger}>
-                              Inactive
-                            </span>
-                          )}
-                        </td>
                         <td>
                           {selectedDepartment.chairUserId === user.id ? (
                             <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">

@@ -90,7 +90,7 @@ function renderRoute() {
   );
 }
 
-test('loads inactive IAM faculty with current department overrides separately', async () => {
+test('loads everyone with current department overrides separately', async () => {
   renderRoute();
 
   expect(
@@ -98,7 +98,7 @@ test('loads inactive IAM faculty with current department overrides separately', 
   ).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole('checkbox', {
-      name: 'Show Active Department Overrides',
+      name: 'Show Current Department Overrides',
     })
   );
 
