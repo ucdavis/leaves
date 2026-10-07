@@ -16,7 +16,7 @@ export const Route = createFileRoute('/(authenticated)/admin/')({
         />
         <div>
           <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-            Loading status data
+            Loading Status
           </h2>
         </div>
       </div>

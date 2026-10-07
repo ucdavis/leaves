@@ -36,6 +36,11 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
             className="loading loading-spinner loading-lg text-primary"
           />
           <div>
+            <h2 className="text-lg font-semibold text-primary">
+              Loading Admins
+            </h2>
+          </div>
+          <div>
           </div>
         </div>
       </div>

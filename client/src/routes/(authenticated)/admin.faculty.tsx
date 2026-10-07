@@ -30,7 +30,7 @@ export const Route = createFileRoute('/(authenticated)/admin/faculty')({
         />
         <div>
           <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-            Loading faculty data
+            Loading Faculty 
           </h2>
         </div>
       </div>

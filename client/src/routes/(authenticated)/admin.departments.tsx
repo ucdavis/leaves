@@ -1,6 +1,7 @@
 import { getDirectorySearchMessage } from '@/shared/admin/directorySearch.ts';
 import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
+import type { ColumnDef } from '@tanstack/react-table';
 import { z } from 'zod';
 import {
   useMutation,
@@ -25,7 +26,9 @@ import { ClusterSettingsModal } from '@/shared/admin/ClusterSettingsModal.tsx';
 import { AdminDepartmentCreationPanel } from '@/shared/admin/AdminDepartmentCreationPanel.tsx';
 import { DepartmentRow } from '@/shared/admin/DepartmentRow.tsx';
 import { DepartmentSettingsModal } from '@/shared/admin/DepartmentSettingsModal.tsx';
+import type { AdminUser } from '@/shared/admin/adminData.ts';
 import { getAdminMutationErrorMessage } from '@/shared/admin/adminErrors.ts';
+import { DataTable } from '@/shared/dataTable.tsx';
 import { WarningModal } from '@/shared/WarningModal.tsx';
 import {
   ArrowLeftIcon,
@@ -64,7 +67,7 @@ export const Route = createFileRoute('/(authenticated)/admin/departments')({
           />
           <div>
             <h2 className="text-lg font-semibold text-primary">
-              Loading department data
+              Loading Departments
             </h2>
           </div>
         </div>
@@ -192,6 +195,69 @@ function AdminDepartmentsRoute() {
       const departmentUsers = facultyUsers.filter(
         (user) => user.departmentId === selectedDepartment.id
       );
+      const rosterColumns: ColumnDef<AdminUser>[] = [
+        {
+          accessorKey: 'name',
+          cell: ({ row }) => (
+            <span className="font-semibold">{row.original.name}</span>
+          ),
+          header: 'Name',
+        },
+        {
+          accessorKey: 'email',
+          cell: ({ row }) =>
+            row.original.email ? (
+              row.original.email
+            ) : (
+              <span className={`italic ${statusTextColors.danger}`}>
+                Missing
+              </span>
+            ),
+          header: 'Email',
+        },
+        {
+          accessorKey: 'role',
+          cell: ({ row }) =>
+            row.original.role === 'chair' ? 'Chair' : 'Faculty',
+          header: 'Role',
+        },
+        {
+          cell: ({ row }) =>
+            selectedDepartment.chairUserId === row.original.id ? (
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
+                <CheckCircleIcon
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0"
+                />
+                Chair
+              </span>
+            ) : (
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={updateDepartmentMutation.isPending}
+                onClick={() => {
+                  setPendingChairChangeError(null);
+                  setPendingChairChange({
+                    currentChairName:
+                      departmentUsers.find(
+                        (departmentUser) =>
+                          departmentUser.id === selectedDepartment.chairUserId
+                      )?.name ?? null,
+                    departmentId: selectedDepartment.id,
+                    departmentName: selectedDepartment.name,
+                    nextChairName: row.original.name,
+                    nextChairUserId: row.original.id,
+                  });
+                }}
+                type="button"
+              >
+                Set chair
+              </button>
+            ),
+          header: 'Department chair',
+          id: 'departmentChair',
+        },
+      ];
 
       return (
         <div className="space-y-5">
@@ -210,82 +276,19 @@ function AdminDepartmentsRoute() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Department chair</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {departmentUsers.map((user) => (
-                      <tr key={user.id}>
-                        <td className="font-semibold">{user.name}</td>
-                        <td>
-                          {user.email ? (
-                            user.email
-                          ) : (
-                            <span
-                              className={`italic ${statusTextColors.danger}`}
-                            >
-                              Missing
-                            </span>
-                          )}
-                        </td>
-                        <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
-                        <td>
-                          {selectedDepartment.chairUserId === user.id ? (
-                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
-                              <CheckCircleIcon
-                                aria-hidden="true"
-                                className="h-4 w-4 shrink-0"
-                              />
-                              Chair
-                            </span>
-                          ) : (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              disabled={updateDepartmentMutation.isPending}
-                              onClick={() => {
-                                setPendingChairChangeError(null);
-                                setPendingChairChange({
-                                  currentChairName:
-                                    departmentUsers.find(
-                                      (departmentUser) =>
-                                        departmentUser.id ===
-                                        selectedDepartment.chairUserId
-                                    )?.name ?? null,
-                                  departmentId: selectedDepartment.id,
-                                  departmentName: selectedDepartment.name,
-                                  nextChairName: user.name,
-                                  nextChairUserId: user.id,
-                                });
-                              }}
-                              type="button"
-                            >
-                              Set chair
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {departmentUsers.length === 0 ? (
-                      <tr>
-                        <td
-                          className="py-6 text-sm text-base-content/70"
-                          colSpan={6}
-                        >
-                          There are currently no faculty members assigned to
-                          this department.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
+              {departmentUsers.length > 0 ? (
+                <DataTable
+                  columns={rosterColumns}
+                  data={departmentUsers}
+                  globalFilter="none"
+                  initialState={{ pagination: { pageSize: 10 } }}
+                />
+              ) : (
+                <p className="py-6 text-sm text-base-content/70">
+                  There are currently no faculty members assigned to this
+                  department.
+                </p>
+              )}
             </div>
           </section>
 

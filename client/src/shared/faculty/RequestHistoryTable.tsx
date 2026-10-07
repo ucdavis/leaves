@@ -125,7 +125,6 @@ export function RequestHistoryTable({
           pageSize: 10,
         },
       }}
-      showPageCount
       tableClassName="table-zebra"
     />
   );
