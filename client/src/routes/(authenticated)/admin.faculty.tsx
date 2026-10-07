@@ -30,7 +30,7 @@ export const Route = createFileRoute('/(authenticated)/admin/faculty')({
         />
         <div>
           <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
-            Loading Faculty 
+            Loading Faculty
           </h2>
         </div>
       </div>
@@ -129,11 +129,13 @@ function AdminPeopleRouteContent() {
     {
       accessorKey: 'role',
       cell: ({ row }) => (
-        <span className="inline-flex rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-primary">
-          {getRoleLabel(row.original.role)}
-        </span>
+        <div className="flex justify-center">
+          <span className="inline-flex rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-primary">
+            {getRoleLabel(row.original.role)}
+          </span>
+        </div>
       ),
-      header: 'Role',
+      header: () => <div className="text-center">Role</div>,
     },
     {
       cell: ({ row }) => (

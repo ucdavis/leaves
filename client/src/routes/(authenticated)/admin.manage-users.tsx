@@ -40,8 +40,6 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
               Loading Admins
             </h2>
           </div>
-          <div>
-          </div>
         </div>
       </div>
     </section>
@@ -174,23 +172,22 @@ function AdminUsersRoute() {
 
   const columns: ColumnDef<AdminRoleAssignment>[] = [
     {
-      accessorKey: 'type',
-      cell: ({ row }) => roleLabels[row.original.type],
-      header: 'Role',
-    },
-    {
       accessorKey: 'name',
       cell: ({ row }) => (
-        <div>
-          <div className="font-semibold text-base-content">
-            {row.original.name}
-          </div>
-          <div className="text-xs text-base-content/70">
-            {row.original.email || row.original.iamId}
-          </div>
-        </div>
+        <span className="font-semibold text-base-content">
+          {row.original.name}
+        </span>
       ),
-      header: 'Person',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'email',
+      cell: ({ row }) => (
+        <span className="text-xs text-base-content/70">
+          {row.original.email || row.original.iamId}
+        </span>
+      ),
+      header: 'Email',
     },
     {
       accessorKey: 'employeeId',
@@ -224,18 +221,22 @@ function AdminUsersRoute() {
           </button>
         );
 
-        return isLastActiveAdmin ? (
-          <Tooltip
-            content={tooltipDefinitions.lastApplicationAdministrator}
-            placement="left"
-          >
-            {removeButton}
-          </Tooltip>
-        ) : (
-          removeButton
+        return (
+          <div className="flex w-20 justify-center">
+            {isLastActiveAdmin ? (
+              <Tooltip
+                content={tooltipDefinitions.lastApplicationAdministrator}
+                placement="left"
+              >
+                {removeButton}
+              </Tooltip>
+            ) : (
+              removeButton
+            )}
+          </div>
         );
       },
-      header: 'Actions',
+      header: () => <div className="w-20 text-center">Actions</div>,
       id: 'actions',
     },
   ];
@@ -426,8 +427,8 @@ function RoleWarningModal({
       {message}
       {isRemovingSelf ? (
         <p className="mt-3 font-semibold">
-          You are removing your own application admin access. You will no
-          longer be able to access this administrative area.
+          You are removing your own application admin access. You will no longer
+          be able to access this administrative area.
         </p>
       ) : null}
     </WarningModal>
