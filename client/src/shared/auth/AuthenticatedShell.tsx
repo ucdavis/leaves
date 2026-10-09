@@ -129,7 +129,7 @@ export const AuthenticatedShell = ({
           <div className="container flex gap-1 overflow-x-auto">
             {items.map((item) => (
               <Link
-                className="border-b-2 border-transparent px-5 py-4 text-sm font-semibold text-base-content/60 transition hover:text-base-content data-[status=active]:border-primary data-[status=active]:text-primary"
+                className="border-b-2 border-transparent px-5 py-4 text-sm font-semibold text-base-content/70 transition hover:text-base-content data-[status=active]:border-primary data-[status=active]:text-primary"
                 key={item.to}
                 to={item.to}
               >

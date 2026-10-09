@@ -239,7 +239,7 @@ function RequestDetailGrid({
 function RequestDetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+      <dt className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         {label}
       </dt>
       <dd className="mt-1 font-medium">{value}</dd>
@@ -250,7 +250,7 @@ function RequestDetailItem({ label, value }: { label: string; value: string }) {
 function RequestNote({ note }: { note?: string | null }) {
   return (
     <div className="rounded-lg bg-base-200 p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         Note
       </div>
       <p className="mt-2 text-sm">{note?.trim() || 'No note provided.'}</p>
@@ -652,7 +652,7 @@ function LeaveRequestForm({
               <form.AppField name="totalHours">
                 {(field) => (
                   <field.TextField
-                    label="Hours per day"
+                    label={usesDateRange ? 'Hours per day' : 'Hours'}
                     placeholder="e.g., 8"
                     required
                   />

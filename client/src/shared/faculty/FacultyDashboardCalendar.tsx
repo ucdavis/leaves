@@ -186,7 +186,7 @@ export function LeaveCalendar({
       <div className="grid grid-cols-7 border-l border-t border-base-300">
         {weekdayLabels.map((label) => (
           <div
-            className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/60"
+            className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
             key={label}
           >
             {label}
@@ -284,7 +284,7 @@ export function LeaveCalendar({
         ))}
       </div>
 
-      <p className="mt-4 text-sm text-base-content/65">
+      <p className="mt-4 text-sm text-base-content/70">
         {holidayCoverageEnd
           ? `Holiday dates are currently available through ${format(parseISO(holidayCoverageEnd), 'MMMM d, yyyy')}.`
           : 'Holiday data is temporarily unavailable, so holidays are not shown in this calendar.'}

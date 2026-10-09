@@ -119,7 +119,7 @@ export function LocalRoleSwitcher({
               </a>
             </li>
           ) : null}
-          <li className="menu-title px-3 pt-2 pb-1 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-base-content/50">
+          <li className="menu-title px-3 pt-2 pb-1 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-base-content/70">
             Switch local role
           </li>
           {DEV_ROLE_SWITCH_OPTIONS.map((option) => {
@@ -142,7 +142,7 @@ export function LocalRoleSwitcher({
                   <div className="flex w-full items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold">{option.label}</div>
-                      <div className="text-xs text-base-content/60">
+                      <div className="text-xs text-base-content/70">
                         {option.description}
                       </div>
                     </div>

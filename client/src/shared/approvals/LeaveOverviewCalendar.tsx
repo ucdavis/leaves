@@ -93,12 +93,12 @@ export function LeaveOverviewCalendar({
         <table className="table-fixed border-collapse text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-52 border-r border-base-300 bg-base-200 px-3 py-3 text-left text-xs font-bold uppercase text-base-content/65">
+              <th className="sticky left-0 z-10 w-52 border-r border-base-300 bg-base-200 px-3 py-3 text-left text-xs font-bold uppercase text-base-content/70">
                 Faculty
               </th>
               {days.map((day) => (
                 <th
-                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0 ${getUniversityHoliday(holidays, day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
+                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/70 last:border-r-0 ${getUniversityHoliday(holidays, day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
                   key={day.isoDate}
                   title={getUniversityHoliday(holidays, day.isoDate)?.name}
                 >
@@ -129,13 +129,13 @@ export function LeaveOverviewCalendar({
 
       <CalendarLegend />
 
-      <p className="mt-4 text-sm text-base-content/65">
+      <p className="mt-4 text-sm text-base-content/70">
         {holidayCoverageEnd
           ? `Holiday dates are currently available through ${format(parseISO(holidayCoverageEnd), 'MMMM d, yyyy')}.`
           : 'Holiday data is temporarily unavailable, so holidays are not shown in this calendar.'}
       </p>
 
-      <p className="mt-5 text-sm text-base-content/65">
+      <p className="mt-5 text-sm text-base-content/70">
         Click a faculty member&apos;s name to open their dashboard.
       </p>
     </section>

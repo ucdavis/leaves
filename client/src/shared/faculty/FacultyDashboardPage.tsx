@@ -158,7 +158,7 @@ function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
             <ReadOnlyBalanceRow balance={balance} key={balance.typeLabel} />
           ))
         ) : (
-          <div className="text-sm text-base-content/60">
+          <div className="text-sm text-base-content/70">
             No current accrual balances are available.
           </div>
         )}

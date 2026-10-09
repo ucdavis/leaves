@@ -83,6 +83,11 @@ body {
   @apply mt-2 text-sm text-base-content/70;
 }
 
+/* DaisyUI renders table headers at 60% base-content, which misses WCAG AA on light surfaces. */
+.table :where(thead, tfoot) {
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
 .tooltip-trigger {
   @apply inline-flex items-center focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary/30;
 }

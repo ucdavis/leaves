@@ -24,7 +24,7 @@ export function AccrualBalancePanel({
     <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="font-bold text-primary">Leave Balances</h2>
-        <span className="rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-base-content/50">
+        <span className="rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-base-content/70">
           Source: UCPath
         </span>
       </div>
@@ -63,14 +63,14 @@ function AccrualBalanceBar({ balance }: { balance: FacultyAccrualBalance }) {
               style={{ width: `${percentage}%` }}
             />
           </div>
-          <div className="mt-2 text-xs text-base-content/60">
+          <div className="mt-2 text-xs text-base-content/70">
             {formatHours(balance.calculatedBalance)} of{' '}
             {formatHours(balance.accrualLimit)} · {Math.round(percentage)}% of
             cap
           </div>
         </>
       ) : (
-        <div className="text-xs text-base-content/60">No accrual cap</div>
+        <div className="text-xs text-base-content/70">No accrual cap</div>
       )}
     </article>
   );
@@ -155,7 +155,7 @@ function RecentRequestRow({
             <div className="truncate text-sm font-bold">
               {request.leaveType}
             </div>
-            <div className="text-xs text-base-content/60">
+            <div className="text-xs text-base-content/70">
               {formatDateRange(request.startDate, request.endDate)}
             </div>
           </div>
@@ -202,7 +202,7 @@ export function FacultyToast({
 }
 
 export function EmptyPanelMessage({ message }: { message: string }) {
-  return <p className="py-3 text-sm text-base-content/60">{message}</p>;
+  return <p className="py-3 text-sm text-base-content/70">{message}</p>;
 }
 
 export function RequestStatusBadge({ status }: { status: string }) {

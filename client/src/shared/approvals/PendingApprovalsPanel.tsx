@@ -62,7 +62,7 @@ function ApprovalRequestCard({
           <span> · {formatDateRange(request.startDate, request.endDate)}</span>
           <span> · {formatCompactHours(request.totalHours)}</span>
         </div>
-        <div className="mt-1 text-xs text-base-content/60">
+        <div className="mt-1 text-xs text-base-content/70">
           {request.note ? `Note: ${request.note}` : request.departmentName}
         </div>
       </div>
@@ -90,7 +90,7 @@ function ApprovalRequestCard({
 
 function NoPendingApprovals() {
   return (
-    <div className="flex min-h-52 flex-col items-center justify-center gap-4 text-center text-base-content/65">
+    <div className="flex min-h-52 flex-col items-center justify-center gap-4 text-center text-base-content/70">
       <CheckIcon className="h-12 w-12 stroke-[1.5]" />
       <p className="text-base font-medium">No pending approvals. All caught up!</p>
     </div>

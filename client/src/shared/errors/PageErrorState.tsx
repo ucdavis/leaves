@@ -17,7 +17,7 @@ export function PageErrorState({
         <div className="text-7xl font-black tracking-tight text-primary">
           {code}
         </div>
-        <p className="mt-3 text-sm font-semibold uppercase tracking-[0.2em] text-base-content/50">
+        <p className="mt-3 text-sm font-semibold uppercase tracking-[0.2em] text-base-content/70">
           {badge}
         </p>
         <h1 className="mt-4 text-3xl font-bold text-primary">
