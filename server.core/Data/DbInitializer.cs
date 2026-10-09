@@ -93,14 +93,13 @@ public class DbInitializer : IDbInitializer
         new(DevelopmentSeedData.TestClusterName, DevelopmentSeedData.LocalCaoIamId, "2026-08-21", null, "adminherd", "2026-08-21T08:50:00", null, null),
     ];
 
-    private static readonly LeaveTypeSeed[] DevLeaveTypes =
+    private static readonly LeaveTypeSeed[] RequiredLeaveTypes =
     [
         new("Vacation", 10, "Vacation", true, true),
         new("Sick", 20, "Sick Leave", true, true),
         new("ProfessionalDevelopment", null, "Professional Development", false, true),
         new("FamilyCare", 30, "FMLA", false, true),
         new("Sabbatical", 40, "Sabbatical", false, true),
-        new("CompTime", 50, "Compensatory Time", true, true),
     ];
 
     private static readonly EmployeeAccrualBalanceSeed[] DevEmployeeAccrualBalances =
@@ -177,6 +176,8 @@ public class DbInitializer : IDbInitializer
             _logger.LogInformation("Database ensured.");
         }
 
+        await EnsureRequiredLeaveTypesAsync(cancellationToken);
+
         if (includeDevSeed)
         {
             await SeedDevelopmentAsync(cancellationToken);
@@ -201,7 +202,6 @@ public class DbInitializer : IDbInitializer
         await SeedDepartmentChairAssignmentsAsync(usersByIamId, nowUtc, ct);
         await SeedClusterCaoAssignmentsAsync(usersByIamId, clustersByName, nowUtc, ct);
         await SeedDepartmentEmailRoutingsAsync(usersByIamId, nowUtc, ct);
-        await SeedLeaveTypesAsync(ct);
         await SeedEmployeeAccrualBalancesAsync(ct);
 
         var leaveTypesByKey = await LoadLeaveTypesByKeyAsync(ct);
@@ -637,7 +637,13 @@ public class DbInitializer : IDbInitializer
         _logger.LogInformation("Seeded {Count} development DepartmentEmailRouting rows.", missingRoutings.Length);
     }
 
-    private async Task SeedLeaveTypesAsync(CancellationToken ct)
+    private Task EnsureRequiredLeaveTypesAsync(CancellationToken ct) =>
+        EnsureLeaveTypesAsync(RequiredLeaveTypes, "required", ct);
+
+    private async Task EnsureLeaveTypesAsync(
+        IReadOnlyCollection<LeaveTypeSeed> leaveTypeSeeds,
+        string seedName,
+        CancellationToken ct)
     {
         var existingLeaveTypes = await _db.LeaveTypes
             .ToListAsync(ct);
@@ -646,47 +652,22 @@ public class DbInitializer : IDbInitializer
             leaveType => leaveType.LeaveTypeKey,
             StringComparer.OrdinalIgnoreCase);
 
-        var updated = false;
+        var updatedCount = 0;
 
-        foreach (var seed in DevLeaveTypes)
+        foreach (var seed in leaveTypeSeeds)
         {
             if (!existingByKey.TryGetValue(seed.LeaveTypeKey, out var existingLeaveType))
             {
                 continue;
             }
 
-            if (existingLeaveType.SourceLeaveTypeNumber != seed.SourceLeaveTypeNumber)
+            if (ApplyLeaveTypeSeed(existingLeaveType, seed))
             {
-                existingLeaveType.SourceLeaveTypeNumber = seed.SourceLeaveTypeNumber;
-                updated = true;
-            }
-
-            if (!string.Equals(existingLeaveType.DisplayName, seed.DisplayName, StringComparison.Ordinal))
-            {
-                existingLeaveType.DisplayName = seed.DisplayName;
-                updated = true;
-            }
-
-            if (existingLeaveType.HasAccrualBalance != seed.HasAccrualBalance)
-            {
-                existingLeaveType.HasAccrualBalance = seed.HasAccrualBalance;
-                updated = true;
-            }
-
-            if (existingLeaveType.IsActive != seed.IsActive)
-            {
-                existingLeaveType.IsActive = seed.IsActive;
-                updated = true;
+                updatedCount++;
             }
         }
 
-        if (updated)
-        {
-            await _db.SaveChangesAsync(ct);
-            _logger.LogInformation("Updated existing development LeaveType rows.");
-        }
-
-        var missingLeaveTypes = DevLeaveTypes
+        var missingLeaveTypes = leaveTypeSeeds
             .Where(leaveType => !existingByKey.ContainsKey(leaveType.LeaveTypeKey))
             .Select(leaveType => new LeaveType
             {
@@ -698,14 +679,22 @@ public class DbInitializer : IDbInitializer
             })
             .ToArray();
 
-        if (missingLeaveTypes.Length == 0)
+        if (missingLeaveTypes.Length == 0 && updatedCount == 0)
         {
             return;
         }
 
-        await _db.LeaveTypes.AddRangeAsync(missingLeaveTypes, ct);
+        if (missingLeaveTypes.Length > 0)
+        {
+            await _db.LeaveTypes.AddRangeAsync(missingLeaveTypes, ct);
+        }
+
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seeded {Count} development LeaveType rows.", missingLeaveTypes.Length);
+        _logger.LogInformation(
+            "Ensured {SeedName} LeaveType rows: added {AddedCount}, updated {UpdatedCount}.",
+            seedName,
+            missingLeaveTypes.Length,
+            updatedCount);
     }
 
     private async Task SeedEmployeeAccrualBalancesAsync(CancellationToken ct)
@@ -980,6 +969,37 @@ public class DbInitializer : IDbInitializer
     }
 
     private static string NormalizeKey(string value) => value.Trim();
+
+    private static bool ApplyLeaveTypeSeed(LeaveType leaveType, LeaveTypeSeed seed)
+    {
+        var updated = false;
+
+        if (leaveType.SourceLeaveTypeNumber != seed.SourceLeaveTypeNumber)
+        {
+            leaveType.SourceLeaveTypeNumber = seed.SourceLeaveTypeNumber;
+            updated = true;
+        }
+
+        if (!string.Equals(leaveType.DisplayName, seed.DisplayName, StringComparison.Ordinal))
+        {
+            leaveType.DisplayName = seed.DisplayName;
+            updated = true;
+        }
+
+        if (leaveType.HasAccrualBalance != seed.HasAccrualBalance)
+        {
+            leaveType.HasAccrualBalance = seed.HasAccrualBalance;
+            updated = true;
+        }
+
+        if (leaveType.IsActive != seed.IsActive)
+        {
+            leaveType.IsActive = seed.IsActive;
+            updated = true;
+        }
+
+        return updated;
+    }
 
     private static string CreateDepartmentRoutingKey(string departmentCode, string toEmail) => $"{departmentCode}|{toEmail}";
 
