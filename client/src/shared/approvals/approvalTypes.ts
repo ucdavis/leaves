@@ -31,7 +31,6 @@ export type CalendarLeave = {
 };
 
 export type LeaveCategory =
-  | 'Compensatory Time'
   | 'FMLA'
   | 'Professional Development'
   | 'Sabbatical'
