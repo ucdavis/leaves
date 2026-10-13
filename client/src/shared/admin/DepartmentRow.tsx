@@ -20,10 +20,8 @@ export function DepartmentRow({
 }) {
   const approvalLabel =
     department.approvalMode === 'approval'
-      ? 'Approval required'
-      : department.approvalMode === 'auto'
-        ? 'Auto-approve'
-        : 'Notification only';
+      ? 'Required'
+      : 'Auto-approve';
 
   return (
     <div className="bg-primary/5 border-l-4 border-primary pl-2">

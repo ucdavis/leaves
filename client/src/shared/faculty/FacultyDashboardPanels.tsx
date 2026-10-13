@@ -326,7 +326,7 @@ export function formatWorkflowModeLabel(
   workflowMode: string | null | undefined
 ) {
   if (workflowMode === 'ApprovalRequired') {
-    return 'Approval required';
+    return 'Required';
   }
 
   if (workflowMode === 'DirectSubmission') {

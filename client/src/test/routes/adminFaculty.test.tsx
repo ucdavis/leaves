@@ -48,7 +48,7 @@ function renderRoute() {
       HttpResponse.json({
         departments: [
           {
-            approvalMode: 'notification',
+            approvalMode: 'auto',
             chairUserId: null,
             clusterId: null,
             code: 'DEPT',

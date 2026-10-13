@@ -16,6 +16,7 @@ import {
   createAdminDepartment,
   deleteAdminCluster,
   deleteAdminDepartment,
+  getAdminDepartmentPendingApprovalCount,
   removeAdminDepartmentRoutingEmail,
   updateAdminCluster,
   updateAdminDepartment,
@@ -509,6 +510,11 @@ function AdminDepartmentsRoute() {
                   closeRoster();
                 }
               })
+          }
+          onGetPendingRequestCount={() =>
+            getAdminDepartmentPendingApprovalCount({
+              departmentId: editingDepartment.id,
+            }).then((response) => response.pendingRequestCount)
           }
           onRemoveRoutingEmail={(emailId) =>
             removeRoutingEmailMutation.mutateAsync({

@@ -13,7 +13,7 @@ import { WarningModal } from '@/shared/WarningModal.tsx';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
 const departmentSettingsSchema = z.object({
-  approvalMode: z.enum(['notification', 'approval', 'auto']),
+  approvalMode: z.enum(['approval', 'auto']),
   clusterId: z.string(),
   name: z
     .string()
@@ -41,6 +41,7 @@ export function DepartmentSettingsModal({
   isDeleting,
   onClose,
   onDelete,
+  onGetPendingRequestCount,
   onRemoveRoutingEmail,
   onSave,
   onUpsertRoutingEmail,
@@ -51,9 +52,14 @@ export function DepartmentSettingsModal({
   isDeleting: boolean;
   onClose: () => void;
   onDelete: () => Promise<void>;
+  onGetPendingRequestCount: () => Promise<number>;
   onRemoveRoutingEmail: (emailId: string) => Promise<void>;
   onSave: (
-    updates: Partial<Pick<AdminDepartment, 'approvalMode' | 'clusterId' | 'name'>>
+    updates: Partial<
+      Pick<AdminDepartment, 'approvalMode' | 'clusterId' | 'name'>
+    > & {
+      approvePendingRequests?: boolean;
+    }
   ) => Promise<void>;
   onUpsertRoutingEmail: (email: {
     address: string;
@@ -70,6 +76,13 @@ export function DepartmentSettingsModal({
   const [pendingRemovalEmailId, setPendingRemovalEmailId] = useState<
     string | null
   >(null);
+  const [pendingAutoApproveSave, setPendingAutoApproveSave] = useState<{
+    approvalMode: 'approval' | 'auto';
+    clusterId: string | null;
+    name: string;
+    pendingRequestCount: number;
+  } | null>(null);
+  const [isConfirmingAutoApprove, setIsConfirmingAutoApprove] = useState(false);
 
   const settingsForm = useAppForm({
     defaultValues: {
@@ -80,12 +93,30 @@ export function DepartmentSettingsModal({
     onSubmit: async ({ value }) => {
       setSaveError(null);
 
+      const updates = {
+        approvalMode: value.approvalMode,
+        clusterId: value.clusterId || null,
+        name: value.name.trim(),
+      };
+
+      if (
+        department.approvalMode === 'approval' &&
+        updates.approvalMode === 'auto'
+      ) {
+        try {
+          const pendingRequestCount = await onGetPendingRequestCount();
+          if (pendingRequestCount > 0) {
+            setPendingAutoApproveSave({ ...updates, pendingRequestCount });
+            return;
+          }
+        } catch (error) {
+          setSaveError(formatError(error));
+          return;
+        }
+      }
+
       try {
-        await onSave({
-          approvalMode: value.approvalMode,
-          clusterId: value.clusterId || null,
-          name: value.name.trim(),
-        });
+        await onSave(updates);
       } catch (error) {
         setSaveError(formatError(error));
       }
@@ -185,11 +216,7 @@ export function DepartmentSettingsModal({
                     label="Approval mode"
                     options={[
                       {
-                        label: 'Notification only',
-                        value: 'notification',
-                      },
-                      {
-                        label: 'Approval required',
+                        label: 'Required',
                         value: 'approval',
                       },
                       {
@@ -319,6 +346,39 @@ export function DepartmentSettingsModal({
         </form>
       </AdminModalFrame>
 
+      {pendingAutoApproveSave ? (
+        <WarningModal
+          confirmLabel="Switch to Auto-approve"
+          isSaving={isConfirmingAutoApprove}
+          onCancel={() => setPendingAutoApproveSave(null)}
+          onConfirm={() => {
+            void (async () => {
+              setIsConfirmingAutoApprove(true);
+              try {
+                await onSave({
+                  approvalMode: pendingAutoApproveSave.approvalMode,
+                  approvePendingRequests: true,
+                  clusterId: pendingAutoApproveSave.clusterId,
+                  name: pendingAutoApproveSave.name,
+                });
+                setPendingAutoApproveSave(null);
+              } catch (error) {
+                setSaveError(formatError(error));
+                setPendingAutoApproveSave(null);
+              } finally {
+                setIsConfirmingAutoApprove(false);
+              }
+            })();
+          }}
+          title="Approve pending requests?"
+        >
+          Switching to Auto-approve will approve all{' '}
+          <strong>{pendingAutoApproveSave.pendingRequestCount}</strong> pending{' '}
+          request{pendingAutoApproveSave.pendingRequestCount === 1 ? '' : 's'}{' '}
+          for this department.
+        </WarningModal>
+      ) : null}
+
       {isDeleteConfirmOpen ? (
         <WarningModal
           confirmLabel="Deactivate department"
@@ -330,7 +390,8 @@ export function DepartmentSettingsModal({
           title="Deactivate department?"
         >
           <span>
-            Deactivate <strong>{department.name}</strong>? Users will no longer be able to submit requests to this department.
+            Deactivate <strong>{department.name}</strong>? Users will no longer
+            be able to submit requests to this department.
           </span>
         </WarningModal>
       ) : null}

@@ -348,9 +348,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             ReportingDepartmentCodeSnapshot = department.DepartmentCode,
             ReportingDepartmentNameSnapshot = department.DepartmentName,
             StartDate = request.StartDate,
-            Status = department.WorkflowMode == WorkflowMode.ApprovalRequired
-                ? LeaveRequestStatus.PendingApproval
-                : LeaveRequestStatus.Approved,
+            Status = department.WorkflowMode == WorkflowMode.DirectSubmission
+                ? LeaveRequestStatus.Approved
+                : LeaveRequestStatus.PendingApproval,
             SubmittedAt = submittedAt,
             TotalHours = request.TotalHours,
             WorkflowModeSnapshot = department.WorkflowMode,

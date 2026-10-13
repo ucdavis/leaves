@@ -58,10 +58,12 @@ export function getLeaveTone(leaveType: LeaveCategory): Tone {
   }
 }
 
-function formatDate(date: string) {
+export function formatDate(date: string) {
+  const value = date.length === 10 ? `${date}T00:00:00` : date;
+
   return new Intl.DateTimeFormat(undefined, {
     day: 'numeric',
     month: 'numeric',
     year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`));
+  }).format(new Date(value));
 }
