@@ -109,7 +109,7 @@ public sealed class AdminDirectoryService
                 var chairUserId = chairAssignment?.IamId.Trim();
 
                 return new AdminDepartmentResponse(
-                    ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "notification",
+                    ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "auto",
                     ChairUserId: chairUserId,
                     ClusterId: department.ClusterId?.ToString(),
                     Code: department.DepartmentCode,

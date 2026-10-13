@@ -1,6 +1,6 @@
 export type AdminRole = 'faculty' | 'chair' | 'cao' | 'admin';
 export type AdminDesignation = 'fy' | 'ay' | 'nfa' | 'chair' | 'cao' | 'admin';
-export type ApprovalMode = 'notification' | 'approval' | 'auto';
+export type ApprovalMode = 'approval' | 'auto';
 export type ImportStatus = 'ready' | 'planned' | 'deferred';
 
 export type AdminUser = {

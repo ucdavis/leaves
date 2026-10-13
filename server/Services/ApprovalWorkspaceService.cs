@@ -236,7 +236,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             Comment = request.Comment,
             IsSelfAction = false,
         });
-        _notificationQueue.QueueDecision(leaveRequest, requester);
+        await _notificationQueue.QueueDecisionAsync(leaveRequest, requester, cancellationToken);
 
         try
         {
