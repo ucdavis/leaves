@@ -42,6 +42,7 @@ export interface FacultyAccrualBalance {
 }
 
 export interface FacultyLeaveRequest {
+  approvalMethod?: 'ApprovalRequired' | 'DirectSubmission';
   decision?: string | null;
   decisionAt?: string | null;
   decisionBy?: string | null;

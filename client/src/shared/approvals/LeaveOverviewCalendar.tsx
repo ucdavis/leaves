@@ -255,10 +255,7 @@ function getLeaveDetails(leave: CalendarLeave) {
     `${leave.leaveType}: ${formatDateRange(leave.startDate, leave.endDate)}`,
   ];
 
-  if (leave.decision) {
-    details.push(`${leave.decision} by ${leave.decisionBy ?? 'an approver'}`);
-  }
-  if (leave.decisionComment) {
+  if (leave.approvalMethod !== 'DirectSubmission' && leave.decisionComment) {
     details.push(`Comment: ${leave.decisionComment}`);
   }
 
@@ -270,10 +267,7 @@ function getLeaveAriaLabel(leave: CalendarLeave, facultyName: string, date: Date
     `View ${leave.status === 'PendingApproval' ? 'pending' : 'approved'} ${leave.leaveType} for ${facultyName}, ${formatDateRange(leave.startDate, leave.endDate)}; ${format(date, 'MMMM d, yyyy')}`,
   ];
 
-  if (leave.decision) {
-    details.push(`${leave.decision} by ${leave.decisionBy ?? 'an approver'}`);
-  }
-  if (leave.decisionComment) {
+  if (leave.approvalMethod !== 'DirectSubmission' && leave.decisionComment) {
     details.push(`Comment: ${leave.decisionComment}`);
   }
 

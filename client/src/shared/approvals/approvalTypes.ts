@@ -21,6 +21,7 @@ export type CalendarFaculty = {
 };
 
 export type CalendarLeave = {
+  approvalMethod?: 'ApprovalRequired' | 'DirectSubmission';
   decision?: string | null;
   decisionBy?: string | null;
   decisionComment?: string | null;

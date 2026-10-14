@@ -517,6 +517,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
                 ActorIamId = actor.IamId,
                 ActionAt = nowUtc,
                 Comment = "Approved because the department approval mode changed to Auto-approve.",
+                ReasonCode = LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange,
                 IsSelfAction = false,
             });
             await _notificationQueue.QueueDecisionAsync(request, requester, cancellationToken);

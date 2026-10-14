@@ -91,6 +91,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
                 request.Status == LeaveRequestStatus.PendingApproval)
             .Select(request => new ApprovalWorkspaceLeaveResponse(
                 Decision: request.Actions.SingleOrDefault()?.ActionType.ToString(),
+                ApprovalMethod: GetApprovalMethod(request, request.Actions.SingleOrDefault()),
                 DecisionBy: GetDecisionActorName(request.Actions.SingleOrDefault(), decisionActorsById),
                 DecisionComment: request.Actions.SingleOrDefault()?.Comment,
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),
@@ -475,6 +476,15 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             : action.ActorIamId;
     }
 
+    private static string GetApprovalMethod(
+        LeaveRequest request,
+        LeaveRequestAction? action) =>
+        request.WorkflowModeSnapshot == WorkflowMode.DirectSubmission ||
+        action?.ReasonCode == LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange ||
+        action?.Comment == "Approved because the department approval mode changed to Auto-approve."
+            ? "DirectSubmission"
+            : "ApprovalRequired";
+
     private async Task<AppUser?> ResolveAppUserAsync(
         ClaimsPrincipal principal,
         CancellationToken cancellationToken)
@@ -552,6 +562,7 @@ public sealed record ApprovalWorkspaceFacultyResponse(
 
 public sealed record ApprovalWorkspaceLeaveResponse(
     string? Decision,
+    string ApprovalMethod,
     string? DecisionBy,
     string? DecisionComment,
     string EndDate,

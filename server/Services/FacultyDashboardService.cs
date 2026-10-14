@@ -650,6 +650,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             DepartmentName: request.ReportingDepartmentNameSnapshot,
             Note: request.Note,
             Decision: decisionAction?.ActionType.ToString(),
+            ApprovalMethod: GetApprovalMethod(request, decisionAction),
             DecisionBy: decisionAction == null
                 ? null
                 : decisionActorsById.TryGetValue(decisionAction.ActorAppUserId, out var actor)
@@ -658,6 +659,15 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             DecisionAt: decisionAction?.ActionAt,
             DecisionComment: decisionAction?.Comment);
     }
+
+    private static string GetApprovalMethod(
+        LeaveRequest request,
+        LeaveRequestAction? action) =>
+        request.WorkflowModeSnapshot == WorkflowMode.DirectSubmission ||
+        action?.ReasonCode == LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange ||
+        action?.Comment == "Approved because the department approval mode changed to Auto-approve."
+            ? "DirectSubmission"
+            : "ApprovalRequired";
 
     private async Task<List<LeaveType>> GetLeaveTypesAsync(CancellationToken cancellationToken)
     {
@@ -927,6 +937,7 @@ public sealed record FacultyLeaveRequestResponse(
     string DepartmentName,
     string? Note,
     string? Decision,
+    string ApprovalMethod,
     string? DecisionBy,
     DateTime? DecisionAt,
     string? DecisionComment);

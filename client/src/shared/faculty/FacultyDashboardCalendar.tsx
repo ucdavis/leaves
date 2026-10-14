@@ -292,7 +292,6 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
-          faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
         />
