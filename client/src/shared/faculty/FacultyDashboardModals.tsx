@@ -230,7 +230,6 @@ function RequestDetailGrid({ request }: { request: FacultyLeaveRequest }) {
       />
       {request.decision ? (
         <>
-          <RequestDetailItem label="Decision" value={request.decision} />
           {!isAutoApproved(request) ? (
             <RequestDetailItem
               label="Decided by"
