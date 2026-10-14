@@ -42,6 +42,10 @@ export interface FacultyAccrualBalance {
 }
 
 export interface FacultyLeaveRequest {
+  decision?: string | null;
+  decisionAt?: string | null;
+  decisionBy?: string | null;
+  decisionComment?: string | null;
   departmentName: string;
   endDate: string;
   id: number;

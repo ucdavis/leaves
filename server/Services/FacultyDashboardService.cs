@@ -236,6 +236,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
         var request = await _db.LeaveRequests
             .AsNoTracking()
+            .Include(leaveRequest => leaveRequest.Actions)
             .Include(leaveRequest => leaveRequest.Days)
             .Where(leaveRequest => leaveRequest.AppUserId == appUser.Id && leaveRequest.Id == leaveRequestId)
             .SingleOrDefaultAsync(cancellationToken);
@@ -547,6 +548,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     {
         IQueryable<LeaveRequest> query = _db.LeaveRequests
             .AsNoTracking()
+            .Include(request => request.Actions)
             .Include(request => request.Days)
             .Where(request => request.AppUserId == appUserId)
             .OrderByDescending(request => request.SubmittedAt)
@@ -569,9 +571,21 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .AsNoTracking()
             .Where(type => leaveTypeIds.Contains(type.Id))
             .ToDictionaryAsync(type => type.Id, cancellationToken);
+        var decisionActorIds = requests
+            .SelectMany(request => request.Actions)
+            .Select(action => action.ActorAppUserId)
+            .Distinct()
+            .ToArray();
+        var decisionActorsById = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => decisionActorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
 
         return requests
-            .Select(request => CreateFacultyLeaveRequestResponse(request, leaveTypesById))
+            .Select(request => CreateFacultyLeaveRequestResponse(
+                request,
+                leaveTypesById,
+                decisionActorsById))
             .ToList();
     }
 
@@ -589,12 +603,25 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .Where(type => leaveTypeIds.Contains(type.Id))
             .ToDictionaryAsync(type => type.Id, cancellationToken);
 
-        return CreateFacultyLeaveRequestResponse(request, leaveTypesById);
+        var decisionActorIds = request.Actions
+            .Select(action => action.ActorAppUserId)
+            .Distinct()
+            .ToArray();
+        var decisionActorsById = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => decisionActorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
+
+        return CreateFacultyLeaveRequestResponse(
+            request,
+            leaveTypesById,
+            decisionActorsById);
     }
 
     private static FacultyLeaveRequestResponse CreateFacultyLeaveRequestResponse(
         LeaveRequest request,
-        IReadOnlyDictionary<int, LeaveType> leaveTypesById)
+        IReadOnlyDictionary<int, LeaveType> leaveTypesById,
+        IReadOnlyDictionary<int, AppUser> decisionActorsById)
     {
         var leaveTypeName = leaveTypesById.TryGetValue(request.LeaveTypeId, out var leaveType)
             ? leaveType.DisplayName
@@ -603,6 +630,8 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             leaveTypesById.TryGetValue(request.PayLeaveTypeId.Value, out var payLeaveType)
                 ? payLeaveType.DisplayName
                 : null;
+
+        var decisionAction = request.Actions.SingleOrDefault();
 
         return new FacultyLeaveRequestResponse(
             Id: request.Id,
@@ -619,7 +648,15 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             SubmittedAt: request.SubmittedAt,
             WorkflowMode: request.WorkflowModeSnapshot.ToString(),
             DepartmentName: request.ReportingDepartmentNameSnapshot,
-            Note: request.Note);
+            Note: request.Note,
+            Decision: decisionAction?.ActionType.ToString(),
+            DecisionBy: decisionAction == null
+                ? null
+                : decisionActorsById.TryGetValue(decisionAction.ActorAppUserId, out var actor)
+                    ? actor.DisplayName ?? decisionAction.ActorIamId
+                    : decisionAction.ActorIamId,
+            DecisionAt: decisionAction?.ActionAt,
+            DecisionComment: decisionAction?.Comment);
     }
 
     private async Task<List<LeaveType>> GetLeaveTypesAsync(CancellationToken cancellationToken)
@@ -888,7 +925,11 @@ public sealed record FacultyLeaveRequestResponse(
     DateTime SubmittedAt,
     string WorkflowMode,
     string DepartmentName,
-    string? Note);
+    string? Note,
+    string? Decision,
+    string? DecisionBy,
+    DateTime? DecisionAt,
+    string? DecisionComment);
 
 public sealed record FacultyLeaveTypeResponse(
     int Id,

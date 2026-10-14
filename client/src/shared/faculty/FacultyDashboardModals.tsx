@@ -185,6 +185,7 @@ export function RequestDetailModal({
         <RequestDetailHeader request={request} />
         <RequestDetailGrid faculty={faculty} request={request} />
         <RequestNote note={request.note} />
+        <DecisionDetails request={request} />
         <div className="flex justify-end gap-3">
           <button className="btn btn-ghost" onClick={onClose} type="button">
             Close
@@ -232,6 +233,15 @@ function RequestDetailGrid({
         label="Submitted"
         value={formatDate(request.submittedAt)}
       />
+      {request.decision ? (
+        <>
+          <RequestDetailItem label="Decision" value={request.decision} />
+          <RequestDetailItem
+            label="Decided by"
+            value={request.decisionBy ?? 'Unknown approver'}
+          />
+        </>
+      ) : null}
     </dl>
   );
 }
@@ -254,6 +264,27 @@ function RequestNote({ note }: { note?: string | null }) {
         Note
       </div>
       <p className="mt-2 text-sm">{note?.trim() || 'No note provided.'}</p>
+    </div>
+  );
+}
+
+function DecisionDetails({ request }: { request: FacultyLeaveRequest }) {
+  if (!request.decision) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg bg-base-200 p-4">
+      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+        {request.decision} decision
+      </div>
+      <p className="mt-2 text-sm font-medium">
+        Decided by {request.decisionBy ?? 'Unknown approver'}
+        {request.decisionAt ? ` on ${formatDate(request.decisionAt)}` : ''}.
+      </p>
+      <p className="mt-3 whitespace-pre-wrap text-sm">
+        {request.decisionComment?.trim() || 'No comment provided.'}
+      </p>
     </div>
   );
 }

@@ -21,6 +21,9 @@ export type CalendarFaculty = {
 };
 
 export type CalendarLeave = {
+  decision?: string | null;
+  decisionBy?: string | null;
+  decisionComment?: string | null;
   endDate: string;
   facultyId: string;
   id: number;

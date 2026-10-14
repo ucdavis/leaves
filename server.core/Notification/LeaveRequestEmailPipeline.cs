@@ -374,6 +374,11 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         var dates = request.StartDate == request.EndDate
             ? request.StartDate.ToString("MMMM d, yyyy")
             : $"{request.StartDate:MMMM d, yyyy} through {request.EndDate:MMMM d, yyyy}";
+        var decisionComment = await _db.LeaveRequestActions
+            .AsNoTracking()
+            .Where(action => action.LeaveRequestId == request.Id)
+            .Select(action => action.Comment)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return message.NotificationType switch
         {
@@ -384,17 +389,31 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
             LeaveRequestNotificationTypes.Approved => new LeaveRequestEmailNotification(
                 "Leave request approved",
                 "Your leave request was approved",
-                $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved."),
+                WithDecisionComment(
+                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                    decisionComment)),
             LeaveRequestNotificationTypes.Denied => new LeaveRequestEmailNotification(
                 "Leave request denied",
                 "Your leave request was denied",
-                $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was denied."),
+                WithDecisionComment(
+                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was denied.",
+                    decisionComment)),
             LeaveRequestNotificationTypes.FinalizedForRouting => new LeaveRequestEmailNotification(
                 "Leave request finalized",
                 "Leave request finalized",
-                $"{requesterName}'s {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved."),
+                WithDecisionComment(
+                    $"{requesterName}'s {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                    decisionComment)),
             _ => null,
         };
+    }
+
+    private static string WithDecisionComment(string message, string? comment)
+    {
+        var trimmedComment = comment?.Trim();
+        return string.IsNullOrWhiteSpace(trimmedComment)
+            ? message
+            : $"{message}\n\nComment: {trimmedComment}";
     }
 
     private Task<bool> MarkSentAsync(ClaimedOutboundMessage message, DateTime nowUtc, CancellationToken cancellationToken)

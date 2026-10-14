@@ -16,6 +16,7 @@ export type ApprovalWorkspaceResponse = {
 };
 
 export type ApprovalDecisionInput = {
+  comment?: string | null;
   decision: ApprovalDecision;
   requestId: number;
 };
@@ -34,13 +35,14 @@ export const approvalWorkspaceQueryOptions = () =>
   });
 
 export async function submitApprovalDecision({
+  comment,
   decision,
   requestId,
 }: ApprovalDecisionInput) {
   await fetchJson<void>(
     `/api/approvalworkspace/requests/${requestId}/decision`,
     {
-      body: JSON.stringify({ decision }),
+      body: JSON.stringify({ comment, decision }),
       method: 'POST',
     }
   );

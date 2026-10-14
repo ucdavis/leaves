@@ -1,4 +1,5 @@
 import { CheckIcon } from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -15,7 +16,11 @@ export function PendingApprovalsPanel({
   requests,
 }: {
   isSubmitting?: boolean;
-  onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
+  onDecision: (
+    request: ApprovalRequest,
+    decision: ApprovalDecision,
+    comment: string
+  ) => void;
   requests: ApprovalRequest[];
 }) {
   return (
@@ -45,10 +50,15 @@ function ApprovalRequestCard({
   request,
 }: {
   disabled?: boolean;
-  onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
+  onDecision: (
+    request: ApprovalRequest,
+    decision: ApprovalDecision,
+    comment: string
+  ) => void;
   request: ApprovalRequest;
 }) {
   const tone = getLeaveTone(request.leaveType);
+  const [comment, setComment] = useState('');
 
   return (
     <article className="grid gap-4 rounded-lg border border-base-300 bg-base-200/35 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
@@ -66,11 +76,29 @@ function ApprovalRequestCard({
           {request.note ? `Note: ${request.note}` : request.departmentName}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
+      <div className="sm:col-start-2">
+        <label className="form-control w-full">
+          <span className="label pb-1 text-xs font-semibold text-base-content/70">
+            Comment <span className="font-normal">(optional)</span>
+          </span>
+          <textarea
+            className="textarea textarea-bordered min-h-20 w-full text-sm"
+            disabled={disabled}
+            maxLength={2000}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder="Add context for the faculty member and leave administrators"
+            value={comment}
+          />
+          <span className="mt-1 text-right text-xs text-base-content/55">
+            {comment.length}/2000
+          </span>
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2 sm:col-start-3 sm:justify-end">
         <button
           className="btn btn-primary btn-sm"
           disabled={disabled}
-          onClick={() => onDecision(request, 'approved')}
+          onClick={() => onDecision(request, 'approved', comment)}
           type="button"
         >
           Approve
@@ -78,7 +106,7 @@ function ApprovalRequestCard({
         <button
           className="btn btn-error btn-sm"
           disabled={disabled}
-          onClick={() => onDecision(request, 'denied')}
+          onClick={() => onDecision(request, 'denied', comment)}
           type="button"
         >
           Deny

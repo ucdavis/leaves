@@ -76,12 +76,14 @@ function RouteComponent() {
 
   const handleDecision = (
     request: ApprovalRequest,
-    decision: ApprovalDecision
+    decision: ApprovalDecision,
+    comment: string
   ) =>
     void (async () => {
       setPendingRequestIds((requestIds) => new Set(requestIds).add(request.id));
       try {
         await decisionMutation.mutateAsync({
+          comment,
           decision,
           requestId: request.id,
         });

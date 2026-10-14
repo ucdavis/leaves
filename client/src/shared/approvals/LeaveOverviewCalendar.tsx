@@ -230,7 +230,7 @@ function CalendarDayCell({
       className={`h-11 border-r border-t border-base-300 p-0 last:border-r-0 ${dayClassName}`}
     >
       <button
-        aria-label={`View ${leave.status === 'PendingApproval' ? 'pending' : 'approved'} ${leave.leaveType} for ${facultyName}, ${formatDateRange(leave.startDate, leave.endDate)}; ${format(day.date, 'MMMM d, yyyy')}`}
+        aria-label={getLeaveAriaLabel(leave, facultyName, day.date)}
         className={`block h-full w-full ${tone.background} text-left transition hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-inset ${
           startsOnDay ? `border-l-4 ${tone.border}` : ''
         } ${endsOnDay ? 'rounded-r-sm' : ''}`}
@@ -243,14 +243,41 @@ function CalendarDayCell({
               }
             : undefined
         }
-        title={`${leave.leaveType}: ${formatDateRange(
-          leave.startDate,
-          leave.endDate
-        )}`}
+        title={getLeaveDetails(leave)}
         type="button"
       />
     </td>
   );
+}
+
+function getLeaveDetails(leave: CalendarLeave) {
+  const details = [
+    `${leave.leaveType}: ${formatDateRange(leave.startDate, leave.endDate)}`,
+  ];
+
+  if (leave.decision) {
+    details.push(`${leave.decision} by ${leave.decisionBy ?? 'an approver'}`);
+  }
+  if (leave.decisionComment) {
+    details.push(`Comment: ${leave.decisionComment}`);
+  }
+
+  return details.join('\n');
+}
+
+function getLeaveAriaLabel(leave: CalendarLeave, facultyName: string, date: Date) {
+  const details = [
+    `View ${leave.status === 'PendingApproval' ? 'pending' : 'approved'} ${leave.leaveType} for ${facultyName}, ${formatDateRange(leave.startDate, leave.endDate)}; ${format(date, 'MMMM d, yyyy')}`,
+  ];
+
+  if (leave.decision) {
+    details.push(`${leave.decision} by ${leave.decisionBy ?? 'an approver'}`);
+  }
+  if (leave.decisionComment) {
+    details.push(`Comment: ${leave.decisionComment}`);
+  }
+
+  return details.join('; ');
 }
 
 function CalendarLegend() {
