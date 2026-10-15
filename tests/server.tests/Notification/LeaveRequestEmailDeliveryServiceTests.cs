@@ -52,6 +52,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             secondWorkerResult.ClaimedCount.Should().Be(BatchSize);
             secondWorkerResult.SentCount.Should().Be(BatchSize);
             slowDelivery.DeliveredTo.Should().Equal("first@example.test");
+            slowDelivery.DeliveredMessages.Should().ContainSingle(message =>
+                message.Contains("Comment: Coverage confirmed.", StringComparison.Ordinal));
             otherDelivery.DeliveredTo.Should().Equal(
                 Enumerable.Range(2, BatchSize - 1).Select(index => $"queued-{index:D2}@example.test")
                     .Append("expired@example.test"));
@@ -123,6 +125,16 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         };
         db.LeaveRequests.Add(request);
         await db.SaveChangesAsync();
+        db.LeaveRequestActions.Add(new LeaveRequestAction
+        {
+            LeaveRequestId = request.Id,
+            ActionType = LeaveRequestActionType.Approved,
+            ActorAppUserId = requester.Id,
+            ActorIamId = requester.IamId,
+            ActionAt = nowUtc,
+            Comment = "Coverage confirmed.",
+        });
+        await db.SaveChangesAsync();
 
         db.OutboundMessages.Add(CreateMessage(request.Id, "first@example.test", nowUtc));
         db.OutboundMessages.AddRange(
@@ -158,6 +170,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
 
         public List<string> DeliveredTo { get; } = [];
 
+        public List<string> DeliveredMessages { get; } = [];
+
         public Task SendStarted => _sendStarted.Task;
 
         public void ReleaseSend() => _release.TrySetResult();
@@ -171,6 +185,7 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         {
             var recipient = recipients.To.Single();
             DeliveredTo.Add(recipient);
+            DeliveredMessages.Add(message);
 
             if (!string.Equals(recipient, _blockedRecipient, StringComparison.OrdinalIgnoreCase))
             {
@@ -241,7 +256,6 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             modelBuilder.Ignore<EmployeeReportingDepartmentOverride>();
             modelBuilder.Ignore<EmployeeAccrualBalance>();
             modelBuilder.Ignore<Person>();
-            modelBuilder.Ignore<LeaveRequestAction>();
             modelBuilder.Ignore<LeaveRequestDay>();
 
             var appUser = modelBuilder.Entity<AppUser>();
@@ -255,12 +269,11 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             appUser.Ignore(user => user.CreatedClusterCaoAssignments);
             appUser.Ignore(user => user.ClosedClusterCaoAssignments);
             appUser.Ignore(user => user.UpdatedDepartmentEmailRoutings);
-            appUser.Ignore(user => user.LeaveRequestActions);
             LeaveType.Configure(modelBuilder.Entity<LeaveType>());
             var leaveRequest = modelBuilder.Entity<LeaveRequest>();
             LeaveRequest.Configure(leaveRequest);
-            leaveRequest.Ignore(request => request.Actions);
             leaveRequest.Ignore(request => request.Days);
+            LeaveRequestAction.Configure(modelBuilder.Entity<LeaveRequestAction>());
             OutboundMessage.Configure(modelBuilder.Entity<OutboundMessage>());
         }
     }
