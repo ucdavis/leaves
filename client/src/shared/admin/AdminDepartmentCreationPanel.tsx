@@ -1,7 +1,12 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import type { AdminCluster, ApprovalMode } from '@/shared/admin/adminData.ts';
-import type { CreateDepartmentInput } from '@/queries/adminDepartments.ts';
+import {
+  departmentCandidatesQueryOptions,
+  type CreateDepartmentInput,
+  type DepartmentCandidate,
+} from '@/queries/adminDepartments.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 
 const DEPARTMENT_CODE_MAX_LENGTH = 10;
@@ -53,6 +58,9 @@ export function AdminDepartmentCreationPanel({
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
+  const [departmentQuery, setDepartmentQuery] = useState('');
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<DepartmentCandidate | null>(null);
 
   const clusterForm = useAppForm({
     defaultValues: {
@@ -91,6 +99,8 @@ export function AdminDepartmentCreationPanel({
           name: value.name.trim(),
         });
         departmentForm.reset();
+        setDepartmentQuery('');
+        setSelectedDepartment(null);
       } catch (error) {
         setDepartmentError(formatError(error));
       }
@@ -99,6 +109,17 @@ export function AdminDepartmentCreationPanel({
       onChange: departmentFormSchema,
     },
   });
+
+  const departmentCandidates = useQuery(
+    departmentCandidatesQueryOptions(departmentQuery)
+  );
+
+  const selectDepartment = (candidate: DepartmentCandidate) => {
+    setSelectedDepartment(candidate);
+    setDepartmentQuery(`${candidate.code} — ${candidate.description ?? ''}`);
+    departmentForm.setFieldValue('code', candidate.code);
+    departmentForm.setFieldValue('name', candidate.description ?? '');
+  };
 
   return (
     <>
@@ -162,15 +183,62 @@ export function AdminDepartmentCreationPanel({
               >
                 <departmentForm.AppForm>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <departmentForm.AppField name="code">
-                      {(field) => (
-                        <field.TextField
-                          inputClassName="input input-bordered w-full bg-white uppercase"
-                          label="Department code"
-                          placeholder="000000"
+                    <div className="sm:col-span-2">
+                      <label className="form-control w-full">
+                        <span className="label-text">
+                          UCPath Level 5 department
+                        </span>
+                        <input
+                          className="input input-bordered w-full bg-white"
+                          onChange={(event) => {
+                            setDepartmentQuery(event.target.value);
+                            setSelectedDepartment(null);
+                            departmentForm.setFieldValue('code', '');
+                          }}
+                          placeholder="Search code or description"
+                          type="search"
+                          value={departmentQuery}
                         />
-                      )}
-                    </departmentForm.AppField>
+                      </label>
+                      {departmentQuery.trim().length > 0 &&
+                      departmentQuery.trim().length < 2 ? (
+                        <p className="mt-2 text-sm text-base-content/70">
+                          Type at least 2 characters.
+                        </p>
+                      ) : null}
+                      {departmentCandidates.isFetching ? (
+                        <p className="mt-2 text-sm text-base-content/70">
+                          Searching UCPath departments…
+                        </p>
+                      ) : null}
+                      {departmentCandidates.data && !selectedDepartment ? (
+                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-1">
+                          {departmentCandidates.data.map((candidate) => (
+                            <button
+                              className="flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-left hover:bg-base-200"
+                              key={candidate.code}
+                              onClick={() => selectDepartment(candidate)}
+                              type="button"
+                            >
+                              <span>
+                                <span className="font-mono font-semibold">
+                                  {candidate.code}
+                                </span>
+                                <span className="text-base-content/70">
+                                  {' — '}
+                                  {candidate.description ?? 'No description'}
+                                </span>
+                              </span>
+                            </button>
+                          ))}
+                          {departmentCandidates.data.length === 0 ? (
+                            <p className="px-3 py-2 text-sm text-base-content/70">
+                              No matching UCPath Level 5 departments.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
 
                     <departmentForm.AppField name="name">
                       {(field) => (

@@ -52,6 +52,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.SearchCaoCandidatesAsync(query, cancellationToken));
     }
 
+    [HttpGet("candidates")]
+    public async Task<IActionResult> SearchDepartmentCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    {
+        return Ok(await _adminDirectoryDataService.SearchDepartmentCandidatesAsync(query, cancellationToken));
+    }
+
     [HttpPost("clusters")]
     public async Task<IActionResult> CreateCluster([FromBody] CreateClusterRequest request, CancellationToken cancellationToken)
     {
@@ -217,6 +223,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         if (departmentExists)
         {
             return Conflict("A department with that code already exists.");
+        }
+
+        var isLevelFiveDepartmentCode = await _adminDirectoryDataService.IsLevelFiveDepartmentCodeAsync(
+            departmentCode,
+            cancellationToken);
+        if (!isLevelFiveDepartmentCode)
+        {
+            return ValidationProblem("Department code must exist in the current UCPath Level 5 department data.");
         }
 
         if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: true, out var workflowMode))

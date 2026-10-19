@@ -180,6 +180,41 @@ test('department roster includes faculty admins and CAOs, and excludes directory
   expect(within(roster).queryByText(/Staff/)).not.toBeInTheDocument();
 });
 
+test('department creation requires a selected UCPath Level 5 department and prefills its name', async () => {
+  let saved: unknown;
+  server.use(
+    http.get('/api/admin/departments/candidates', () =>
+      HttpResponse.json([
+        {
+          code: 'PLS',
+          description: 'Plant Sciences',
+        },
+      ])
+    ),
+    http.post('/api/admin/departments', async ({ request }) => {
+      saved = await request.json();
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  renderDepartments();
+
+  const search = await screen.findByPlaceholderText('Search code or description');
+  fireEvent.change(search, { target: { value: 'Plant' } });
+  fireEvent.click(await screen.findByRole('button', { name: /PLS.*Plant Sciences/ }));
+
+  expect(screen.getByDisplayValue('Plant Sciences')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
+
+  await waitFor(() =>
+    expect(saved).toEqual({
+      approvalMode: 'auto',
+      clusterId: null,
+      code: 'PLS',
+      name: 'Plant Sciences',
+    })
+  );
+});
+
 test.each([
   ['Staff candidate', 'candidate'],
   ['Staff with faculty appointment', 'split'],

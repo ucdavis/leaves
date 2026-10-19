@@ -16,6 +16,11 @@ export type CreateDepartmentInput = {
   name: string;
 };
 
+export type DepartmentCandidate = {
+  code: string;
+  description: string | null;
+};
+
 type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
   departmentId: string | null;
   departmentOverrideEndDate?: string | null;
@@ -104,6 +109,20 @@ export const caoCandidatesQueryOptions = (query: string) => {
         signal
       ),
     queryKey: ['admin', 'caoCandidates', term] as const,
+  });
+};
+
+export const departmentCandidatesQueryOptions = (query: string) => {
+  const term = query.trim();
+  return queryOptions({
+    enabled: term.length >= 2 && term.length <= 128,
+    queryFn: ({ signal }): Promise<DepartmentCandidate[]> =>
+      fetchJson<DepartmentCandidate[]>(
+        `/api/admin/departments/candidates?query=${encodeURIComponent(term)}`,
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'departmentCandidates', term] as const,
   });
 };
 

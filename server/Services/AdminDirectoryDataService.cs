@@ -157,6 +157,47 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DepartmentCandidate>> SearchDepartmentCandidatesAsync(
+        string? query,
+        CancellationToken cancellationToken)
+    {
+        var term = query?.Trim() ?? string.Empty;
+        if (term.Length > 128)
+        {
+            return [];
+        }
+
+        var levelFiveDepartments = _db.EmployeeAccrualBalances
+            .AsNoTracking()
+            .Where(balance => balance.Level5Dept != null && balance.Level5Dept.Trim() != string.Empty);
+
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            levelFiveDepartments = levelFiveDepartments.Where(balance =>
+                balance.Level5Dept.Contains(term) || balance.Level5DeptDesc.Contains(term));
+        }
+
+        var candidates = await levelFiveDepartments
+            .GroupBy(balance => balance.Level5Dept.Trim())
+            .Select(group => new DepartmentCandidate(
+                group.Key,
+                group.Max(balance => balance.Level5DeptDesc)))
+            .OrderBy(candidate => candidate.Code)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        return candidates;
+    }
+
+    public Task<bool> IsLevelFiveDepartmentCodeAsync(string departmentCode, CancellationToken cancellationToken)
+    {
+        return _db.EmployeeAccrualBalances
+            .AsNoTracking()
+            .AnyAsync(balance => balance.Level5Dept != null &&
+                                 balance.Level5Dept.Trim() == departmentCode,
+                cancellationToken);
+    }
+
     public async Task<AdminStatusDirectoryData> LoadStatusDirectoryDataAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -390,6 +431,10 @@ public sealed record DirectoryEmployee(
     string? DisplayName,
     string? Email,
     string? EmployeeId = null);
+
+public sealed record DepartmentCandidate(
+    string Code,
+    string? Description);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,
