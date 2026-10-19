@@ -59,6 +59,17 @@ function ApprovalRequestCard({
 }) {
   const tone = getLeaveTone(request.leaveType);
   const [comment, setComment] = useState('');
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  const denyRequest = () => {
+    if (!comment.trim()) {
+      setCommentError('A comment is required when denying a request.');
+      return;
+    }
+
+    setCommentError(null);
+    onDecision(request, 'denied', comment);
+  };
 
   return (
     <article className="grid gap-4 rounded-lg border border-base-300 bg-base-200/35 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
@@ -79,22 +90,42 @@ function ApprovalRequestCard({
       <div className="sm:col-start-2">
         <label className="form-control w-full">
           <span className="label pb-1 text-xs font-semibold text-base-content/70">
-            Comment <span className="font-normal">(optional)</span>
+            Comment
           </span>
           <textarea
-            className="textarea textarea-bordered min-h-20 w-full text-sm"
+            aria-describedby={commentError ? `comment-error-${request.id}` : undefined}
+            aria-invalid={Boolean(commentError)}
+            className="textarea textarea-bordered h-8 min-h-8 w-full resize-none overflow-y-hidden py-1 text-sm"
             disabled={disabled}
             maxLength={2000}
-            onChange={(event) => setComment(event.target.value)}
+            onChange={(event) => {
+              event.currentTarget.style.height = 'auto';
+              event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+              setComment(event.target.value);
+              if (commentError) {
+                setCommentError(null);
+              }
+            }}
             placeholder="Add context for the faculty member and leave administrators"
             value={comment}
           />
-          <span className="mt-1 text-right text-xs text-base-content/55">
-            {comment.length}/2000
-          </span>
+          <div className="mt-1">
+            <div className="text-right text-xs text-base-content/55">
+              {comment.length}/2000
+            </div>
+            {commentError ? (
+              <div className="mt-1 text-sm text-error" id={`comment-error-${request.id}`}>
+                {commentError}
+              </div>
+            ) : null}
+          </div>
         </label>
       </div>
-      <div className="flex flex-wrap gap-2 sm:col-start-3 sm:justify-end">
+      <div
+        className={`flex flex-wrap gap-2 sm:col-start-3 sm:justify-end ${
+          commentError ? 'sm:-translate-y-3' : ''
+        }`}
+      >
         <button
           className="btn btn-primary btn-sm"
           disabled={disabled}
@@ -106,7 +137,7 @@ function ApprovalRequestCard({
         <button
           className="btn btn-error btn-sm"
           disabled={disabled}
-          onClick={() => onDecision(request, 'denied', comment)}
+          onClick={denyRequest}
           type="button"
         >
           Deny

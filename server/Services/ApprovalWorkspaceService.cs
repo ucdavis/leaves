@@ -219,6 +219,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             return ApprovalDecisionResult.Invalid("Decision must be either approved or denied.");
         }
 
+        if (status.Value == LeaveRequestStatus.Denied && comment == null)
+        {
+            return ApprovalDecisionResult.Invalid(
+                "Comment is required when denying a request.",
+                "comment");
+        }
+
         var appUser = await ResolveAppUserAsync(principal, cancellationToken);
         if (appUser == null)
         {
