@@ -10,6 +10,42 @@ namespace Server.Tests.Services;
 
 public class FacultyDashboardServiceTests
 {
+    [Theory]
+    [MemberData(nameof(VacationAvailabilityCases))]
+    public void Vacation_availability_uses_FY_job_codes_or_a_positive_current_vacation_balance(
+        string? jobCodeDescription,
+        string balanceType,
+        decimal balanceHours,
+        bool expected)
+    {
+        var employee = new CurrentFacultyWithAccrual
+        {
+            IamId = "faculty",
+            JobCodeDescription = jobCodeDescription,
+        };
+        var balances = new[]
+        {
+            new CurrentFacultyAccrualBalance
+            {
+                EmployeeId = "12345678",
+                IamId = "faculty",
+                TypeLabel = balanceType,
+                CalculatedBal = balanceHours,
+                ApproachingMax = "N",
+            },
+        };
+
+        FacultyDashboardService.IsVacationAvailable(employee, balances).Should().Be(expected);
+    }
+
+    public static IEnumerable<object?[]> VacationAvailabilityCases =>
+    [
+        ["Fiscal Year FY appointment", "Vacation", 0m, true],
+        ["Academic Year appointment", "Sick Leave", 80m, false],
+        ["Academic Year appointment", "Vacation", 12m, true],
+        ["Academic Year appointment", "Vacation", 0m, false],
+    ];
+
     [Fact]
     public async Task Submission_without_current_faculty_reports_eligibility_and_creates_no_request()
     {
