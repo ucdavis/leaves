@@ -10,7 +10,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type {
   FacultyDashboardResponse,
@@ -62,6 +62,7 @@ export function LeaveCalendar({
   onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
 }) {
+  const calendarRef = useRef<HTMLElement>(null);
   const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
   const holidayCoverageEnd = getUniversityHolidayCoverageEnd(holidays);
   const visibleRequests = useMemo(
@@ -73,6 +74,7 @@ export function LeaveCalendar({
     [focusDate, visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
+  const [focusedDate, setFocusedDate] = useState<string | null>(focusDate ?? null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
@@ -89,7 +91,14 @@ export function LeaveCalendar({
     [visibleRequests]
   );
 
+  useEffect(() => {
+    if (focusDate) {
+      calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [focusDate]);
+
   const selectDate = (date: string) => {
+    setFocusedDate(null);
     setSelectedDate(date);
     if (!onReportLeave) {
       return;
@@ -108,6 +117,7 @@ export function LeaveCalendar({
     const today = format(new Date(), 'yyyy-MM-dd');
 
     setVisibleMonth(startOfMonth(new Date()));
+    setFocusedDate(null);
     setSelectedDate(today);
     setSelectionStartDate(today);
     setSelectionEndDate(null);
@@ -116,7 +126,10 @@ export function LeaveCalendar({
   const selectedEndDate = selectionEndDate ?? selectionStartDate;
 
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section
+      className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm"
+      ref={calendarRef}
+    >
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <button
           className="btn btn-ghost btn-sm"
@@ -202,6 +215,7 @@ export function LeaveCalendar({
 
           return (
             <div
+              aria-current={focusedDate === day?.isoDate ? 'date' : undefined}
               className={`relative min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
                 holiday
                   ? 'bg-sky-100 hover:bg-sky-200'
@@ -211,6 +225,10 @@ export function LeaveCalendar({
                       ? 'hover:bg-base-200'
                       : 'bg-base-200/40'
               } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
+                focusedDate === day?.isoDate
+                  ? 'ring-2 ring-primary/60 ring-inset'
+                  : ''
+              } ${
                 day ? 'cursor-pointer' : ''
               }`}
               key={day?.isoDate ?? `blank-${index}`}
@@ -292,7 +310,6 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
-          faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
         />

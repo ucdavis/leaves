@@ -108,7 +108,6 @@ export function FacultyDashboardPage({
 
       {selectedRequest ? (
         <RequestDetailModal
-          faculty={data.faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
         />

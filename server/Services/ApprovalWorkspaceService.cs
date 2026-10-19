@@ -75,12 +75,25 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             .AsNoTracking()
             .Where(type => leaveTypeIds.Contains(type.Id))
             .ToDictionaryAsync(type => type.Id, cancellationToken);
+        var decisionActorIds = scopedLeaveRequests
+            .SelectMany(request => request.Actions)
+            .Select(action => action.ActorAppUserId)
+            .Distinct()
+            .ToArray();
+        var decisionActorsById = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => decisionActorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
 
         var leaves = scopedLeaveRequests
             .Where(request =>
                 request.Status == LeaveRequestStatus.Approved ||
                 request.Status == LeaveRequestStatus.PendingApproval)
             .Select(request => new ApprovalWorkspaceLeaveResponse(
+                Decision: request.Actions.SingleOrDefault()?.ActionType.ToString(),
+                ApprovalMethod: GetApprovalMethod(request, request.Actions.SingleOrDefault()),
+                DecisionBy: GetDecisionActorName(request.Actions.SingleOrDefault(), decisionActorsById),
+                DecisionComment: request.Actions.SingleOrDefault()?.Comment,
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),
                 FacultyId: request.IamId.Trim(),
                 Id: request.Id,
@@ -184,6 +197,16 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         SubmitApprovalDecisionRequest request,
         CancellationToken cancellationToken)
     {
+        var comment = string.IsNullOrWhiteSpace(request.Comment)
+            ? null
+            : request.Comment.Trim();
+        if (comment?.Length > 2000)
+        {
+            return ApprovalDecisionResult.Invalid(
+                "Comment must be 2,000 characters or fewer.",
+                "comment");
+        }
+
         var status = NormalizeKey(request.Decision) switch
         {
             "approved" => LeaveRequestStatus.Approved,
@@ -194,6 +217,13 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         if (!status.HasValue)
         {
             return ApprovalDecisionResult.Invalid("Decision must be either approved or denied.");
+        }
+
+        if (status.Value == LeaveRequestStatus.Denied && comment == null)
+        {
+            return ApprovalDecisionResult.Invalid(
+                "Comment is required when denying a request.",
+                "comment");
         }
 
         var appUser = await ResolveAppUserAsync(principal, cancellationToken);
@@ -233,7 +263,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             ActorAppUserId = appUser.Id,
             ActorIamId = appUser.IamId,
             ActionAt = nowUtc,
-            Comment = request.Comment,
+            Comment = comment,
             IsSelfAction = false,
         });
         await _notificationQueue.QueueDecisionAsync(leaveRequest, requester, cancellationToken);
@@ -343,6 +373,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         var facultyIds = scopedFacultyIds.ToArray();
         var query = _db.LeaveRequests
             .AsNoTracking()
+            .Include(request => request.Actions)
             .Include(request => request.Days)
             .Where(request =>
                 (request.Status == LeaveRequestStatus.Approved && facultyIds.Contains(request.IamId)) ||
@@ -438,6 +469,29 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
             : "Vacation";
     }
 
+    private static string? GetDecisionActorName(
+        LeaveRequestAction? action,
+        IReadOnlyDictionary<int, AppUser> decisionActorsById)
+    {
+        if (action == null)
+        {
+            return null;
+        }
+
+        return decisionActorsById.TryGetValue(action.ActorAppUserId, out var actor)
+            ? actor.DisplayName ?? action.ActorIamId
+            : action.ActorIamId;
+    }
+
+    private static string GetApprovalMethod(
+        LeaveRequest request,
+        LeaveRequestAction? action) =>
+        request.WorkflowModeSnapshot == WorkflowMode.DirectSubmission ||
+        action?.ReasonCode == LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange ||
+        action?.Comment == "Approved because the department approval mode changed to Auto-approve."
+            ? "DirectSubmission"
+            : "ApprovalRequired";
+
     private async Task<AppUser?> ResolveAppUserAsync(
         ClaimsPrincipal principal,
         CancellationToken cancellationToken)
@@ -514,6 +568,10 @@ public sealed record ApprovalWorkspaceFacultyResponse(
     string Name);
 
 public sealed record ApprovalWorkspaceLeaveResponse(
+    string? Decision,
+    string ApprovalMethod,
+    string? DecisionBy,
+    string? DecisionComment,
     string EndDate,
     string FacultyId,
     int Id,
@@ -548,6 +606,6 @@ public sealed record ApprovalDecisionResult(
     public static ApprovalDecisionResult NotFound() =>
         new(false, true, []);
 
-    public static ApprovalDecisionResult Invalid(string message) =>
-        new(false, false, new Dictionary<string, string[]> { ["decision"] = [message] });
+    public static ApprovalDecisionResult Invalid(string message, string key = "decision") =>
+        new(false, false, new Dictionary<string, string[]> { [key] = [message] });
 }

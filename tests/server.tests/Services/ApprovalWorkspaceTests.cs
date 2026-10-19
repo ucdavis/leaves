@@ -59,6 +59,16 @@ public class ApprovalWorkspaceTests
         AddRequest(5, "current", LeaveRequestStatus.Approved, true);
         AddRequest(6, "current", LeaveRequestStatus.PendingApproval, false);
         await db.SaveChangesAsync();
+        db.LeaveRequestActions.Add(new LeaveRequestAction
+        {
+            LeaveRequestId = 5,
+            ActionType = LeaveRequestActionType.Approved,
+            ActorAppUserId = viewer.Id,
+            ActorIamId = viewer.IamId,
+            ActionAt = DateTime.UtcNow,
+            Comment = "Coverage confirmed.",
+        });
+        await db.SaveChangesAsync();
         var data = new AdminDirectoryData(
             AppUsers: [viewer, former, unnamed], Clusters: [cluster],
             CurrentCaoAssignmentsByCluster: new Dictionary<int, ClusterCaoAssignment>(),
@@ -84,6 +94,10 @@ public class ApprovalWorkspaceTests
         workspace.PendingRequests.Single(item => item.Id == 1).FacultyName.Should().Be("Former Faculty");
         workspace.PendingRequests.Single(item => item.Id == 2).FacultyName.Should().Be("unnamed");
         workspace.Leaves.Where(item => item.Status == "Approved").Select(item => item.Id).Should().Equal(5);
+        var approvedLeave = workspace.Leaves.Single(item => item.Id == 5);
+        approvedLeave.Decision.Should().Be("Approved");
+        approvedLeave.DecisionBy.Should().Be(viewer.IamId);
+        approvedLeave.DecisionComment.Should().Be("Coverage confirmed.");
     }
 
     private sealed class DirectoryStub(AdminDirectoryData data) : IAdminDirectoryDataService
