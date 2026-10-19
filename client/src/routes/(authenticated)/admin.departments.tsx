@@ -18,6 +18,8 @@ import {
   deleteAdminDepartment,
   getAdminDepartmentPendingApprovalCount,
   removeAdminDepartmentRoutingEmail,
+  reactivateAdminCluster,
+  reactivateAdminDepartment,
   updateAdminCluster,
   updateAdminDepartment,
   upsertAdminDepartmentRoutingEmail,
@@ -79,7 +81,14 @@ function AdminDepartmentsRoute() {
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
-  const { caoUsers, clusters, departments, facultyUsers } = data;
+  const {
+    caoUsers,
+    clusters,
+    departments,
+    facultyUsers,
+    inactiveClusters,
+    inactiveDepartments,
+  } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
@@ -163,6 +172,14 @@ function AdminDepartmentsRoute() {
   });
   const deleteClusterMutation = useMutation({
     mutationFn: deleteAdminCluster,
+    onSuccess: invalidateDepartments,
+  });
+  const reactivateDepartmentMutation = useMutation({
+    mutationFn: reactivateAdminDepartment,
+    onSuccess: invalidateDepartments,
+  });
+  const reactivateClusterMutation = useMutation({
+    mutationFn: reactivateAdminCluster,
     onSuccess: invalidateDepartments,
   });
   const upsertRoutingEmailMutation = useMutation({
@@ -347,6 +364,9 @@ function AdminDepartmentsRoute() {
         onCreateDepartment={(input) =>
           createDepartmentMutation.mutateAsync({ input })
         }
+        onReactivateDepartment={(departmentId) =>
+          reactivateDepartmentMutation.mutateAsync({ departmentId })
+        }
       />
 
       <h2 className="text-2xl font-semibold text-primary">
@@ -486,6 +506,63 @@ function AdminDepartmentsRoute() {
                   onOpenRoster={() => openRoster(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
                 />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {inactiveDepartments.length > 0 || inactiveClusters.length > 0 ? (
+        <section className="card border border-dashed border-main-border bg-base-100">
+          <div className="card-body p-6">
+            <h2 className="text-lg font-semibold text-base-content/70">
+              Inactive departments and clusters
+            </h2>
+            <div className="mt-4 space-y-3">
+              {inactiveDepartments.map((department) => (
+                <div
+                  className="flex items-center justify-between gap-4 rounded-lg border border-base-300 p-4"
+                  key={department.id}
+                >
+                  <div>
+                    <div className="font-semibold">{department.name}</div>
+                    <div className="font-mono text-sm text-base-content/70">
+                      {department.code}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-outline"
+                    disabled={reactivateDepartmentMutation.isPending}
+                    onClick={() =>
+                      void reactivateDepartmentMutation.mutateAsync({
+                        departmentId: department.id,
+                      })
+                    }
+                    type="button"
+                  >
+                    Reactivate department
+                  </button>
+                </div>
+              ))}
+              {inactiveClusters.map((cluster) => (
+                <div
+                  className="flex items-center justify-between gap-4 rounded-lg border border-base-300 p-4"
+                  key={cluster.id}
+                >
+                  <div className="font-semibold">{cluster.name}</div>
+                  <button
+                    className="btn btn-outline"
+                    disabled={reactivateClusterMutation.isPending}
+                    onClick={() =>
+                      void reactivateClusterMutation.mutateAsync({
+                        clusterId: cluster.id,
+                      })
+                    }
+                    type="button"
+                  >
+                    Reactivate cluster
+                  </button>
+                </div>
               ))}
             </div>
           </div>

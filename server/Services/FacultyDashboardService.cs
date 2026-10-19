@@ -328,6 +328,19 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         if (department == null)
         {
+            var departmentCode = employee.ResolvedReportingDepartmentCode?.Trim();
+            var isInactiveDepartment = !string.IsNullOrWhiteSpace(departmentCode) &&
+                                       await _db.Departments
+                                           .IgnoreQueryFilters()
+                                           .AnyAsync(item => item.DepartmentCode == departmentCode && !item.IsActive,
+                                               cancellationToken);
+            if (isInactiveDepartment)
+            {
+                return CreateLeaveRequestResult.Invalid(
+                    "department",
+                    "Your reporting department has been deactivated. You cannot submit leave requests until an administrator reactivates it.");
+            }
+
             return CreateLeaveRequestResult.Invalid(
                 "department",
                 "A reporting department is required before a leave request can be submitted.");

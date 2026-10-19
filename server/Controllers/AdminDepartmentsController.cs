@@ -176,6 +176,22 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return NoContent();
     }
 
+    [HttpPost("clusters/{clusterId:int}/reactivate")]
+    public async Task<IActionResult> ReactivateCluster(int clusterId, CancellationToken cancellationToken)
+    {
+        var cluster = await _db.Clusters.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == clusterId, cancellationToken);
+        if (cluster == null || cluster.IsActive)
+        {
+            return NotFound();
+        }
+
+        cluster.IsActive = true;
+        cluster.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentRequest request, CancellationToken cancellationToken)
     {
@@ -217,11 +233,16 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             }
         }
 
-        var departmentExists = await _db.Departments.AnyAsync(
+        var existingDepartment = await _db.Departments.IgnoreQueryFilters().FirstOrDefaultAsync(
             department => department.DepartmentCode == departmentCode,
             cancellationToken);
-        if (departmentExists)
+        if (existingDepartment != null)
         {
+            if (!existingDepartment.IsActive)
+            {
+                return Conflict(new { inactiveDepartmentCode = existingDepartment.DepartmentCode });
+            }
+
             return Conflict("A department with that code already exists.");
         }
 
@@ -373,6 +394,23 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         department.IsActive = false;
         department.UpdatedUtc = DateTime.UtcNow;
 
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{departmentCode}/reactivate")]
+    public async Task<IActionResult> ReactivateDepartment(string departmentCode, CancellationToken cancellationToken)
+    {
+        var department = await _db.Departments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
+        if (department == null || department.IsActive)
+        {
+            return NotFound();
+        }
+
+        department.ClusterId = null;
+        department.IsActive = true;
+        department.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

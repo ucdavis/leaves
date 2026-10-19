@@ -390,7 +390,7 @@ export function DepartmentSettingsModal({
           title="Deactivate department?"
         >
           <span>
-            Deactivate <strong>{department.name}</strong>? Users will no longer
+            Deactivate <strong>{department.name}</strong>? Faculty will no longer
             be able to submit requests to this department.
           </span>
         </WarningModal>

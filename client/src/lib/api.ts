@@ -41,9 +41,14 @@ export async function fetchJson<T>(
   }
 
   const text = await res.text();
-  const contentType = res.headers.get('content-type') || '';
+  const mediaType = (res.headers.get('content-type') || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
   const data =
-    contentType.includes('application/json') && text ? JSON.parse(text) : text;
+    (mediaType === 'application/json' || mediaType.endsWith('+json')) && text
+      ? JSON.parse(text)
+      : text;
 
   if (!res.ok) {
     throw new HttpError(res.status, url, data);

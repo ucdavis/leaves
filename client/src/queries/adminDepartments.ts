@@ -41,6 +41,8 @@ type AdminDepartmentsResponse = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
   facultyUsers: AdminDepartmentUserResponse[];
+  inactiveClusters?: AdminCluster[];
+  inactiveDepartments?: AdminDepartment[];
 };
 
 export type AdminDepartmentsPageData = {
@@ -48,6 +50,8 @@ export type AdminDepartmentsPageData = {
   clusters: AdminCluster[];
   departments: AdminDepartment[];
   facultyUsers: AdminUser[];
+  inactiveClusters: AdminCluster[];
+  inactiveDepartments: AdminDepartment[];
 };
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
@@ -77,6 +81,8 @@ function normalizeDepartmentData(
       departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
       role: user.role,
     })),
+    inactiveClusters: response.inactiveClusters ?? [],
+    inactiveDepartments: response.inactiveDepartments ?? [],
   };
 }
 
@@ -200,6 +206,34 @@ export async function createAdminDepartment({
       }),
       method: 'POST',
     },
+    signal
+  );
+}
+
+export async function reactivateAdminDepartment({
+  departmentId,
+  signal,
+}: {
+  departmentId: string;
+  signal?: AbortSignal;
+}) {
+  await fetchJson<void>(
+    `/api/admin/departments/${encodeURIComponent(departmentId)}/reactivate`,
+    { method: 'POST' },
+    signal
+  );
+}
+
+export async function reactivateAdminCluster({
+  clusterId,
+  signal,
+}: {
+  clusterId: string;
+  signal?: AbortSignal;
+}) {
+  await fetchJson<void>(
+    `/api/admin/departments/clusters/${encodeURIComponent(clusterId)}/reactivate`,
+    { method: 'POST' },
     signal
   );
 }

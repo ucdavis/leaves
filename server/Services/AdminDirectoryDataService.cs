@@ -18,10 +18,17 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
         _db = db;
     }
 
-    public async Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
+    public Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
+    {
+        return LoadDirectoryDataAsync(cancellationToken, includeInactive: false);
+    }
+
+    public async Task<AdminDirectoryData> LoadDirectoryDataAsync(
+        CancellationToken cancellationToken,
+        bool includeInactive)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var coreData = await LoadDirectoryCoreDataAsync(cancellationToken);
+        var coreData = await LoadDirectoryCoreDataAsync(cancellationToken, includeInactive);
         var currentOverridesById = await LoadCurrentOverridesByIdAsync(coreData.CurrentFaculty, cancellationToken);
         var currentChairAssignmentsByDepartment = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
         var currentCaoAssignmentsByCluster = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
@@ -295,13 +302,23 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 cancellationToken);
     }
 
-    private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(CancellationToken cancellationToken)
+    private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(
+        CancellationToken cancellationToken,
+        bool includeInactive)
     {
-        var clusters = await _db.Clusters
+        var clustersQuery = _db.Clusters.AsQueryable();
+        var departmentsQuery = _db.Departments.AsQueryable();
+        if (includeInactive)
+        {
+            clustersQuery = clustersQuery.IgnoreQueryFilters();
+            departmentsQuery = departmentsQuery.IgnoreQueryFilters();
+        }
+
+        var clusters = await clustersQuery
             .AsNoTracking()
             .OrderBy(cluster => cluster.ClusterName)
             .ToListAsync(cancellationToken);
-        var departments = await _db.Departments
+        var departments = await departmentsQuery
             .AsNoTracking()
             .Include(department => department.DepartmentEmailRoutings)
             .OrderBy(department => department.DepartmentName)

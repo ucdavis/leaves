@@ -13,7 +13,7 @@ public sealed class AdminDirectoryService
 
     public async Task<AdminDepartmentsResponse> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken);
+        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken, includeInactive: true);
         var caoEmployees = await _directoryDataService.LoadCaoEmployeesAsync(
             directoryData.CurrentCaoAssignmentsByCluster.Values.Select(assignment => assignment.IamId),
             cancellationToken);
@@ -91,16 +91,20 @@ public sealed class AdminDirectoryService
     {
         var roleAssignments = BuildRoleAssignments(directoryData);
         return new AdminDepartmentsResponse(
-            Clusters: BuildClusterResponses(directoryData),
-            Departments: BuildDepartmentResponses(directoryData),
+            Clusters: BuildClusterResponses(directoryData, isActive: true),
+            Departments: BuildDepartmentResponses(directoryData, isActive: true),
+            InactiveClusters: BuildClusterResponses(directoryData, isActive: false),
+            InactiveDepartments: BuildDepartmentResponses(directoryData, isActive: false),
             FacultyUsers: BuildFacultyUserResponses(directoryData, roleAssignments),
             CaoUsers: BuildCaoUserResponses(directoryData, caoEmployees, roleAssignments));
     }
 
     private static IReadOnlyList<AdminDepartmentResponse> BuildDepartmentResponses(
-        AdminDirectoryData directoryData)
+        AdminDirectoryData directoryData,
+        bool? isActive = null)
     {
         return directoryData.Departments
+            .Where(department => !isActive.HasValue || department.IsActive == isActive.Value)
             .Select(department =>
             {
                 directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(
@@ -128,9 +132,11 @@ public sealed class AdminDirectoryService
     }
 
     private static IReadOnlyList<AdminClusterResponse> BuildClusterResponses(
-        AdminDirectoryData directoryData)
+        AdminDirectoryData directoryData,
+        bool? isActive = null)
     {
         return directoryData.Clusters
+            .Where(cluster => !isActive.HasValue || cluster.IsActive == isActive.Value)
             .Select(cluster =>
             {
                 directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
@@ -282,6 +288,8 @@ public sealed class AdminDirectoryService
 public sealed record AdminDepartmentsResponse(
     IReadOnlyList<AdminClusterResponse> Clusters,
     IReadOnlyList<AdminDepartmentResponse> Departments,
+    IReadOnlyList<AdminClusterResponse> InactiveClusters,
+    IReadOnlyList<AdminDepartmentResponse> InactiveDepartments,
     IReadOnlyList<AdminUserResponse> FacultyUsers,
     IReadOnlyList<AdminCaoUserResponse> CaoUsers);
 

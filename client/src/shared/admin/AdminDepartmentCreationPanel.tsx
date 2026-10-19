@@ -8,6 +8,7 @@ import {
   type DepartmentCandidate,
 } from '@/queries/adminDepartments.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
+import { HttpError } from '@/lib/api.ts';
 
 const DEPARTMENT_CODE_MAX_LENGTH = 10;
 const DEPARTMENT_NAME_MAX_LENGTH = 100;
@@ -50,14 +51,17 @@ export function AdminDepartmentCreationPanel({
   formatError,
   onCreateCluster,
   onCreateDepartment,
+  onReactivateDepartment,
 }: {
   clusters: AdminCluster[];
   formatError: (error: unknown) => string;
   onCreateCluster: (name: string) => Promise<void>;
   onCreateDepartment: (input: CreateDepartmentInput) => Promise<void>;
+  onReactivateDepartment: (departmentId: string) => Promise<void>;
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
+  const [inactiveDepartmentId, setInactiveDepartmentId] = useState<string | null>(null);
   const [departmentQuery, setDepartmentQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] =
     useState<DepartmentCandidate | null>(null);
@@ -90,6 +94,7 @@ export function AdminDepartmentCreationPanel({
     },
     onSubmit: async ({ value }) => {
       setDepartmentError(null);
+      setInactiveDepartmentId(null);
 
       try {
         await onCreateDepartment({
@@ -102,6 +107,14 @@ export function AdminDepartmentCreationPanel({
         setDepartmentQuery('');
         setSelectedDepartment(null);
       } catch (error) {
+        if (error instanceof HttpError && error.body && typeof error.body === 'object') {
+          const body = error.body as { inactiveDepartmentCode?: string };
+          if (body.inactiveDepartmentCode) {
+            setInactiveDepartmentId(body.inactiveDepartmentCode);
+            setDepartmentError('This department was previously deactivated.');
+            return;
+          }
+        }
         setDepartmentError(formatError(error));
       }
     },
@@ -287,6 +300,17 @@ export function AdminDepartmentCreationPanel({
                   {departmentError ? (
                     <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                       {departmentError}
+                      {inactiveDepartmentId ? (
+                        <button
+                          className="btn btn-sm ml-3"
+                          onClick={() => {
+                            void onReactivateDepartment(inactiveDepartmentId);
+                          }}
+                          type="button"
+                        >
+                          Reactivate department
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 
