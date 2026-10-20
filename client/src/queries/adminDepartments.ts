@@ -16,8 +16,9 @@ export type CreateDepartmentInput = {
   name: string;
 };
 
-export type DepartmentCandidate = {
+export type DepartmentOption = {
   code: string;
+  currentFacultyCount: number;
   description: string | null;
 };
 
@@ -118,17 +119,17 @@ export const caoCandidatesQueryOptions = (query: string) => {
   });
 };
 
-export const departmentCandidatesQueryOptions = (query: string) => {
+export const departmentOptionsQueryOptions = (query = '') => {
   const term = query.trim();
   return queryOptions({
-    enabled: term.length >= 2 && term.length <= 128,
-    queryFn: ({ signal }): Promise<DepartmentCandidate[]> =>
-      fetchJson<DepartmentCandidate[]>(
-        `/api/admin/departments/candidates?query=${encodeURIComponent(term)}`,
+    enabled: term.length <= 128,
+    queryFn: ({ signal }): Promise<DepartmentOption[]> =>
+      fetchJson<DepartmentOption[]>(
+        `/api/admin/departments/options?query=${encodeURIComponent(term)}`,
         {},
         signal
       ),
-    queryKey: ['admin', 'departmentCandidates', term] as const,
+    queryKey: ['admin', 'departmentOptions', term] as const,
   });
 };
 

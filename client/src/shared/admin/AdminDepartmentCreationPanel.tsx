@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import type { AdminCluster, ApprovalMode } from '@/shared/admin/adminData.ts';
 import {
-  departmentCandidatesQueryOptions,
+  departmentOptionsQueryOptions,
   type CreateDepartmentInput,
-  type DepartmentCandidate,
+  type DepartmentOption,
 } from '@/queries/adminDepartments.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 import { HttpError } from '@/lib/api.ts';
@@ -27,7 +27,7 @@ const clusterFormSchema = z.object({
 
 const departmentFormSchema = z.object({
   approvalMode: z.enum(['approval', 'auto']),
-  clusterId: z.string(),
+  clusterId: z.string().min(1, 'Cluster is required.'),
   code: z
     .string()
     .trim()
@@ -62,9 +62,10 @@ export function AdminDepartmentCreationPanel({
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
   const [inactiveDepartmentId, setInactiveDepartmentId] = useState<string | null>(null);
-  const [departmentQuery, setDepartmentQuery] = useState('');
+  const [isReactivatingDepartment, setIsReactivatingDepartment] =
+    useState(false);
   const [selectedDepartment, setSelectedDepartment] =
-    useState<DepartmentCandidate | null>(null);
+    useState<DepartmentOption | null>(null);
 
   const clusterForm = useAppForm({
     defaultValues: {
@@ -99,12 +100,11 @@ export function AdminDepartmentCreationPanel({
       try {
         await onCreateDepartment({
           approvalMode: value.approvalMode,
-          clusterId: value.clusterId || null,
+          clusterId: value.clusterId,
           code: value.code.trim().toUpperCase(),
           name: value.name.trim(),
         });
         departmentForm.reset();
-        setDepartmentQuery('');
         setSelectedDepartment(null);
       } catch (error) {
         if (error instanceof HttpError && error.body && typeof error.body === 'object') {
@@ -123,15 +123,45 @@ export function AdminDepartmentCreationPanel({
     },
   });
 
-  const departmentCandidates = useQuery(
-    departmentCandidatesQueryOptions(departmentQuery)
+  const departmentOptions = useQuery(
+    departmentOptionsQueryOptions()
   );
 
-  const selectDepartment = (candidate: DepartmentCandidate) => {
-    setSelectedDepartment(candidate);
-    setDepartmentQuery(`${candidate.code} — ${candidate.description ?? ''}`);
-    departmentForm.setFieldValue('code', candidate.code);
-    departmentForm.setFieldValue('name', candidate.description ?? '');
+  const selectDepartment = (code: string) => {
+    const departmentOption = departmentOptions.data?.find(
+      (item) => item.code === code
+    );
+
+    if (!departmentOption) {
+      setSelectedDepartment(null);
+      departmentForm.setFieldValue('code', '');
+      departmentForm.setFieldValue('name', '');
+      return;
+    }
+
+    setSelectedDepartment(departmentOption);
+    departmentForm.setFieldValue('code', departmentOption.code);
+    departmentForm.setFieldValue('name', departmentOption.description ?? '');
+  };
+
+  const reactivateDepartment = async () => {
+    if (!inactiveDepartmentId) {
+      return;
+    }
+
+    setIsReactivatingDepartment(true);
+
+    try {
+      await onReactivateDepartment(inactiveDepartmentId);
+      setDepartmentError(null);
+      setInactiveDepartmentId(null);
+      departmentForm.reset();
+      setSelectedDepartment(null);
+    } catch (error) {
+      setDepartmentError(formatError(error));
+    } finally {
+      setIsReactivatingDepartment(false);
+    }
   };
 
   return (
@@ -197,59 +227,43 @@ export function AdminDepartmentCreationPanel({
                 <departmentForm.AppForm>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <label className="form-control w-full">
-                        <span className="label-text">
-                          UCPath Level 5 department
-                        </span>
-                        <input
-                          className="input input-bordered w-full bg-white"
-                          onChange={(event) => {
-                            setDepartmentQuery(event.target.value);
-                            setSelectedDepartment(null);
-                            departmentForm.setFieldValue('code', '');
-                          }}
-                          placeholder="Search code or description"
-                          type="search"
-                          value={departmentQuery}
-                        />
-                      </label>
-                      {departmentQuery.trim().length > 0 &&
-                      departmentQuery.trim().length < 2 ? (
-                        <p className="mt-2 text-sm text-base-content/70">
-                          Type at least 2 characters.
-                        </p>
-                      ) : null}
-                      {departmentCandidates.isFetching ? (
-                        <p className="mt-2 text-sm text-base-content/70">
-                          Searching UCPath departments…
-                        </p>
-                      ) : null}
-                      {departmentCandidates.data && !selectedDepartment ? (
-                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-1">
-                          {departmentCandidates.data.map((candidate) => (
-                            <button
-                              className="flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-left hover:bg-base-200"
-                              key={candidate.code}
-                              onClick={() => selectDepartment(candidate)}
-                              type="button"
-                            >
-                              <span>
-                                <span className="font-mono font-semibold">
-                                  {candidate.code}
-                                </span>
-                                <span className="text-base-content/70">
-                                  {' — '}
-                                  {candidate.description ?? 'No description'}
-                                </span>
-                              </span>
-                            </button>
+                      <div className="form-control w-full">
+                        <label className="label" htmlFor="department-code">
+                          <span className="label-text font-medium">
+                            Department Code
+                          </span>
+                        </label>
+                        <select
+                          className="select select-bordered w-full bg-white"
+                          disabled={departmentOptions.isFetching}
+                          id="department-code"
+                          onChange={(event) => selectDepartment(event.target.value)}
+                          value={selectedDepartment?.code ?? ''}
+                        >
+                          <option value="">Select a department</option>
+                          {departmentOptions.data?.map((departmentOption) => (
+                            <option key={departmentOption.code} value={departmentOption.code}>
+                              {departmentOption.code} —{' '}
+                              {departmentOption.description ?? 'No description'} ({' '}
+                              {departmentOption.currentFacultyCount} faculty)
+                            </option>
                           ))}
-                          {departmentCandidates.data.length === 0 ? (
-                            <p className="px-3 py-2 text-sm text-base-content/70">
-                              No matching UCPath Level 5 departments.
-                            </p>
-                          ) : null}
-                        </div>
+                        </select>
+                      </div>
+                      {departmentOptions.isFetching ? (
+                        <p className="mt-2 text-sm text-base-content/70">
+                          Loading departments…
+                        </p>
+                      ) : null}
+                      {departmentOptions.isError ? (
+                        <p className="mt-2 text-sm text-error">
+                          {formatError(departmentOptions.error)}
+                        </p>
+                      ) : null}
+                      {departmentOptions.data?.length === 0 ? (
+                        <p className="mt-2 text-sm text-base-content/70">
+                         Department list is not available.
+                        </p>
                       ) : null}
                     </div>
 
@@ -271,7 +285,7 @@ export function AdminDepartmentCreationPanel({
                             label: cluster.name,
                             value: cluster.id,
                           }))}
-                          placeholder="No cluster"
+                          placeholder="Select a cluster"
                           selectClassName="select select-bordered w-full bg-white"
                         />
                       )}
@@ -303,12 +317,13 @@ export function AdminDepartmentCreationPanel({
                       {inactiveDepartmentId ? (
                         <button
                           className="btn btn-sm ml-3"
-                          onClick={() => {
-                            void onReactivateDepartment(inactiveDepartmentId);
-                          }}
+                          disabled={isReactivatingDepartment}
+                          onClick={() => void reactivateDepartment()}
                           type="button"
                         >
-                          Reactivate department
+                          {isReactivatingDepartment
+                            ? 'Reactivating department...'
+                            : 'Reactivate department'}
                         </button>
                       ) : null}
                     </div>

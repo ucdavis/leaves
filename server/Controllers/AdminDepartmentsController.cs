@@ -23,6 +23,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private readonly ILeaveRequestNotificationQueue _notificationQueue;
     private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
     private readonly IUserService _userService;
+    private readonly IHostEnvironment _environment;
 
     public AdminDepartmentsController(
         AppDbContext db,
@@ -30,7 +31,8 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         AdminDirectoryService adminDirectoryService,
         ILeaveRequestNotificationQueue notificationQueue,
         IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
-        IUserService userService)
+        IUserService userService,
+        IHostEnvironment environment)
     {
         _db = db;
         _adminDirectoryDataService = adminDirectoryDataService;
@@ -38,6 +40,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         _notificationQueue = notificationQueue;
         _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
         _userService = userService;
+        _environment = environment;
     }
 
     [HttpGet]
@@ -52,10 +55,24 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.SearchCaoCandidatesAsync(query, cancellationToken));
     }
 
-    [HttpGet("candidates")]
-    public async Task<IActionResult> SearchDepartmentCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    [HttpGet("options")]
+    public async Task<IActionResult> GetDepartmentOptionsAsync([FromQuery] string? query, CancellationToken cancellationToken)
     {
-        return Ok(await _adminDirectoryDataService.SearchDepartmentCandidatesAsync(query, cancellationToken));
+        try
+        {
+            var options = await _adminDirectoryDataService.GetDepartmentOptionsAsync(query, cancellationToken);
+            return Ok(options);
+        }
+        catch (Exception exception)
+        {
+            var detail = _environment.IsDevelopment()
+                ? exception.GetBaseException().Message
+                : "Unable to load department options.";
+            return Problem(
+                detail: detail,
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Unable to load department options");
+        }
     }
 
     [HttpPost("clusters")]
@@ -222,15 +239,17 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem($"Department name must be {DepartmentNameMaxLength} characters or fewer.");
         }
 
-        if (request.ClusterId.HasValue)
+        if (!request.ClusterId.HasValue)
         {
-            var cluster = await _db.Clusters.FirstOrDefaultAsync(
-                item => item.Id == request.ClusterId.Value,
-                cancellationToken);
-            if (cluster == null || !cluster.IsActive)
-            {
-                return ValidationProblem("Selected cluster does not exist.");
-            }
+            return ValidationProblem("Cluster is required.");
+        }
+
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == request.ClusterId.Value,
+            cancellationToken);
+        if (cluster == null || !cluster.IsActive)
+        {
+            return ValidationProblem("Selected cluster does not exist.");
         }
 
         var existingDepartment = await _db.Departments.IgnoreQueryFilters().FirstOrDefaultAsync(
@@ -251,7 +270,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             cancellationToken);
         if (!isLevelFiveDepartmentCode)
         {
-            return ValidationProblem("Department code must exist in the current UCPath Level 5 department data.");
+            return ValidationProblem("Department code must exist in the current department data.");
         }
 
         if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: true, out var workflowMode))

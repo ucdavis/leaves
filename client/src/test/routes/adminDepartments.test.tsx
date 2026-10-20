@@ -18,7 +18,11 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mswUtils.ts';
 import { adminDepartmentsQueryOptions } from '@/queries/adminDepartments.ts';
 import { routeTree } from '@/routeTree.gen.ts';
-import type { AdminUser } from '@/shared/admin/adminData.ts';
+import type {
+  AdminCluster,
+  AdminDepartment,
+  AdminUser,
+} from '@/shared/admin/adminData.ts';
 
 const facultyUser = (id: string, role: AdminUser['role']): AdminUser => ({
   active: true,
@@ -107,6 +111,8 @@ const response = {
     facultyUser('facadmin', 'admin'),
     facultyUser('faccao', 'cao'),
   ],
+  inactiveClusters: [] as AdminCluster[],
+  inactiveDepartments: [] as AdminDepartment[],
 };
 
 // jsdom does not implement native dialog methods used by WarningModal.
@@ -125,7 +131,14 @@ afterEach(() => {
   queryClient?.clear();
 });
 
-function renderDepartments() {
+function renderDepartments(
+  data = response,
+  departmentOptions: Array<{
+    code: string;
+    currentFacultyCount: number;
+    description: string;
+  }> = []
+) {
   server.use(
     http.get('/api/user/me', () =>
       HttpResponse.json({
@@ -138,8 +151,8 @@ function renderDepartments() {
     ),
     http.get('/api/admin/departments', () =>
       HttpResponse.json({
-        ...response,
-        caoUsers: response.caoUsers.filter((user) => user.id === 'current'),
+        ...data,
+        caoUsers: data.caoUsers.filter((user) => user.id === 'current'),
       })
     ),
     http.get('/api/admin/departments/cao-candidates', () =>
@@ -148,6 +161,9 @@ function renderDepartments() {
           ['candidate', 'split', 'unknown'].includes(user.id)
         )
       )
+    ),
+    http.get('/api/admin/departments/options', () =>
+      HttpResponse.json(departmentOptions)
     )
   );
   queryClient = new QueryClient({
@@ -168,6 +184,19 @@ function renderDepartments() {
   );
 }
 
+function getSelectField(label: string) {
+  const select = screen
+    .getByText(label)
+    .closest('.form-control')
+    ?.querySelector('select');
+
+  if (!select) {
+    throw new Error(`Unable to find the ${label} select field.`);
+  }
+
+  return select;
+}
+
 test('department roster includes faculty admins and CAOs, and excludes directory staff', async () => {
   renderDepartments();
   expect(await screen.findByText('CAO: Staff current CAO')).toBeInTheDocument();
@@ -183,36 +212,150 @@ test('department roster includes faculty admins and CAOs, and excludes directory
 test('department creation requires a selected UCPath Level 5 department and prefills its name', async () => {
   let saved: unknown;
   server.use(
-    http.get('/api/admin/departments/candidates', () =>
-      HttpResponse.json([
-        {
-          code: 'PLS',
-          description: 'Plant Sciences',
-        },
-      ])
-    ),
     http.post('/api/admin/departments', async ({ request }) => {
       saved = await request.json();
       return new HttpResponse(null, { status: 204 });
     })
   );
-  renderDepartments();
+  renderDepartments(response, [
+    {
+      code: 'PLS',
+      currentFacultyCount: 3,
+      description: 'Plant Sciences',
+    },
+  ]);
 
-  const search = await screen.findByPlaceholderText('Search code or description');
-  fireEvent.change(search, { target: { value: 'Plant' } });
-  fireEvent.click(await screen.findByRole('button', { name: /PLS.*Plant Sciences/ }));
-
+  const departmentSelect = await screen.findByLabelText(
+    'Department Code'
+  );
+  expect(
+    await screen.findByRole('option', {
+      name: /PLS.*Plant Sciences.*3 faculty/,
+    })
+  ).toBeInTheDocument();
+  fireEvent.change(departmentSelect, { target: { value: 'PLS' } });
   expect(screen.getByDisplayValue('Plant Sciences')).toBeInTheDocument();
+  fireEvent.change(getSelectField('Cluster'), { target: { value: '1' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
 
   await waitFor(() =>
     expect(saved).toEqual({
       approvalMode: 'auto',
-      clusterId: null,
+      clusterId: 1,
       code: 'PLS',
       name: 'Plant Sciences',
     })
   );
+});
+
+test('department creation requires a cluster before it submits', async () => {
+  let didSubmit = false;
+  server.use(
+    http.post('/api/admin/departments', () => {
+      didSubmit = true;
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  renderDepartments(response, [
+    {
+      code: 'PLS',
+      currentFacultyCount: 3,
+      description: 'Plant Sciences',
+    },
+  ]);
+
+  const departmentSelect = await screen.findByLabelText(
+    'Department Code'
+  );
+  await screen.findByRole('option', {
+    name: /PLS.*Plant Sciences.*3 faculty/,
+  });
+  fireEvent.change(departmentSelect, { target: { value: 'PLS' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
+
+  expect(await screen.findByText('Cluster is required.')).toBeInTheDocument();
+  expect(didSubmit).toBe(false);
+});
+
+test('department creation reports reactivation failures and clears the prompt after success', async () => {
+  let reactivationAttempts = 0;
+  server.use(
+    http.post('/api/admin/departments', () =>
+      HttpResponse.json({ inactiveDepartmentCode: 'PLS' }, { status: 409 })
+    ),
+    http.post('/api/admin/departments/PLS/reactivate', () => {
+      reactivationAttempts += 1;
+      return reactivationAttempts === 1
+        ? new HttpResponse('Unable to reactivate department.', { status: 500 })
+        : new HttpResponse(null, { status: 204 });
+    })
+  );
+  renderDepartments(response, [
+    {
+      code: 'PLS',
+      currentFacultyCount: 3,
+      description: 'Plant Sciences',
+    },
+  ]);
+
+  const departmentSelect = await screen.findByLabelText(
+    'Department Code'
+  );
+  await screen.findByRole('option', {
+    name: /PLS.*Plant Sciences.*3 faculty/,
+  });
+  fireEvent.change(departmentSelect, { target: { value: 'PLS' } });
+  fireEvent.change(getSelectField('Cluster'), { target: { value: '1' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
+
+  const reactivate = await screen.findByRole('button', {
+    name: 'Reactivate department',
+  });
+  fireEvent.click(reactivate);
+  expect(
+    await screen.findByText('Unable to reactivate department.')
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Reactivate department' })
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: /Reactivate department/ })
+    ).not.toBeInTheDocument()
+  );
+  expect(departmentSelect).toHaveValue('');
+});
+
+test('inactive department reactivation errors are shown in the inactive section', async () => {
+  server.use(
+    http.post('/api/admin/departments/OLD/reactivate', () =>
+      new HttpResponse('Unable to reactivate department.', { status: 500 })
+    )
+  );
+  renderDepartments({
+    ...response,
+    inactiveDepartments: [
+      {
+        approvalMode: 'auto',
+        chairUserId: null,
+        clusterId: null,
+        code: 'OLD',
+        id: 'OLD',
+        name: 'Former department',
+        routingEmails: [],
+      },
+    ],
+  });
+
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Reactivate department' })
+  );
+
+  expect(
+    await screen.findByText('Unable to reactivate department.')
+  ).toBeInTheDocument();
 });
 
 test.each([

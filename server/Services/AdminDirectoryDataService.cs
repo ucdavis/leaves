@@ -164,7 +164,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DepartmentCandidate>> SearchDepartmentCandidatesAsync(
+    public async Task<IReadOnlyList<DepartmentOption>> GetDepartmentOptionsAsync(
         string? query,
         CancellationToken cancellationToken)
     {
@@ -174,26 +174,40 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             return [];
         }
 
-        var levelFiveDepartments = _db.EmployeeAccrualBalances
+        var currentFaculty = _db.CurrentFacultyWithAccrual
             .AsNoTracking()
-            .Where(balance => balance.Level5Dept != null && balance.Level5Dept.Trim() != string.Empty);
+            .Where(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                              faculty.ResolvedReportingDepartmentCode.Trim() != string.Empty);
 
         if (!string.IsNullOrWhiteSpace(term))
         {
-            levelFiveDepartments = levelFiveDepartments.Where(balance =>
-                balance.Level5Dept.Contains(term) || balance.Level5DeptDesc.Contains(term));
+            currentFaculty = currentFaculty.Where(faculty =>
+                (faculty.ResolvedReportingDepartmentCode != null &&
+                 faculty.ResolvedReportingDepartmentCode.Contains(term)) ||
+                (faculty.ResolvedReportingDepartmentName != null &&
+                 faculty.ResolvedReportingDepartmentName.Contains(term)));
         }
 
-        var candidates = await levelFiveDepartments
-            .GroupBy(balance => balance.Level5Dept.Trim())
-            .Select(group => new DepartmentCandidate(
-                group.Key,
-                group.Max(balance => balance.Level5DeptDesc)))
-            .OrderBy(candidate => candidate.Code)
-            .Take(50)
+        var facultyDepartments = await currentFaculty
+            .Select(faculty => new
+            {
+                Code = faculty.ResolvedReportingDepartmentCode!.Trim(),
+                Description = faculty.ResolvedReportingDepartmentName,
+                IamId = faculty.IamId.Trim(),
+            })
+            .Distinct()
             .ToListAsync(cancellationToken);
 
-        return candidates;
+        return facultyDepartments
+            .GroupBy(faculty => faculty.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new DepartmentOption(
+                group.Key,
+                group.Max(faculty => faculty.Description),
+                group.Select(faculty => faculty.IamId)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count()))
+            .OrderBy(option => option.Code)
+            .ToList();
     }
 
     public Task<bool> IsLevelFiveDepartmentCodeAsync(string departmentCode, CancellationToken cancellationToken)
@@ -449,9 +463,10 @@ public sealed record DirectoryEmployee(
     string? Email,
     string? EmployeeId = null);
 
-public sealed record DepartmentCandidate(
+public sealed record DepartmentOption(
     string Code,
-    string? Description);
+    string? Description,
+    int CurrentFacultyCount);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,

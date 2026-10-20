@@ -13,6 +13,33 @@ namespace Server.Tests.Controllers;
 public class AdminDepartmentsControllerWorkflowTests
 {
     [Fact]
+    public async Task CreateDepartment_without_a_cluster_returns_a_validation_error()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.CreateDepartment(
+            new AdminDepartmentsController.CreateDepartmentRequest(
+                ApprovalMode: "auto",
+                ClusterId: null,
+                Code: "DEPT",
+                Name: "Department"),
+            CancellationToken.None);
+
+        var validationResult = result.Should().BeOfType<ObjectResult>().Subject;
+        validationResult.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        validationResult.Value.Should().BeOfType<ValidationProblemDetails>()
+            .Which.Detail.Should().Be("Cluster is required.");
+    }
+
+    [Fact]
     public async Task UpdateDepartment_to_auto_approve_immediately_approves_each_pending_request_after_confirmation()
     {
         await using var db = TestDbContextFactory.CreateInMemory();
@@ -72,6 +99,7 @@ public class AdminDepartmentsControllerWorkflowTests
             new AdminDirectoryService(new AdminDirectoryDataService(db)),
             queue,
             new EmailDeliveryWakeSignal(),
+            null!,
             null!)
         {
             ControllerContext = new ControllerContext

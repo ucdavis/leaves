@@ -129,6 +129,9 @@ function AdminDepartmentsRoute() {
   const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
     string | null
   >(null);
+  const [reactivationError, setReactivationError] = useState<string | null>(
+    null
+  );
   const viewDepartmentId = peopleFor ?? null;
 
   const openRoster = (departmentId: string) => {
@@ -190,6 +193,30 @@ function AdminDepartmentsRoute() {
     mutationFn: removeAdminDepartmentRoutingEmail,
     onSuccess: invalidateDepartments,
   });
+
+  const reactivateDepartment = (departmentId: string) => {
+    setReactivationError(null);
+    reactivateDepartmentMutation.mutate(
+      { departmentId },
+      {
+        onError: (error) => {
+          setReactivationError(getAdminMutationErrorMessage(error));
+        },
+      }
+    );
+  };
+
+  const reactivateCluster = (clusterId: string) => {
+    setReactivationError(null);
+    reactivateClusterMutation.mutate(
+      { clusterId },
+      {
+        onError: (error) => {
+          setReactivationError(getAdminMutationErrorMessage(error));
+        },
+      }
+    );
+  };
 
   const clusterGroups = clusters.map((cluster) => ({
     ...cluster,
@@ -518,6 +545,11 @@ function AdminDepartmentsRoute() {
             <h2 className="text-lg font-semibold text-base-content/70">
               Inactive departments and clusters
             </h2>
+            {reactivationError ? (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {reactivationError}
+              </div>
+            ) : null}
             <div className="mt-4 space-y-3">
               {inactiveDepartments.map((department) => (
                 <div
@@ -533,11 +565,7 @@ function AdminDepartmentsRoute() {
                   <button
                     className="btn btn-outline"
                     disabled={reactivateDepartmentMutation.isPending}
-                    onClick={() =>
-                      void reactivateDepartmentMutation.mutateAsync({
-                        departmentId: department.id,
-                      })
-                    }
+                    onClick={() => reactivateDepartment(department.id)}
                     type="button"
                   >
                     Reactivate department
@@ -553,11 +581,7 @@ function AdminDepartmentsRoute() {
                   <button
                     className="btn btn-outline"
                     disabled={reactivateClusterMutation.isPending}
-                    onClick={() =>
-                      void reactivateClusterMutation.mutateAsync({
-                        clusterId: cluster.id,
-                      })
-                    }
+                    onClick={() => reactivateCluster(cluster.id)}
                     type="button"
                   >
                     Reactivate cluster
