@@ -201,7 +201,7 @@ test('department roster includes faculty admins and CAOs, and excludes directory
   renderDepartments();
   expect(await screen.findByText('CAO: Staff current CAO')).toBeInTheDocument();
   expect(screen.getByText('3 active users')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Linked users' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Faculty' }));
   const roster = await screen.findByRole('table');
   for (const role of ['faculty', 'admin', 'cao']) {
     expect(within(roster).getByText(`Faculty ${role}`)).toBeInTheDocument();
@@ -225,9 +225,7 @@ test('department creation requires a selected UCPath Level 5 department and pref
     },
   ]);
 
-  const departmentSelect = await screen.findByLabelText(
-    'Department Code'
-  );
+  const departmentSelect = await screen.findByLabelText('Department Code');
   expect(
     await screen.findByRole('option', {
       name: /PLS.*Plant Sciences.*3 faculty/,
@@ -264,9 +262,7 @@ test('department creation requires a cluster before it submits', async () => {
     },
   ]);
 
-  const departmentSelect = await screen.findByLabelText(
-    'Department Code'
-  );
+  const departmentSelect = await screen.findByLabelText('Department Code');
   await screen.findByRole('option', {
     name: /PLS.*Plant Sciences.*3 faculty/,
   });
@@ -298,9 +294,7 @@ test('department creation reports reactivation failures and clears the prompt af
     },
   ]);
 
-  const departmentSelect = await screen.findByLabelText(
-    'Department Code'
-  );
+  const departmentSelect = await screen.findByLabelText('Department Code');
   await screen.findByRole('option', {
     name: /PLS.*Plant Sciences.*3 faculty/,
   });
@@ -330,8 +324,10 @@ test('department creation reports reactivation failures and clears the prompt af
 
 test('inactive department reactivation errors are shown in the inactive section', async () => {
   server.use(
-    http.post('/api/admin/departments/OLD/reactivate', () =>
-      new HttpResponse('Unable to reactivate department.', { status: 500 })
+    http.post(
+      '/api/admin/departments/OLD/reactivate',
+      () =>
+        new HttpResponse('Unable to reactivate department.', { status: 500 })
     )
   );
   renderDepartments({

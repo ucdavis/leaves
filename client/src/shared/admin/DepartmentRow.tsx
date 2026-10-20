@@ -19,9 +19,7 @@ export function DepartmentRow({
   onOpenSettings: () => void;
 }) {
   const approvalLabel =
-    department.approvalMode === 'approval'
-      ? 'Required'
-      : 'Auto-approve';
+    department.approvalMode === 'approval' ? 'Required' : 'Auto-approve';
 
   return (
     <div className="bg-primary/5 border-l-4 border-primary pl-2">
@@ -69,7 +67,7 @@ export function DepartmentRow({
               type="button"
             >
               <UserGroupIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
-              Linked users
+              Faculty
             </button>
             <button
               className="btn btn-outline"
