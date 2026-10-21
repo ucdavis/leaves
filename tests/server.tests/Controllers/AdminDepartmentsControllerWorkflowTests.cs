@@ -33,10 +33,10 @@ public class AdminDepartmentsControllerWorkflowTests
                 Name: "Department"),
             CancellationToken.None);
 
-        var validationResult = result.Should().BeOfType<ObjectResult>().Subject;
-        validationResult.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
-        validationResult.Value.Should().BeOfType<ValidationProblemDetails>()
-            .Which.Detail.Should().Be("Cluster is required.");
+        var validationProblem = result.Should().BeOfType<ObjectResult>().Which.Value
+            .Should().BeOfType<ValidationProblemDetails>().Subject;
+        validationProblem.Status.Should().Be(StatusCodes.Status400BadRequest);
+        validationProblem.Detail.Should().Be("Cluster is required.");
     }
 
     [Fact]
