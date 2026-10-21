@@ -49,6 +49,19 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.GetDepartmentsAsync(cancellationToken));
     }
 
+    [HttpGet("{departmentCode}/faculty")]
+    public async Task<IActionResult> GetDepartmentFacultyAsync(string departmentCode, CancellationToken cancellationToken)
+    {
+        var exists = await _db.Departments.AnyAsync(
+            department => department.DepartmentCode == departmentCode, cancellationToken);
+        if (!exists)
+        {
+            return NotFound();
+        }
+
+        return Ok(await _adminDirectoryService.GetDepartmentFacultyAsync(departmentCode, cancellationToken));
+    }
+
     [HttpGet("cao-candidates")]
     public async Task<IActionResult> SearchCaoCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
     {

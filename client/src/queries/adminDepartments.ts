@@ -3,7 +3,6 @@ import { fetchJson } from '@/lib/api.ts';
 import type {
   AdminCluster,
   AdminDepartment,
-  AdminRole,
   AdminUser,
   ApprovalMode,
   DepartmentRoutingEmail,
@@ -22,14 +21,6 @@ export type DepartmentOption = {
   description: string | null;
 };
 
-type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
-  departmentId: string | null;
-  departmentOverrideEndDate?: string | null;
-  departmentOverrideId?: string | null;
-  departmentOverrideStartDate?: string | null;
-  role: AdminRole;
-};
-
 export type AdminCaoUser = Pick<
   AdminUser,
   'id' | 'active' | 'email' | 'name'
@@ -37,20 +28,22 @@ export type AdminCaoUser = Pick<
   designation: AdminUser['designation'] | 'faculty';
 };
 
+export type DepartmentFacultyMember = {
+  email: string;
+  id: string;
+  name: string;
+};
+
 type AdminDepartmentsResponse = {
-  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  facultyUsers: AdminDepartmentUserResponse[];
   inactiveClusters?: AdminCluster[];
   inactiveDepartments?: AdminDepartment[];
 };
 
 export type AdminDepartmentsPageData = {
-  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  facultyUsers: AdminUser[];
   inactiveClusters: AdminCluster[];
   inactiveDepartments: AdminDepartment[];
 };
@@ -74,14 +67,6 @@ function normalizeDepartmentData(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    facultyUsers: response.facultyUsers.map((user) => ({
-      ...user,
-      departmentId: user.departmentId ?? '',
-      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
-      departmentOverrideId: user.departmentOverrideId ?? '',
-      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      role: user.role,
-    })),
     inactiveClusters: response.inactiveClusters ?? [],
     inactiveDepartments: response.inactiveDepartments ?? [],
   };
@@ -103,6 +88,19 @@ export const adminDepartmentsQueryOptions = () =>
       return normalizeDepartmentData(response);
     },
     queryKey: ['admin', 'departments'] as const,
+    staleTime: 60_000,
+  });
+
+export const departmentFacultyQueryOptions = (departmentCode: string) =>
+  queryOptions({
+    queryFn: ({ signal }): Promise<DepartmentFacultyMember[]> =>
+      fetchJson<DepartmentFacultyMember[]>(
+        `/api/admin/departments/${encodeURIComponent(departmentCode)}/faculty`,
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'departments', departmentCode, 'faculty'] as const,
+    staleTime: 60_000,
   });
 
 export const caoCandidatesQueryOptions = (query: string) => {

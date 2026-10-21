@@ -102,44 +102,52 @@ public class AdminDirectoryServiceTests
     }
 
     [Fact]
-    public void Faculty_and_department_rosters_include_faculty_admins_and_Caos()
+    public void Faculty_roster_includes_faculty_admins_and_Caos()
     {
         var data = CreateData();
         var faculty = AdminDirectoryService.BuildFacultyResponse(data);
-        var departments = AdminDirectoryService.BuildDepartmentsResponse(data, CaoEmployees());
 
         faculty.FacultyUsers.Select(user => user.Id).Should().BeEquivalentTo("faculty", "admin", "cao");
-        departments.FacultyUsers.Should().BeEquivalentTo(faculty.FacultyUsers);
         faculty.FacultyUsers.Single(user => user.Id == "admin").Role.Should().Be("admin");
         faculty.FacultyUsers.Single(user => user.Id == "cao").Role.Should().Be("cao");
         faculty.FacultyUsers.Single(user => user.Id == "faculty").IsActiveInIam.Should().BeFalse();
         faculty.FacultyUsers.Where(user => user.Id != "faculty").Should().OnlyContain(user => user.IsActiveInIam);
         faculty.FacultyUsers.Should().OnlyContain(user => user.DepartmentId == "DEPT");
-        departments.Clusters.Single(cluster => cluster.Id == "2").CaoUserId.Should().Be("staffcao");
-        departments.CaoUsers.Single(user => user.Id == "staffcao").Name.Should().Be("Staff CAO");
-        departments.CaoUsers.Single(user => user.Id == "staffcao").Email.Should().Be("staffcao@example.test");
     }
 
     [Fact]
-    public void Cao_candidates_preserve_active_status_and_role_precedence_for_all_employees()
+    public void Department_overview_uses_counts_and_assignee_names_without_user_roles()
     {
-        var response = AdminDirectoryService.BuildDepartmentsResponse(CreateData(), CaoEmployees());
-        response.CaoUsers.Should().Contain(user => user.Id == "faculty" && user.Active && user.Designation == "faculty");
-        response.CaoUsers.Should().Contain(user => user.Id == "unknown" && user.Active && user.Designation == "faculty");
-        response.CaoUsers.Should().Contain(user => user.Id == "staff" && user.Active && user.Designation == "nfa");
-        response.CaoUsers.Single(user => user.Id == "inactive").Active.Should().BeFalse();
-        response.CaoUsers.Single(user => user.Id == "staffadmin").Designation.Should().Be("admin");
-        response.CaoUsers.Single(user => user.Id == "staffchair").Designation.Should().Be("chair");
-        response.CaoUsers.Single(user => user.Id == "staffcao").Designation.Should().Be("cao");
-        response.CaoUsers.Single(user => user.Id == "unknown").Designation.Should().NotBe("nfa");
+        var response = AdminDirectoryService.BuildDepartmentsResponse(CreateOverviewData());
+        response.Departments.Single().FacultyCount.Should().Be(3);
+        response.Departments.Single().HasFaculty.Should().BeTrue();
+        response.Departments.Single().ChairName.Should().Be("Staff chair");
+        response.Clusters.Single(cluster => cluster.Id == "2").CaoName.Should().Be("Staff CAO");
     }
 
     [Fact]
-    public void Missing_cao_identity_retains_assignment_id_for_display_fallback()
+    public void Departments_without_faculty_are_marked_and_missing_assignee_uses_id()
     {
-        var response = AdminDirectoryService.BuildDepartmentsResponse(CreateData(), []);
+        var data = CreateOverviewData() with
+        {
+            FacultyCountsByDepartment = new Dictionary<string, int>(),
+            AssignedPeopleByIamId = new Dictionary<string, CaoDirectoryEmployee>(),
+        };
+        var response = AdminDirectoryService.BuildDepartmentsResponse(data);
+        response.Departments.Single().FacultyCount.Should().Be(0);
+        response.Departments.Single().HasFaculty.Should().BeFalse();
         response.Clusters.Single(cluster => cluster.Id == "2").CaoUserId.Should().Be("staffcao");
-        response.CaoUsers.Should().BeEmpty();
+        response.Clusters.Single(cluster => cluster.Id == "2").CaoName.Should().Be("staffcao");
+    }
+
+    private static AdminDepartmentOverviewData CreateOverviewData()
+    {
+        var data = CreateData();
+        return new AdminDepartmentOverviewData(
+            data.Clusters, data.Departments, data.CurrentChairAssignmentsByDepartment,
+            data.CurrentCaoAssignmentsByCluster,
+            new Dictionary<string, int> { ["DEPT"] = 3 },
+            CaoEmployees().ToDictionary(person => person.IamId));
     }
 
     private static AdminDirectoryData CreateData() => new(

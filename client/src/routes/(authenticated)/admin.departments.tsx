@@ -11,6 +11,7 @@ import {
 import {
   adminDepartmentsQueryOptions,
   caoCandidatesQueryOptions,
+  departmentFacultyQueryOptions,
   type AdminCaoUser,
   createAdminCluster,
   createAdminDepartment,
@@ -81,14 +82,7 @@ function AdminDepartmentsRoute() {
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(adminDepartmentsQueryOptions());
-  const {
-    caoUsers,
-    clusters,
-    departments,
-    facultyUsers,
-    inactiveClusters,
-    inactiveDepartments,
-  } = data;
+  const { clusters, departments, inactiveClusters, inactiveDepartments } = data;
   const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(
     null
   );
@@ -133,6 +127,13 @@ function AdminDepartmentsRoute() {
     null
   );
   const viewDepartmentId = peopleFor ?? null;
+  const selectedDepartment = departments.find(
+    (department) => department.id === viewDepartmentId
+  );
+  const roster = useQuery({
+    ...departmentFacultyQueryOptions(viewDepartmentId ?? ''),
+    enabled: selectedDepartment !== undefined,
+  });
 
   const openRoster = (departmentId: string) => {
     void navigate({
@@ -153,6 +154,15 @@ function AdminDepartmentsRoute() {
     });
   };
 
+  const invalidateDepartmentAndRoster = async () => {
+    await invalidateDepartments();
+    if (viewDepartmentId) {
+      await queryClient.invalidateQueries({
+        queryKey: departmentFacultyQueryOptions(viewDepartmentId).queryKey,
+      });
+    }
+  };
+
   const createClusterMutation = useMutation({
     mutationFn: createAdminCluster,
     onSuccess: invalidateDepartments,
@@ -163,7 +173,7 @@ function AdminDepartmentsRoute() {
   });
   const updateDepartmentMutation = useMutation({
     mutationFn: updateAdminDepartment,
-    onSuccess: invalidateDepartments,
+    onSuccess: invalidateDepartmentAndRoster,
   });
   const deleteDepartmentMutation = useMutation({
     mutationFn: deleteAdminDepartment,
@@ -229,14 +239,8 @@ function AdminDepartmentsRoute() {
   );
 
   if (viewDepartmentId) {
-    const selectedDepartment = departments.find(
-      (department) => department.id === viewDepartmentId
-    );
-
     if (selectedDepartment) {
-      const departmentUsers = facultyUsers.filter(
-        (user) => user.departmentId === selectedDepartment.id
-      );
+      const departmentUsers = roster.data ?? [];
 
       return (
         <div className="space-y-5">
@@ -255,82 +259,103 @@ function AdminDepartmentsRoute() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Department chair</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {departmentUsers.map((user) => (
-                      <tr key={user.id}>
-                        <td className="font-semibold">{user.name}</td>
-                        <td>
-                          {user.email ? (
-                            user.email
-                          ) : (
-                            <span
-                              className={`italic ${statusTextColors.danger}`}
-                            >
-                              Missing
-                            </span>
-                          )}
-                        </td>
-                        <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
-                        <td>
-                          {selectedDepartment.chairUserId === user.id ? (
-                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
-                              <CheckCircleIcon
-                                aria-hidden="true"
-                                className="h-4 w-4 shrink-0"
-                              />
-                              Chair
-                            </span>
-                          ) : (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              disabled={updateDepartmentMutation.isPending}
-                              onClick={() => {
-                                setPendingChairChangeError(null);
-                                setPendingChairChange({
-                                  currentChairName:
-                                    departmentUsers.find(
-                                      (departmentUser) =>
-                                        departmentUser.id ===
-                                        selectedDepartment.chairUserId
-                                    )?.name ?? null,
-                                  departmentId: selectedDepartment.id,
-                                  departmentName: selectedDepartment.name,
-                                  nextChairName: user.name,
-                                  nextChairUserId: user.id,
-                                });
-                              }}
-                              type="button"
-                            >
-                              Set chair
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {departmentUsers.length === 0 ? (
+              {roster.isPending ? (
+                <div className="flex items-center gap-3" role="status">
+                  <span
+                    aria-hidden="true"
+                    className="loading loading-spinner text-primary"
+                  />
+                  Loading faculty…
+                </div>
+              ) : roster.isError ? (
+                <div role="alert">
+                  Unable to load faculty.{' '}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => void roster.refetch()}
+                    type="button"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="table">
+                    <thead>
                       <tr>
-                        <td
-                          className="py-6 text-sm text-base-content/70"
-                          colSpan={6}
-                        >
-                          There are currently no faculty members assigned to
-                          this department.
-                        </td>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Department chair</th>
                       </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {departmentUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td className="font-semibold">{user.name}</td>
+                          <td>
+                            {user.email ? (
+                              user.email
+                            ) : (
+                              <span
+                                className={`italic ${statusTextColors.danger}`}
+                              >
+                                Missing
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {selectedDepartment.chairUserId === user.id
+                              ? 'Chair'
+                              : 'Faculty'}
+                          </td>
+                          <td>
+                            {selectedDepartment.chairUserId === user.id ? (
+                              <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
+                                <CheckCircleIcon
+                                  aria-hidden="true"
+                                  className="h-4 w-4 shrink-0"
+                                />
+                                Chair
+                              </span>
+                            ) : (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                disabled={updateDepartmentMutation.isPending}
+                                onClick={() => {
+                                  setPendingChairChangeError(null);
+                                  setPendingChairChange({
+                                    currentChairName:
+                                      selectedDepartment.chairName,
+                                    departmentId: selectedDepartment.id,
+                                    departmentName: selectedDepartment.name,
+                                    nextChairName: user.name,
+                                    nextChairUserId: user.id,
+                                  });
+                                }}
+                                type="button"
+                              >
+                                Set chair
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {departmentUsers.length === 0 ? (
+                        <tr>
+                          <td
+                            className="py-6 text-sm text-base-content/70"
+                            colSpan={4}
+                          >
+                            There are currently no faculty members assigned to
+                            this department.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </section>
 
@@ -410,10 +435,7 @@ function AdminDepartmentsRoute() {
               <div>
                 <div className="text-lg font-semibold">{cluster.name}</div>
                 <ClusterCaoEditor
-                  currentCaoName={
-                    caoUsers.find((user) => user.id === cluster.caoUserId)
-                      ?.name ?? cluster.caoUserId
-                  }
+                  currentCaoName={cluster.caoName ?? cluster.caoUserId}
                   isEditing={editingClusterCaoId === cluster.id}
                   isSaving={updateClusterMutation.isPending}
                   isSearching={caoSearch.isFetching}
@@ -441,9 +463,7 @@ function AdminDepartmentsRoute() {
                     setPendingCaoChange({
                       clusterId: cluster.id,
                       clusterName: cluster.name,
-                      currentCaoName:
-                        caoUsers.find((user) => user.id === cluster.caoUserId)
-                          ?.name ?? cluster.caoUserId,
+                      currentCaoName: cluster.caoName ?? cluster.caoUserId,
                       nextCaoName: selectedUser.name,
                       nextCaoUserId: selectedUser.id,
                     });
@@ -483,26 +503,15 @@ function AdminDepartmentsRoute() {
             </div>
 
             <div className="space-y-3">
-              {cluster.departments.map((department) => {
-                const linkedUserCount = facultyUsers.filter(
-                  (user) => user.departmentId === department.id
-                ).length;
-
-                return (
-                  <DepartmentRow
-                    chairName={
-                      facultyUsers.find(
-                        (user) => user.id === department.chairUserId
-                      )?.name ?? null
-                    }
-                    department={department}
-                    key={department.id}
-                    linkedUserCount={linkedUserCount}
-                    onOpenRoster={() => openRoster(department.id)}
-                    onOpenSettings={() => setEditingDepartmentId(department.id)}
-                  />
-                );
-              })}
+              {cluster.departments.map((department) => (
+                <DepartmentRow
+                  chairName={department.chairName}
+                  department={department}
+                  key={department.id}
+                  onOpenRoster={() => openRoster(department.id)}
+                  onOpenSettings={() => setEditingDepartmentId(department.id)}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -517,19 +526,9 @@ function AdminDepartmentsRoute() {
             <div className="mt-4 space-y-3">
               {unassignedDepartments.map((department) => (
                 <DepartmentRow
-                  chairName={
-                    facultyUsers.find(
-                      (user) => user.id === department.chairUserId
-                    )?.name ?? null
-                  }
+                  chairName={department.chairName}
                   department={department}
                   key={department.id}
-                  linkedUserCount={
-                    facultyUsers.filter(
-                      (user) =>
-                        user.departmentId === department.id && user.active
-                    ).length
-                  }
                   onOpenRoster={() => openRoster(department.id)}
                   onOpenSettings={() => setEditingDepartmentId(department.id)}
                 />

@@ -11,13 +11,21 @@ public sealed class AdminDirectoryService
         _directoryDataService = directoryDataService;
     }
 
-    public async Task<AdminDepartmentsResponse> GetDepartmentsAsync(CancellationToken cancellationToken)
+    public async Task<AdminDepartmentOverviewResponse> GetDepartmentsAsync(CancellationToken cancellationToken)
     {
-        var directoryData = await _directoryDataService.LoadDirectoryDataAsync(cancellationToken, includeInactive: true);
-        var caoEmployees = await _directoryDataService.LoadCaoEmployeesAsync(
-            directoryData.CurrentCaoAssignmentsByCluster.Values.Select(assignment => assignment.IamId),
-            cancellationToken);
-        return BuildDepartmentsResponse(directoryData, caoEmployees);
+        var overviewData = await _directoryDataService.LoadDepartmentOverviewAsync(cancellationToken);
+        return BuildDepartmentsResponse(overviewData);
+    }
+
+    public async Task<IReadOnlyList<DepartmentFacultyResponse>> GetDepartmentFacultyAsync(
+        string departmentCode, CancellationToken cancellationToken)
+    {
+        var faculty = await _directoryDataService.LoadDepartmentFacultyAsync(departmentCode, cancellationToken);
+        return faculty.Select(person => new DepartmentFacultyResponse(
+                person.IamId,
+                NullIfWhiteSpace(person.Name) ?? person.IamId,
+                NullIfWhiteSpace(person.Email) ?? string.Empty))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<AdminCaoUserResponse>> SearchCaoCandidatesAsync(
@@ -81,42 +89,69 @@ public sealed class AdminDirectoryService
     internal static AdminFacultyResponse BuildFacultyResponse(AdminDirectoryData directoryData)
     {
         return new AdminFacultyResponse(
-            Departments: BuildDepartmentResponses(directoryData),
+            Departments: BuildFacultyDepartmentResponses(directoryData),
             FacultyUsers: BuildFacultyUserResponses(directoryData, BuildRoleAssignments(directoryData)));
     }
 
-    internal static AdminDepartmentsResponse BuildDepartmentsResponse(
-        AdminDirectoryData directoryData,
-        IReadOnlyList<CaoDirectoryEmployee> caoEmployees)
+    private static IReadOnlyList<AdminDepartmentResponse> BuildFacultyDepartmentResponses(AdminDirectoryData data)
     {
-        var roleAssignments = BuildRoleAssignments(directoryData);
-        return new AdminDepartmentsResponse(
-            Clusters: BuildClusterResponses(directoryData, isActive: true),
-            Departments: BuildDepartmentResponses(directoryData, isActive: true),
-            InactiveClusters: BuildClusterResponses(directoryData, isActive: false),
-            InactiveDepartments: BuildDepartmentResponses(directoryData, isActive: false),
-            FacultyUsers: BuildFacultyUserResponses(directoryData, roleAssignments),
-            CaoUsers: BuildCaoUserResponses(directoryData, caoEmployees, roleAssignments));
+        var counts = data.CurrentFaculty
+            .Where(faculty => !string.IsNullOrWhiteSpace(faculty.ResolvedReportingDepartmentCode))
+            .GroupBy(faculty => faculty.ResolvedReportingDepartmentCode!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(faculty => faculty.IamId.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count(), StringComparer.OrdinalIgnoreCase);
+
+        return data.Departments.Select(department =>
+        {
+            data.CurrentChairAssignmentsByDepartment.TryGetValue(department.DepartmentCode.Trim(), out var chair);
+            counts.TryGetValue(department.DepartmentCode.Trim(), out var count);
+            return new AdminDepartmentResponse(
+                department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "auto",
+                chair?.IamId.Trim(), null, department.ClusterId?.ToString(), department.DepartmentCode,
+                count, count > 0, department.DepartmentCode, department.DepartmentName,
+                department.DepartmentEmailRoutings.Where(routing => routing.IsActive)
+                    .OrderBy(routing => routing.ToEmail)
+                    .Select(routing => new DepartmentRoutingEmailResponse(routing.ToEmail, routing.Id.ToString(), "to"))
+                    .ToList());
+        }).ToList();
+    }
+
+    internal static AdminDepartmentOverviewResponse BuildDepartmentsResponse(AdminDepartmentOverviewData data)
+    {
+        return new AdminDepartmentOverviewResponse(
+            Clusters: BuildClusterResponses(data, isActive: true),
+            Departments: BuildDepartmentResponses(data, isActive: true),
+            InactiveClusters: BuildClusterResponses(data, isActive: false),
+            InactiveDepartments: BuildDepartmentResponses(data, isActive: false));
     }
 
     private static IReadOnlyList<AdminDepartmentResponse> BuildDepartmentResponses(
-        AdminDirectoryData directoryData,
+        AdminDepartmentOverviewData data,
         bool? isActive = null)
     {
-        return directoryData.Departments
+        return data.Departments
             .Where(department => !isActive.HasValue || department.IsActive == isActive.Value)
             .Select(department =>
             {
-                directoryData.CurrentChairAssignmentsByDepartment.TryGetValue(
+                data.CurrentChairAssignmentsByDepartment.TryGetValue(
                     department.DepartmentCode.Trim(),
                     out var chairAssignment);
                 var chairUserId = chairAssignment?.IamId.Trim();
+                data.FacultyCountsByDepartment.TryGetValue(department.DepartmentCode.Trim(), out var facultyCount);
+                CaoDirectoryEmployee? chair = null;
+                if (chairUserId != null)
+                {
+                    data.AssignedPeopleByIamId.TryGetValue(chairUserId, out chair);
+                }
 
                 return new AdminDepartmentResponse(
                     ApprovalMode: department.WorkflowMode == WorkflowMode.ApprovalRequired ? "approval" : "auto",
                     ChairUserId: chairUserId,
+                    ChairName: chairUserId == null ? null : NullIfWhiteSpace(chair?.DisplayName) ?? chairUserId,
                     ClusterId: department.ClusterId?.ToString(),
                     Code: department.DepartmentCode,
+                    FacultyCount: facultyCount,
+                    HasFaculty: facultyCount > 0,
                     Id: department.DepartmentCode,
                     Name: department.DepartmentName,
                     RoutingEmails: department.DepartmentEmailRoutings
@@ -132,18 +167,24 @@ public sealed class AdminDirectoryService
     }
 
     private static IReadOnlyList<AdminClusterResponse> BuildClusterResponses(
-        AdminDirectoryData directoryData,
+        AdminDepartmentOverviewData data,
         bool? isActive = null)
     {
-        return directoryData.Clusters
+        return data.Clusters
             .Where(cluster => !isActive.HasValue || cluster.IsActive == isActive.Value)
             .Select(cluster =>
             {
-                directoryData.CurrentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
+                data.CurrentCaoAssignmentsByCluster.TryGetValue(cluster.Id, out var caoAssignment);
                 var caoUserId = caoAssignment?.IamId.Trim();
+                CaoDirectoryEmployee? cao = null;
+                if (caoUserId != null)
+                {
+                    data.AssignedPeopleByIamId.TryGetValue(caoUserId, out cao);
+                }
 
                 return new AdminClusterResponse(
                     CaoUserId: caoUserId,
+                    CaoName: caoUserId == null ? null : NullIfWhiteSpace(cao?.DisplayName) ?? caoUserId,
                     Id: cluster.Id.ToString(),
                     Name: cluster.ClusterName);
             })
@@ -285,13 +326,13 @@ public sealed class AdminDirectoryService
     }
 }
 
-public sealed record AdminDepartmentsResponse(
+public sealed record AdminDepartmentOverviewResponse(
     IReadOnlyList<AdminClusterResponse> Clusters,
     IReadOnlyList<AdminDepartmentResponse> Departments,
     IReadOnlyList<AdminClusterResponse> InactiveClusters,
-    IReadOnlyList<AdminDepartmentResponse> InactiveDepartments,
-    IReadOnlyList<AdminUserResponse> FacultyUsers,
-    IReadOnlyList<AdminCaoUserResponse> CaoUsers);
+    IReadOnlyList<AdminDepartmentResponse> InactiveDepartments);
+
+public sealed record DepartmentFacultyResponse(string Id, string Name, string Email);
 
 public sealed record AdminCaoUserResponse(string Id, bool Active, string Designation, string Email, string Name);
 
@@ -315,13 +356,16 @@ public sealed record FacultyWithOverrideResponse(
     string Position,
     string Role);
 
-public sealed record AdminClusterResponse(string? CaoUserId, string Id, string Name);
+public sealed record AdminClusterResponse(string? CaoUserId, string? CaoName, string Id, string Name);
 
 public sealed record AdminDepartmentResponse(
     string ApprovalMode,
     string? ChairUserId,
+    string? ChairName,
     string? ClusterId,
     string Code,
+    int FacultyCount,
+    bool HasFaculty,
     string Id,
     string Name,
     IReadOnlyList<DepartmentRoutingEmailResponse> RoutingEmails);

@@ -1,5 +1,6 @@
 import {
   Cog6ToothIcon,
+  ExclamationTriangleIcon,
   PencilSquareIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
@@ -8,13 +9,11 @@ import type { AdminDepartment } from '@/shared/admin/adminData.ts';
 export function DepartmentRow({
   chairName,
   department,
-  linkedUserCount,
   onOpenRoster,
   onOpenSettings,
 }: {
   chairName: string | null;
   department: AdminDepartment;
-  linkedUserCount: number;
   onOpenRoster: () => void;
   onOpenSettings: () => void;
 }) {
@@ -26,7 +25,20 @@ export function DepartmentRow({
       <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="w-full max-w-md text-lg font-bold uppercase tracking-wide text-primary">
+            <div className="flex w-full max-w-md items-center gap-2 text-lg font-bold uppercase tracking-wide text-primary">
+              {!department.hasFaculty ? (
+                <div
+                  aria-label="No faculty are assigned to this department"
+                  className="tooltip tooltip-warning shrink-0"
+                  data-tip="No faculty are assigned to this department"
+                  role="img"
+                >
+                  <ExclamationTriangleIcon
+                    aria-hidden="true"
+                    className="h-5 w-5 text-warning"
+                  />
+                </div>
+              ) : null}
               {department.name}
             </div>
           </div>
@@ -34,7 +46,7 @@ export function DepartmentRow({
             {department.code}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-base-content/70">
-            <span>{linkedUserCount} active users</span>
+            <span>{department.facultyCount} faculty</span>
             <span>·</span>
             <span>{approvalLabel}</span>
             <span>·</span>

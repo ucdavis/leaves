@@ -1,4 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import {
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  offset,
+  shift,
+  size,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useListNavigation,
+  useRole,
+} from '@floating-ui/react';
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import type { AdminCluster, ApprovalMode } from '@/shared/admin/adminData.ts';
@@ -61,11 +75,54 @@ export function AdminDepartmentCreationPanel({
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
-  const [inactiveDepartmentId, setInactiveDepartmentId] = useState<string | null>(null);
+  const [inactiveDepartmentId, setInactiveDepartmentId] = useState<
+    string | null
+  >(null);
   const [isReactivatingDepartment, setIsReactivatingDepartment] =
     useState(false);
   const [selectedDepartment, setSelectedDepartment] =
     useState<DepartmentOption | null>(null);
+  const [isDepartmentCodeOpen, setIsDepartmentCodeOpen] = useState(false);
+  const [hasRequestedDepartmentOptions, setHasRequestedDepartmentOptions] =
+    useState(false);
+  const [activeDepartmentOptionIndex, setActiveDepartmentOptionIndex] =
+    useState<number | null>(null);
+  const departmentOptionElements = useRef<Array<HTMLElement | null>>([]);
+  const { context, floatingStyles, refs } = useFloating({
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        apply({ elements, rects }) {
+          elements.floating.style.width = `${rects.reference.width}px`;
+        },
+      }),
+    ],
+    onOpenChange: (open) => {
+      setIsDepartmentCodeOpen(open);
+      setActiveDepartmentOptionIndex(null);
+      if (open) {
+        setHasRequestedDepartmentOptions(true);
+      }
+    },
+    open: isDepartmentCodeOpen,
+    placement: 'bottom-start',
+    whileElementsMounted: autoUpdate,
+  });
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: 'select' });
+  const listNavigation = useListNavigation(context, {
+    activeIndex: activeDepartmentOptionIndex,
+    enabled: true,
+    listRef: departmentOptionElements,
+    loop: true,
+    onNavigate: setActiveDepartmentOptionIndex,
+  });
+  const { getFloatingProps, getItemProps, getReferenceProps } = useInteractions(
+    [click, dismiss, role, listNavigation]
+  );
 
   const clusterForm = useAppForm({
     defaultValues: {
@@ -107,7 +164,11 @@ export function AdminDepartmentCreationPanel({
         departmentForm.reset();
         setSelectedDepartment(null);
       } catch (error) {
-        if (error instanceof HttpError && error.body && typeof error.body === 'object') {
+        if (
+          error instanceof HttpError &&
+          error.body &&
+          typeof error.body === 'object'
+        ) {
           const body = error.body as { inactiveDepartmentCode?: string };
           if (body.inactiveDepartmentCode) {
             setInactiveDepartmentId(body.inactiveDepartmentCode);
@@ -123,9 +184,10 @@ export function AdminDepartmentCreationPanel({
     },
   });
 
-  const departmentOptions = useQuery(
-    departmentOptionsQueryOptions()
-  );
+  const departmentOptions = useQuery({
+    ...departmentOptionsQueryOptions(),
+    enabled: hasRequestedDepartmentOptions,
+  });
 
   const selectDepartment = (code: string) => {
     const departmentOption = departmentOptions.data?.find(
@@ -142,6 +204,8 @@ export function AdminDepartmentCreationPanel({
     setSelectedDepartment(departmentOption);
     departmentForm.setFieldValue('code', departmentOption.code);
     departmentForm.setFieldValue('name', departmentOption.description ?? '');
+    setIsDepartmentCodeOpen(false);
+    setActiveDepartmentOptionIndex(null);
   };
 
   const reactivateDepartment = async () => {
@@ -233,38 +297,94 @@ export function AdminDepartmentCreationPanel({
                             Department Code
                           </span>
                         </label>
-                        <select
-                          className="select select-bordered w-full bg-white"
-                          disabled={departmentOptions.isFetching}
+                        <button
+                          className="select select-bordered flex w-full items-center bg-white text-left"
                           id="department-code"
-                          onChange={(event) => selectDepartment(event.target.value)}
-                          value={selectedDepartment?.code ?? ''}
+                          ref={refs.setReference}
+                          type="button"
+                          {...getReferenceProps()}
                         >
-                          <option value="">Select a department</option>
-                          {departmentOptions.data?.map((departmentOption) => (
-                            <option key={departmentOption.code} value={departmentOption.code}>
-                              {departmentOption.code} —{' '}
-                              {departmentOption.description ?? 'No description'} ({' '}
-                              {departmentOption.currentFacultyCount} faculty)
-                            </option>
-                          ))}
-                        </select>
+                          {selectedDepartment
+                            ? `${selectedDepartment.code} — ${selectedDepartment.description ?? 'No description'} (${selectedDepartment.currentFacultyCount} faculty)`
+                            : 'Select a department'}
+                        </button>
+                        {isDepartmentCodeOpen ? (
+                          <FloatingFocusManager
+                            context={context}
+                            initialFocus={-1}
+                            modal={false}
+                          >
+                            <div
+                              className="z-30 max-h-64 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg"
+                              ref={refs.setFloating}
+                              style={floatingStyles}
+                              {...getFloatingProps()}
+                            >
+                              {departmentOptions.isPending ? (
+                                <div
+                                  className="flex items-center gap-2 px-4 py-3 text-sm"
+                                  role="status"
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className="loading loading-spinner loading-sm"
+                                  />
+                                  Loading departments…
+                                </div>
+                              ) : departmentOptions.isError ? (
+                                <button
+                                  className="w-full px-4 py-3 text-left text-sm"
+                                  onClick={() =>
+                                    void departmentOptions.refetch()
+                                  }
+                                  type="button"
+                                >
+                                  Could not load departments. Try again
+                                </button>
+                              ) : departmentOptions.data.length === 0 ? (
+                                <div
+                                  className="px-4 py-3 text-sm"
+                                  role="status"
+                                >
+                                  Department list is not available.
+                                </div>
+                              ) : (
+                                departmentOptions.data.map(
+                                  (departmentOption, index) => (
+                                    <button
+                                      aria-selected={
+                                        selectedDepartment?.code ===
+                                        departmentOption.code
+                                      }
+                                      className="block w-full px-4 py-3 text-left text-sm hover:bg-base-200 focus:bg-base-200"
+                                      key={departmentOption.code}
+                                      ref={(node) => {
+                                        departmentOptionElements.current[
+                                          index
+                                        ] = node;
+                                      }}
+                                      type="button"
+                                      {...getItemProps({
+                                        onClick: () =>
+                                          selectDepartment(
+                                            departmentOption.code
+                                          ),
+                                      })}
+                                      role="option"
+                                    >
+                                      {departmentOption.code} —{' '}
+                                      {departmentOption.description ??
+                                        'No description'}{' '}
+                                      ({departmentOption.currentFacultyCount}{' '}
+                                      faculty)
+                                    </button>
+                                  )
+                                )
+                              )}
+                            </div>
+                          </FloatingFocusManager>
+                        ) : null}
                       </div>
-                      {departmentOptions.isFetching ? (
-                        <p className="mt-2 text-sm text-base-content/70">
-                          Loading departments…
-                        </p>
-                      ) : null}
-                      {departmentOptions.isError ? (
-                        <p className="mt-2 text-sm text-error">
-                          {formatError(departmentOptions.error)}
-                        </p>
-                      ) : null}
-                      {departmentOptions.data?.length === 0 ? (
-                        <p className="mt-2 text-sm text-base-content/70">
-                         Department list is not available.
-                        </p>
-                      ) : null}
                     </div>
 
                     <departmentForm.AppField name="name">
