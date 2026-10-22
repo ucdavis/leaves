@@ -123,9 +123,9 @@ function AdminDepartmentsRoute() {
   const [editingClusterSettingsId, setEditingClusterSettingsId] = useState<
     string | null
   >(null);
-  const [reactivationError, setReactivationError] = useState<string | null>(
-    null
-  );
+  const [clusterReactivationError, setClusterReactivationError] = useState<
+    string | null
+  >(null);
   const viewDepartmentId = peopleFor ?? null;
   const selectedDepartment = departments.find(
     (department) => department.id === viewDepartmentId
@@ -204,25 +204,13 @@ function AdminDepartmentsRoute() {
     onSuccess: invalidateDepartments,
   });
 
-  const reactivateDepartment = (departmentId: string) => {
-    setReactivationError(null);
-    reactivateDepartmentMutation.mutate(
-      { departmentId },
-      {
-        onError: (error) => {
-          setReactivationError(getAdminMutationErrorMessage(error));
-        },
-      }
-    );
-  };
-
   const reactivateCluster = (clusterId: string) => {
-    setReactivationError(null);
+    setClusterReactivationError(null);
     reactivateClusterMutation.mutate(
       { clusterId },
       {
         onError: (error) => {
-          setReactivationError(getAdminMutationErrorMessage(error));
+          setClusterReactivationError(getAdminMutationErrorMessage(error));
         },
       }
     );
@@ -416,8 +404,8 @@ function AdminDepartmentsRoute() {
         onCreateDepartment={(input) =>
           createDepartmentMutation.mutateAsync({ input })
         }
-        onReactivateDepartment={(departmentId) =>
-          reactivateDepartmentMutation.mutateAsync({ departmentId })
+        onReactivateDepartment={(departmentId, clusterId) =>
+          reactivateDepartmentMutation.mutateAsync({ departmentId, clusterId })
         }
       />
 
@@ -544,9 +532,9 @@ function AdminDepartmentsRoute() {
             <h2 className="text-lg font-semibold text-base-content/70">
               Inactive departments and clusters
             </h2>
-            {reactivationError ? (
+            {clusterReactivationError ? (
               <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {reactivationError}
+                {clusterReactivationError}
               </div>
             ) : null}
             <div className="mt-4 space-y-3">
@@ -561,14 +549,6 @@ function AdminDepartmentsRoute() {
                       {department.code}
                     </div>
                   </div>
-                  <button
-                    className="btn btn-outline"
-                    disabled={reactivateDepartmentMutation.isPending}
-                    onClick={() => reactivateDepartment(department.id)}
-                    type="button"
-                  >
-                    Reactivate department
-                  </button>
                 </div>
               ))}
               {inactiveClusters.map((cluster) => (

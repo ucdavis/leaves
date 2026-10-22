@@ -117,17 +117,15 @@ export const caoCandidatesQueryOptions = (query: string) => {
   });
 };
 
-export const departmentOptionsQueryOptions = (query = '') => {
-  const term = query.trim();
+export const departmentOptionsQueryOptions = () => {
   return queryOptions({
-    enabled: term.length <= 128,
     queryFn: ({ signal }): Promise<DepartmentOption[]> =>
       fetchJson<DepartmentOption[]>(
-        `/api/admin/departments/options?query=${encodeURIComponent(term)}`,
+        '/api/admin/departments/options',
         {},
         signal
       ),
-    queryKey: ['admin', 'departmentOptions', term] as const,
+    queryKey: ['admin', 'departmentOptions'] as const,
   });
 };
 
@@ -210,15 +208,20 @@ export async function createAdminDepartment({
 }
 
 export async function reactivateAdminDepartment({
+  clusterId,
   departmentId,
   signal,
 }: {
+  clusterId: string;
   departmentId: string;
   signal?: AbortSignal;
 }) {
   await fetchJson<void>(
     `/api/admin/departments/${encodeURIComponent(departmentId)}/reactivate`,
-    { method: 'POST' },
+    {
+      body: JSON.stringify({ clusterId: Number(clusterId) }),
+      method: 'POST',
+    },
     signal
   );
 }

@@ -358,12 +358,14 @@ test('department creation requires a cluster before it submits', async () => {
 
 test('department creation reports reactivation failures and clears the prompt after success', async () => {
   let reactivationAttempts = 0;
+  let reactivationInput: unknown;
   server.use(
     http.post('/api/admin/departments', () =>
       HttpResponse.json({ inactiveDepartmentCode: 'PLS' }, { status: 409 })
     ),
-    http.post('/api/admin/departments/PLS/reactivate', () => {
+    http.post('/api/admin/departments/PLS/reactivate', async ({ request }) => {
       reactivationAttempts += 1;
+      reactivationInput = await request.json();
       return reactivationAttempts === 1
         ? new HttpResponse('Unable to reactivate department.', { status: 500 })
         : new HttpResponse(null, { status: 204 });
@@ -391,6 +393,7 @@ test('department creation reports reactivation failures and clears the prompt af
     name: 'Reactivate department',
   });
   fireEvent.click(reactivate);
+  await waitFor(() => expect(reactivationInput).toEqual({ clusterId: 1 }));
   expect(
     await screen.findByText('Unable to reactivate department.')
   ).toBeInTheDocument();
@@ -407,14 +410,7 @@ test('department creation reports reactivation failures and clears the prompt af
   expect(departmentSelect).toHaveTextContent('Select a department');
 });
 
-test('inactive department reactivation errors are shown in the inactive section', async () => {
-  server.use(
-    http.post(
-      '/api/admin/departments/OLD/reactivate',
-      () =>
-        new HttpResponse('Unable to reactivate department.', { status: 500 })
-    )
-  );
+test('inactive departments direct admins to the add department form', async () => {
   renderDepartments({
     ...response,
     inactiveDepartments: [
@@ -433,13 +429,12 @@ test('inactive department reactivation errors are shown in the inactive section'
     ],
   });
 
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Reactivate department' })
-  );
-
   expect(
-    await screen.findByText('Unable to reactivate department.')
+    await screen.findByText('Reactivate this department from the form above.')
   ).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Reactivate department' })
+  ).not.toBeInTheDocument();
 });
 
 test.each([

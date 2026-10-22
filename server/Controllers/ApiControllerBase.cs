@@ -9,5 +9,4 @@ namespace Server.Controllers;
 [Route("api/[controller]")]
 public class ApiControllerBase : ControllerBase
 {
-
 }

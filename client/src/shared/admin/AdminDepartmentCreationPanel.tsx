@@ -71,7 +71,10 @@ export function AdminDepartmentCreationPanel({
   formatError: (error: unknown) => string;
   onCreateCluster: (name: string) => Promise<void>;
   onCreateDepartment: (input: CreateDepartmentInput) => Promise<void>;
-  onReactivateDepartment: (departmentId: string) => Promise<void>;
+  onReactivateDepartment: (
+    departmentId: string,
+    clusterId: string
+  ) => Promise<void>;
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
@@ -216,7 +219,10 @@ export function AdminDepartmentCreationPanel({
     setIsReactivatingDepartment(true);
 
     try {
-      await onReactivateDepartment(inactiveDepartmentId);
+      await onReactivateDepartment(
+        inactiveDepartmentId,
+        departmentForm.state.values.clusterId
+      );
       setDepartmentError(null);
       setInactiveDepartmentId(null);
       departmentForm.reset();

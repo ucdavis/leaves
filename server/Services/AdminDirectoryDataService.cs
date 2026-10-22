@@ -204,28 +204,12 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
     }
 
     public async Task<IReadOnlyList<DepartmentOption>> GetDepartmentOptionsAsync(
-        string? query,
         CancellationToken cancellationToken)
     {
-        var term = query?.Trim() ?? string.Empty;
-        if (term.Length > 128)
-        {
-            return [];
-        }
-
         var currentFaculty = _db.CurrentFacultyWithAccrual
             .AsNoTracking()
             .Where(faculty => faculty.ResolvedReportingDepartmentCode != null &&
                               faculty.ResolvedReportingDepartmentCode.Trim() != string.Empty);
-
-        if (!string.IsNullOrWhiteSpace(term))
-        {
-            currentFaculty = currentFaculty.Where(faculty =>
-                (faculty.ResolvedReportingDepartmentCode != null &&
-                 faculty.ResolvedReportingDepartmentCode.Contains(term)) ||
-                (faculty.ResolvedReportingDepartmentName != null &&
-                 faculty.ResolvedReportingDepartmentName.Contains(term)));
-        }
 
         var facultyCounts = await currentFaculty
             .GroupBy(faculty => faculty.ResolvedReportingDepartmentCode!.Trim())
@@ -235,7 +219,7 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 Count = group.Select(faculty => faculty.IamId.Trim()).Distinct().Count(),
             })
             .ToListAsync(cancellationToken);
-            
+
         var departmentNames = await currentFaculty
             .Select(faculty => new
             {

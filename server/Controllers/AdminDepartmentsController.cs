@@ -69,11 +69,11 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     }
 
     [HttpGet("options")]
-    public async Task<IActionResult> GetDepartmentOptionsAsync([FromQuery] string? query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetDepartmentOptionsAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var options = await _adminDirectoryDataService.GetDepartmentOptionsAsync(query, cancellationToken);
+            var options = await _adminDirectoryDataService.GetDepartmentOptionsAsync(cancellationToken);
             return Ok(options);
         }
         catch (Exception exception)
@@ -431,7 +431,10 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     }
 
     [HttpPost("{departmentCode}/reactivate")]
-    public async Task<IActionResult> ReactivateDepartment(string departmentCode, CancellationToken cancellationToken)
+    public async Task<IActionResult> ReactivateDepartment(
+        string departmentCode,
+        [FromBody] ReactivateDepartmentRequest? request,
+        CancellationToken cancellationToken)
     {
         var department = await _db.Departments.IgnoreQueryFilters()
             .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
@@ -440,7 +443,21 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return NotFound();
         }
 
-        department.ClusterId = null;
+        if (request == null || !request.ClusterId.HasValue)
+        {
+            return ValidationProblem("Cluster is required.");
+        }
+
+        var clusterId = request.ClusterId.Value;
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == clusterId,
+            cancellationToken);
+        if (cluster == null)
+        {
+            return ValidationProblem("Selected cluster does not exist.");
+        }
+
+        department.ClusterId = cluster.Id;
         department.IsActive = true;
         department.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
@@ -826,6 +843,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     public sealed record CreateClusterRequest(string? Name);
     public sealed record UpdateClusterRequest(string? Name, string? CaoUserId, bool CaoUserIdSet);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
+    public sealed record ReactivateDepartmentRequest(int? ClusterId);
     public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, bool ApprovePendingRequests, string? ChairUserId, bool ChairUserIdSet);
     public sealed record UpsertRoutingEmailRequest(string? Address);
 }
