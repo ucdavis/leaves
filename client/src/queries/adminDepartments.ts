@@ -3,7 +3,6 @@ import { fetchJson } from '@/lib/api.ts';
 import type {
   AdminCluster,
   AdminDepartment,
-  AdminRole,
   AdminUser,
   ApprovalMode,
   DepartmentRoutingEmail,
@@ -16,12 +15,10 @@ export type CreateDepartmentInput = {
   name: string;
 };
 
-type AdminDepartmentUserResponse = Omit<AdminUser, 'departmentId' | 'role'> & {
-  departmentId: string | null;
-  departmentOverrideEndDate?: string | null;
-  departmentOverrideId?: string | null;
-  departmentOverrideStartDate?: string | null;
-  role: AdminRole;
+export type DepartmentOption = {
+  code: string;
+  currentFacultyCount: number;
+  description: string | null;
 };
 
 export type AdminCaoUser = Pick<
@@ -31,18 +28,24 @@ export type AdminCaoUser = Pick<
   designation: AdminUser['designation'] | 'faculty';
 };
 
+export type DepartmentFacultyMember = {
+  email: string;
+  id: string;
+  name: string;
+};
+
 type AdminDepartmentsResponse = {
-  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  facultyUsers: AdminDepartmentUserResponse[];
+  inactiveClusters?: AdminCluster[];
+  inactiveDepartments?: AdminDepartment[];
 };
 
 export type AdminDepartmentsPageData = {
-  caoUsers: AdminCaoUser[];
   clusters: AdminCluster[];
   departments: AdminDepartment[];
-  facultyUsers: AdminUser[];
+  inactiveClusters: AdminCluster[];
+  inactiveDepartments: AdminDepartment[];
 };
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
@@ -64,14 +67,8 @@ function normalizeDepartmentData(
         kind: email.kind === 'cc' ? 'cc' : 'to',
       })),
     })),
-    facultyUsers: response.facultyUsers.map((user) => ({
-      ...user,
-      departmentId: user.departmentId ?? '',
-      departmentOverrideEndDate: user.departmentOverrideEndDate ?? '',
-      departmentOverrideId: user.departmentOverrideId ?? '',
-      departmentOverrideStartDate: user.departmentOverrideStartDate ?? '',
-      role: user.role,
-    })),
+    inactiveClusters: response.inactiveClusters ?? [],
+    inactiveDepartments: response.inactiveDepartments ?? [],
   };
 }
 
@@ -91,6 +88,19 @@ export const adminDepartmentsQueryOptions = () =>
       return normalizeDepartmentData(response);
     },
     queryKey: ['admin', 'departments'] as const,
+    staleTime: 60_000,
+  });
+
+export const departmentFacultyQueryOptions = (departmentCode: string) =>
+  queryOptions({
+    queryFn: ({ signal }): Promise<DepartmentFacultyMember[]> =>
+      fetchJson<DepartmentFacultyMember[]>(
+        `/api/admin/departments/${encodeURIComponent(departmentCode)}/faculty`,
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'departments', departmentCode, 'faculty'] as const,
+    staleTime: 60_000,
   });
 
 export const caoCandidatesQueryOptions = (query: string) => {
@@ -104,6 +114,18 @@ export const caoCandidatesQueryOptions = (query: string) => {
         signal
       ),
     queryKey: ['admin', 'caoCandidates', term] as const,
+  });
+};
+
+export const departmentOptionsQueryOptions = () => {
+  return queryOptions({
+    queryFn: ({ signal }): Promise<DepartmentOption[]> =>
+      fetchJson<DepartmentOption[]>(
+        '/api/admin/departments/options',
+        {},
+        signal
+      ),
+    queryKey: ['admin', 'departmentOptions'] as const,
   });
 };
 
@@ -181,6 +203,39 @@ export async function createAdminDepartment({
       }),
       method: 'POST',
     },
+    signal
+  );
+}
+
+export async function reactivateAdminDepartment({
+  clusterId,
+  departmentId,
+  signal,
+}: {
+  clusterId: string;
+  departmentId: string;
+  signal?: AbortSignal;
+}) {
+  await fetchJson<void>(
+    `/api/admin/departments/${encodeURIComponent(departmentId)}/reactivate`,
+    {
+      body: JSON.stringify({ clusterId: Number(clusterId) }),
+      method: 'POST',
+    },
+    signal
+  );
+}
+
+export async function reactivateAdminCluster({
+  clusterId,
+  signal,
+}: {
+  clusterId: string;
+  signal?: AbortSignal;
+}) {
+  await fetchJson<void>(
+    `/api/admin/departments/clusters/${encodeURIComponent(clusterId)}/reactivate`,
+    { method: 'POST' },
     signal
   );
 }

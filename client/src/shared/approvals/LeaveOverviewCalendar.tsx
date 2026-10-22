@@ -163,7 +163,7 @@ function CalendarFacultyRow({
     <tr>
       <th className="sticky left-0 z-10 border-r border-t border-base-300 bg-base-100 px-3 py-3 text-left">
         <button
-          className="font-bold text-primary underline-offset-4 hover:underline"
+          className="block w-full text-left font-bold text-primary underline-offset-4 hover:underline"
           onClick={() => onSelectFaculty(facultyMember.id)}
           type="button"
         >

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Server.Controllers;
 using Server.Core.Domain;
@@ -12,6 +13,166 @@ namespace Server.Tests.Controllers;
 
 public class AdminDepartmentsControllerWorkflowTests
 {
+    [Fact]
+    public async Task CreateCluster_with_a_deactivated_matching_name_returns_its_id_for_reactivation()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        db.Clusters.Add(new Cluster { Id = 1, ClusterName = "Cluster", IsActive = false });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.CreateCluster(
+            new AdminDepartmentsController.CreateClusterRequest("Cluster"),
+            CancellationToken.None);
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Which;
+        conflict.Value.Should().BeEquivalentTo(new { inactiveClusterId = 1 });
+    }
+
+    [Fact]
+    public async Task ReactivateCluster_with_an_active_matching_name_returns_a_conflict()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        db.Clusters.AddRange(
+            new Cluster { Id = 1, ClusterName = "Cluster" },
+            new Cluster { Id = 2, ClusterName = "Cluster", IsActive = false });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.ReactivateCluster(2, CancellationToken.None);
+
+        result.Should().BeOfType<ConflictObjectResult>();
+        (await db.Clusters.IgnoreQueryFilters().SingleAsync(cluster => cluster.Id == 2))
+            .IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateDepartment_without_a_cluster_returns_a_validation_error()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.CreateDepartment(
+            new AdminDepartmentsController.CreateDepartmentRequest(
+                ApprovalMode: "auto",
+                ClusterId: null,
+                Code: "DEPT",
+                Name: "Department"),
+            CancellationToken.None);
+
+        var validationProblem = result.Should().BeOfType<ObjectResult>().Which.Value
+            .Should().BeOfType<ValidationProblemDetails>().Subject;
+        validationProblem.Detail.Should().Be("Cluster is required.");
+    }
+
+    [Fact]
+    public async Task ReactivateDepartment_with_a_cluster_assigns_the_department_to_that_cluster()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var admin = new AppUser
+        {
+            EntraObjectId = Guid.NewGuid(),
+            IamId = "admin",
+            FirstLoginUtc = DateTime.UtcNow,
+        };
+        db.Clusters.Add(new Cluster { Id = 1, ClusterName = "Cluster" });
+        db.Departments.Add(new Department
+        {
+            ClusterId = null,
+            DepartmentCode = "DEPT",
+            DepartmentName = "Department",
+            IsActive = false,
+            WorkflowMode = WorkflowMode.ApprovalRequired,
+        });
+        db.AppUsers.Add(admin);
+        await db.SaveChangesAsync();
+        db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = "DEPT",
+            ToEmail = "routing@example.test",
+            UpdatedByAppUserId = admin.Id,
+        });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.ReactivateDepartment(
+            "DEPT",
+            new AdminDepartmentsController.ReactivateDepartmentRequest(1),
+            CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+        var department = await db.Departments.IgnoreQueryFilters()
+            .SingleAsync(item => item.DepartmentCode == "DEPT");
+        department.IsActive.Should().BeTrue();
+        department.ClusterId.Should().Be(1);
+        department.WorkflowMode.Should().Be(WorkflowMode.ApprovalRequired);
+        db.DepartmentEmailRoutings.Should().ContainSingle(routing =>
+            routing.DepartmentCode == "DEPT" &&
+            routing.ToEmail == "routing@example.test");
+    }
+
+    [Fact]
+    public async Task ReactivateDepartment_without_a_cluster_returns_a_validation_error()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        db.Departments.Add(new Department
+        {
+            DepartmentCode = "DEPT",
+            DepartmentName = "Department",
+            IsActive = false,
+        });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.ReactivateDepartment(
+            "DEPT",
+            null,
+            CancellationToken.None);
+
+        var validationProblem = result.Should().BeOfType<ObjectResult>().Which.Value
+            .Should().BeOfType<ValidationProblemDetails>().Subject;
+        validationProblem.Detail.Should().Be("Cluster is required.");
+    }
+
     [Fact]
     public async Task UpdateDepartment_to_auto_approve_immediately_approves_each_pending_request_after_confirmation()
     {
@@ -72,6 +233,7 @@ public class AdminDepartmentsControllerWorkflowTests
             new AdminDirectoryService(new AdminDirectoryDataService(db)),
             queue,
             new EmailDeliveryWakeSignal(),
+            null!,
             null!)
         {
             ControllerContext = new ControllerContext

@@ -18,10 +18,56 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
         _db = db;
     }
 
-    public async Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
+    public Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken)
+    {
+        return LoadDirectoryDataAsync(cancellationToken, includeInactive: false);
+    }
+
+    public async Task<AdminDepartmentOverviewData> LoadDepartmentOverviewAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var coreData = await LoadDirectoryCoreDataAsync(cancellationToken);
+        var clusters = await _db.Clusters.IgnoreQueryFilters().AsNoTracking()
+            .OrderBy(cluster => cluster.ClusterName).ToListAsync(cancellationToken);
+        var departments = await _db.Departments.IgnoreQueryFilters().AsNoTracking()
+            .Include(department => department.DepartmentEmailRoutings)
+            .OrderBy(department => department.DepartmentName).ToListAsync(cancellationToken);
+        var chairAssignments = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
+        var caoAssignments = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
+        var facultyCounts = await _db.CurrentFacultyWithAccrual.AsNoTracking()
+            .Where(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                              faculty.ResolvedReportingDepartmentCode.Trim() != string.Empty)
+            .GroupBy(faculty => faculty.ResolvedReportingDepartmentCode!.Trim())
+            .Select(group => new { Code = group.Key, Count = group.Select(faculty => faculty.IamId.Trim()).Distinct().Count() })
+            .ToDictionaryAsync(item => item.Code, item => item.Count, cancellationToken);
+
+        var assignmentIds = chairAssignments.Values.Select(assignment => assignment.IamId)
+            .Concat(caoAssignments.Values.Select(assignment => assignment.IamId));
+        var assignedPeople = await LoadCaoEmployeesAsync(assignmentIds, cancellationToken);
+
+        return new AdminDepartmentOverviewData(
+            clusters, departments, chairAssignments, caoAssignments,
+            new Dictionary<string, int>(facultyCounts, StringComparer.OrdinalIgnoreCase),
+            assignedPeople.ToDictionary(person => person.IamId.Trim(), StringComparer.OrdinalIgnoreCase));
+    }
+
+    public Task<List<DepartmentFacultyMember>> LoadDepartmentFacultyAsync(string departmentCode, CancellationToken cancellationToken)
+    {
+        var normalizedCode = departmentCode.Trim();
+        return _db.CurrentFacultyWithAccrual.AsNoTracking()
+            .Where(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                              faculty.ResolvedReportingDepartmentCode.Trim() == normalizedCode)
+            .OrderBy(faculty => faculty.DisplayName).ThenBy(faculty => faculty.IamId)
+            .Select(faculty => new DepartmentFacultyMember(
+                faculty.IamId.Trim(), faculty.DisplayName, faculty.Email))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AdminDirectoryData> LoadDirectoryDataAsync(
+        CancellationToken cancellationToken,
+        bool includeInactive)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var coreData = await LoadDirectoryCoreDataAsync(cancellationToken, includeInactive);
         var currentOverridesById = await LoadCurrentOverridesByIdAsync(coreData.CurrentFaculty, cancellationToken);
         var currentChairAssignmentsByDepartment = await GetCurrentChairAssignmentsByDepartmentAsync(today, cancellationToken);
         var currentCaoAssignmentsByCluster = await GetCurrentCaoAssignmentsByClusterAsync(today, cancellationToken);
@@ -157,6 +203,56 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DepartmentOption>> GetDepartmentOptionsAsync(
+        CancellationToken cancellationToken)
+    {
+        var currentFaculty = _db.CurrentFacultyWithAccrual
+            .AsNoTracking()
+            .Where(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                              faculty.ResolvedReportingDepartmentCode.Trim() != string.Empty);
+
+        var facultyCounts = await currentFaculty
+            .GroupBy(faculty => faculty.ResolvedReportingDepartmentCode!.Trim())
+            .Select(group => new
+            {
+                Code = group.Key,
+                Count = group.Select(faculty => faculty.IamId.Trim()).Distinct().Count(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var departmentNames = await currentFaculty
+            .Select(faculty => new
+            {
+                Code = faculty.ResolvedReportingDepartmentCode!.Trim(),
+                Description = faculty.ResolvedReportingDepartmentName,
+            })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var countsByCode = facultyCounts.ToDictionary(
+            department => department.Code,
+            department => department.Count,
+            StringComparer.OrdinalIgnoreCase);
+
+        return departmentNames
+            .GroupBy(department => department.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new DepartmentOption(
+                group.Key,
+                group.Max(department => department.Description),
+                countsByCode[group.Key]))
+            .OrderBy(option => option.Code)
+            .ToList();
+    }
+
+    public Task<bool> IsResolvedDepartmentCodeAsync(string departmentCode, CancellationToken cancellationToken)
+    {
+        var normalizedCode = departmentCode.Trim();
+        return _db.CurrentFacultyWithAccrual
+            .AsNoTracking()
+            .AnyAsync(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                                 faculty.ResolvedReportingDepartmentCode.Trim() == normalizedCode,
+                cancellationToken);
+    }
+
     public async Task<AdminStatusDirectoryData> LoadStatusDirectoryDataAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -254,13 +350,23 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
                 cancellationToken);
     }
 
-    private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(CancellationToken cancellationToken)
+    private async Task<AdminDirectoryCoreData> LoadDirectoryCoreDataAsync(
+        CancellationToken cancellationToken,
+        bool includeInactive)
     {
-        var clusters = await _db.Clusters
+        var clustersQuery = _db.Clusters.AsQueryable();
+        var departmentsQuery = _db.Departments.AsQueryable();
+        if (includeInactive)
+        {
+            clustersQuery = clustersQuery.IgnoreQueryFilters();
+            departmentsQuery = departmentsQuery.IgnoreQueryFilters();
+        }
+
+        var clusters = await clustersQuery
             .AsNoTracking()
             .OrderBy(cluster => cluster.ClusterName)
             .ToListAsync(cancellationToken);
-        var departments = await _db.Departments
+        var departments = await departmentsQuery
             .AsNoTracking()
             .Include(department => department.DepartmentEmailRoutings)
             .OrderBy(department => department.DepartmentName)
@@ -354,6 +460,16 @@ public sealed record AdminDirectoryData(
     IReadOnlyList<Department> Departments,
     IReadOnlySet<string> AdminIamIds);
 
+public sealed record AdminDepartmentOverviewData(
+    IReadOnlyList<Cluster> Clusters,
+    IReadOnlyList<Department> Departments,
+    IReadOnlyDictionary<string, DepartmentChairAssignment> CurrentChairAssignmentsByDepartment,
+    IReadOnlyDictionary<int, ClusterCaoAssignment> CurrentCaoAssignmentsByCluster,
+    IReadOnlyDictionary<string, int> FacultyCountsByDepartment,
+    IReadOnlyDictionary<string, CaoDirectoryEmployee> AssignedPeopleByIamId);
+
+public sealed record DepartmentFacultyMember(string IamId, string? Name, string? Email);
+
 public sealed record AdminStatusDirectoryData(
     IReadOnlyList<Cluster> Clusters,
     IReadOnlyDictionary<int, ClusterCaoAssignment> CurrentCaoAssignmentsByCluster,
@@ -390,6 +506,11 @@ public sealed record DirectoryEmployee(
     string? DisplayName,
     string? Email,
     string? EmployeeId = null);
+
+public sealed record DepartmentOption(
+    string Code,
+    string? Description,
+    int CurrentFacultyCount);
 
 public sealed record AdminRoleAssignmentsData(
     IReadOnlyList<AppAdminAssignment> AdminAssignments,

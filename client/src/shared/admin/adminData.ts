@@ -21,10 +21,7 @@ export type AdminUser = {
   role: AdminRole;
 };
 
-export type AdminUserEditableFields = Pick<
-  AdminUser,
-  'email' | 'name'
->;
+export type AdminUserEditableFields = Pick<AdminUser, 'email' | 'name'>;
 
 export type UpdateUserInput = Partial<AdminUserEditableFields> & {
   active?: boolean;
@@ -41,15 +38,19 @@ export type DepartmentRoutingEmail = {
 
 export type AdminDepartment = {
   approvalMode: ApprovalMode;
+  chairName: string | null;
   chairUserId: string | null;
   clusterId: string | null;
   code: string;
+  facultyCount: number;
+  hasFaculty: boolean;
   id: string;
   name: string;
   routingEmails: DepartmentRoutingEmail[];
 };
 
 export type AdminCluster = {
+  caoName: string | null;
   caoUserId: string | null;
   id: string;
   name: string;

@@ -23,6 +23,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private readonly ILeaveRequestNotificationQueue _notificationQueue;
     private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
     private readonly IUserService _userService;
+    private readonly IHostEnvironment _environment;
 
     public AdminDepartmentsController(
         AppDbContext db,
@@ -30,7 +31,8 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         AdminDirectoryService adminDirectoryService,
         ILeaveRequestNotificationQueue notificationQueue,
         IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
-        IUserService userService)
+        IUserService userService,
+        IHostEnvironment environment)
     {
         _db = db;
         _adminDirectoryDataService = adminDirectoryDataService;
@@ -38,6 +40,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         _notificationQueue = notificationQueue;
         _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
         _userService = userService;
+        _environment = environment;
     }
 
     [HttpGet]
@@ -46,10 +49,43 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return Ok(await _adminDirectoryService.GetDepartmentsAsync(cancellationToken));
     }
 
+    [HttpGet("{departmentCode}/faculty")]
+    public async Task<IActionResult> GetDepartmentFacultyAsync(string departmentCode, CancellationToken cancellationToken)
+    {
+        var exists = await _db.Departments.AnyAsync(
+            department => department.DepartmentCode == departmentCode, cancellationToken);
+        if (!exists)
+        {
+            return NotFound();
+        }
+
+        return Ok(await _adminDirectoryService.GetDepartmentFacultyAsync(departmentCode, cancellationToken));
+    }
+
     [HttpGet("cao-candidates")]
     public async Task<IActionResult> SearchCaoCandidatesAsync([FromQuery] string? query, CancellationToken cancellationToken)
     {
         return Ok(await _adminDirectoryService.SearchCaoCandidatesAsync(query, cancellationToken));
+    }
+
+    [HttpGet("options")]
+    public async Task<IActionResult> GetDepartmentOptionsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var options = await _adminDirectoryDataService.GetDepartmentOptionsAsync(cancellationToken);
+            return Ok(options);
+        }
+        catch (Exception exception)
+        {
+            var detail = _environment.IsDevelopment()
+                ? exception.GetBaseException().Message
+                : "Unable to load department options.";
+            return Problem(
+                detail: detail,
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Unable to load department options");
+        }
     }
 
     [HttpPost("clusters")]
@@ -66,11 +102,16 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem($"Cluster name must be {ClusterNameMaxLength} characters or fewer.");
         }
 
-        var duplicateExists = await _db.Clusters.AnyAsync(
-            cluster => cluster.IsActive && cluster.ClusterName == name,
+        var existingCluster = await _db.Clusters.IgnoreQueryFilters().FirstOrDefaultAsync(
+            cluster => cluster.ClusterName == name,
             cancellationToken);
-        if (duplicateExists)
+        if (existingCluster != null)
         {
+            if (!existingCluster.IsActive)
+            {
+                return Conflict(new { inactiveClusterId = existingCluster.Id });
+            }
+
             return Conflict("A cluster with that name already exists.");
         }
 
@@ -170,6 +211,30 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return NoContent();
     }
 
+    [HttpPost("clusters/{clusterId:int}/reactivate")]
+    public async Task<IActionResult> ReactivateCluster(int clusterId, CancellationToken cancellationToken)
+    {
+        var cluster = await _db.Clusters.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.Id == clusterId, cancellationToken);
+        if (cluster == null || cluster.IsActive)
+        {
+            return NotFound();
+        }
+
+        var duplicateExists = await _db.Clusters.AnyAsync(
+            item => item.Id != clusterId && item.IsActive && item.ClusterName == cluster.ClusterName,
+            cancellationToken);
+        if (duplicateExists)
+        {
+            return Conflict("A cluster with that name already exists.");
+        }
+
+        cluster.IsActive = true;
+        cluster.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentRequest request, CancellationToken cancellationToken)
     {
@@ -200,23 +265,38 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem($"Department name must be {DepartmentNameMaxLength} characters or fewer.");
         }
 
-        if (request.ClusterId.HasValue)
+        if (!request.ClusterId.HasValue)
         {
-            var cluster = await _db.Clusters.FirstOrDefaultAsync(
-                item => item.Id == request.ClusterId.Value,
-                cancellationToken);
-            if (cluster == null || !cluster.IsActive)
-            {
-                return ValidationProblem("Selected cluster does not exist.");
-            }
+            return ValidationProblem("Cluster is required.");
         }
 
-        var departmentExists = await _db.Departments.AnyAsync(
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == request.ClusterId.Value,
+            cancellationToken);
+        if (cluster == null || !cluster.IsActive)
+        {
+            return ValidationProblem("Selected cluster does not exist.");
+        }
+
+        var existingDepartment = await _db.Departments.IgnoreQueryFilters().FirstOrDefaultAsync(
             department => department.DepartmentCode == departmentCode,
             cancellationToken);
-        if (departmentExists)
+        if (existingDepartment != null)
         {
+            if (!existingDepartment.IsActive)
+            {
+                return Conflict(new { inactiveDepartmentCode = existingDepartment.DepartmentCode });
+            }
+
             return Conflict("A department with that code already exists.");
+        }
+
+        var isResolvedDepartmentCode = await _adminDirectoryDataService.IsResolvedDepartmentCodeAsync(
+            departmentCode,
+            cancellationToken);
+        if (!isResolvedDepartmentCode)
+        {
+            return ValidationProblem("Department code must exist in the current faculty data.");
         }
 
         if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: true, out var workflowMode))
@@ -359,6 +439,40 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         department.IsActive = false;
         department.UpdatedUtc = DateTime.UtcNow;
 
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{departmentCode}/reactivate")]
+    public async Task<IActionResult> ReactivateDepartment(
+        string departmentCode,
+        [FromBody] ReactivateDepartmentRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var department = await _db.Departments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(item => item.DepartmentCode == departmentCode, cancellationToken);
+        if (department == null || department.IsActive)
+        {
+            return NotFound();
+        }
+
+        if (request == null || !request.ClusterId.HasValue)
+        {
+            return ValidationProblem("Cluster is required.");
+        }
+
+        var clusterId = request.ClusterId.Value;
+        var cluster = await _db.Clusters.FirstOrDefaultAsync(
+            item => item.Id == clusterId,
+            cancellationToken);
+        if (cluster == null)
+        {
+            return ValidationProblem("Selected cluster does not exist.");
+        }
+
+        department.ClusterId = cluster.Id;
+        department.IsActive = true;
+        department.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -743,6 +857,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     public sealed record CreateClusterRequest(string? Name);
     public sealed record UpdateClusterRequest(string? Name, string? CaoUserId, bool CaoUserIdSet);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
+    public sealed record ReactivateDepartmentRequest(int? ClusterId);
     public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, bool ApprovePendingRequests, string? ChairUserId, bool ChairUserIdSet);
     public sealed record UpsertRoutingEmailRequest(string? Address);
 }

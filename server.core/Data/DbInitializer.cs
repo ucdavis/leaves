@@ -383,6 +383,7 @@ public class DbInitializer : IDbInitializer
         CancellationToken ct)
     {
         var existingNames = await _db.Clusters
+            .IgnoreQueryFilters()
             .Select(cluster => cluster.ClusterName)
             .ToListAsync(ct);
 
@@ -416,6 +417,7 @@ public class DbInitializer : IDbInitializer
         CancellationToken ct)
     {
         var existingCodes = await _db.Departments
+            .IgnoreQueryFilters()
             .Select(department => department.DepartmentCode)
             .ToListAsync(ct);
 
@@ -933,6 +935,7 @@ public class DbInitializer : IDbInitializer
     private async Task<Dictionary<string, Cluster>> LoadClustersByNameAsync(CancellationToken ct)
     {
         var clusters = await _db.Clusters
+            .IgnoreQueryFilters()
             .OrderByDescending(cluster => cluster.IsActive)
             .ThenBy(cluster => cluster.Id)
             .ToListAsync(ct);
