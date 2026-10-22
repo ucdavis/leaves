@@ -306,6 +306,7 @@ function LeaveRequestForm({
   onTitleChange: (title: string) => void;
 }) {
   const leaveTypeSelectId = useId();
+  const leaveTypeErrorId = `${leaveTypeSelectId}-error`;
   const queryClient = useQueryClient();
   const { data: holidays = [], isPending: isLoadingHolidays } = useQuery(
     universityHolidaysQueryOptions()
@@ -460,6 +461,12 @@ function LeaveRequestForm({
                     </span>
                   </label>
                   <select
+                    aria-describedby={
+                      field.state.meta.errors.length > 0
+                        ? leaveTypeErrorId
+                        : undefined
+                    }
+                    aria-invalid={field.state.meta.errors.length > 0}
                     aria-required
                     className={`select select-bordered w-full ${
                       field.state.meta.errors.length > 0 ? 'select-error' : ''
@@ -494,13 +501,13 @@ function LeaveRequestForm({
                     ))}
                   </select>
                   {field.state.meta.errors.length > 0 ? (
-                    <label className="label">
+                    <p className="label" id={leaveTypeErrorId}>
                       <span className="label-text-alt text-error" role="alert">
                         {field.state.meta.errors
                           .map(getValidationErrorMessage)
                           .join(', ')}
                       </span>
-                    </label>
+                    </p>
                   ) : null}
                 </div>
               )}
