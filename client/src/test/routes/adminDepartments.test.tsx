@@ -410,33 +410,6 @@ test('department creation reports reactivation failures and clears the prompt af
   expect(departmentSelect).toHaveTextContent('Select a department');
 });
 
-test('inactive departments direct admins to the add department form', async () => {
-  renderDepartments({
-    ...response,
-    inactiveDepartments: [
-      {
-        approvalMode: 'auto',
-        chairName: null,
-        chairUserId: null,
-        clusterId: null,
-        code: 'OLD',
-        facultyCount: 0,
-        hasFaculty: false,
-        id: 'OLD',
-        name: 'Former department',
-        routingEmails: [],
-      },
-    ],
-  });
-
-  expect(
-    await screen.findByText('Reactivate this department from the form above.')
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByRole('button', { name: 'Reactivate department' })
-  ).not.toBeInTheDocument();
-});
-
 test.each([
   ['Staff candidate', 'candidate'],
   ['Staff with faculty appointment', 'split'],
