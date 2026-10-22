@@ -65,18 +65,24 @@ export function AdminDepartmentCreationPanel({
   formatError,
   onCreateCluster,
   onCreateDepartment,
+  onReactivateCluster,
   onReactivateDepartment,
 }: {
   clusters: AdminCluster[];
   formatError: (error: unknown) => string;
   onCreateCluster: (name: string) => Promise<void>;
   onCreateDepartment: (input: CreateDepartmentInput) => Promise<void>;
+  onReactivateCluster: (clusterId: string) => Promise<void>;
   onReactivateDepartment: (
     departmentId: string,
     clusterId: string
   ) => Promise<void>;
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
+  const [inactiveClusterId, setInactiveClusterId] = useState<string | null>(
+    null
+  );
+  const [isReactivatingCluster, setIsReactivatingCluster] = useState(false);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
   const [inactiveDepartmentId, setInactiveDepartmentId] = useState<
     string | null
@@ -133,11 +139,24 @@ export function AdminDepartmentCreationPanel({
     },
     onSubmit: async ({ value }) => {
       setClusterError(null);
+      setInactiveClusterId(null);
 
       try {
         await onCreateCluster(value.name.trim());
         clusterForm.reset();
       } catch (error) {
+        if (
+          error instanceof HttpError &&
+          error.body &&
+          typeof error.body === 'object'
+        ) {
+          const body = error.body as { inactiveClusterId?: number };
+          if (body.inactiveClusterId !== undefined) {
+            setInactiveClusterId(String(body.inactiveClusterId));
+            setClusterError('This cluster was previously deactivated.');
+            return;
+          }
+        }
         setClusterError(formatError(error));
       }
     },
@@ -193,6 +212,9 @@ export function AdminDepartmentCreationPanel({
   });
 
   const selectDepartment = (code: string) => {
+    setDepartmentError(null);
+    setInactiveDepartmentId(null);
+
     const departmentOption = departmentOptions.data?.find(
       (item) => item.code === code
     );
@@ -234,6 +256,25 @@ export function AdminDepartmentCreationPanel({
     }
   };
 
+  const reactivateCluster = async () => {
+    if (!inactiveClusterId) {
+      return;
+    }
+
+    setIsReactivatingCluster(true);
+
+    try {
+      await onReactivateCluster(inactiveClusterId);
+      setClusterError(null);
+      setInactiveClusterId(null);
+      clusterForm.reset();
+    } catch (error) {
+      setClusterError(formatError(error));
+    } finally {
+      setIsReactivatingCluster(false);
+    }
+  };
+
   return (
     <>
       <h2 className="text-2xl font-semibold text-primary">
@@ -268,6 +309,18 @@ export function AdminDepartmentCreationPanel({
                   {clusterError ? (
                     <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                       {clusterError}
+                      {inactiveClusterId ? (
+                        <button
+                          className="btn btn-sm ml-3"
+                          disabled={isReactivatingCluster}
+                          onClick={() => void reactivateCluster()}
+                          type="button"
+                        >
+                          {isReactivatingCluster
+                            ? 'Reactivating cluster...'
+                            : 'Reactivate cluster'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 

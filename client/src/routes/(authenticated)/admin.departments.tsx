@@ -404,8 +404,11 @@ function AdminDepartmentsRoute() {
         onCreateDepartment={(input) =>
           createDepartmentMutation.mutateAsync({ input })
         }
+        onReactivateCluster={(clusterId) =>
+          reactivateClusterMutation.mutateAsync({ clusterId })
+        }
         onReactivateDepartment={(departmentId, clusterId) =>
-          reactivateDepartmentMutation.mutateAsync({ departmentId, clusterId })
+          reactivateDepartmentMutation.mutateAsync({ clusterId, departmentId })
         }
       />
 

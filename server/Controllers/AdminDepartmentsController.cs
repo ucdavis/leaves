@@ -102,11 +102,16 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem($"Cluster name must be {ClusterNameMaxLength} characters or fewer.");
         }
 
-        var duplicateExists = await _db.Clusters.AnyAsync(
-            cluster => cluster.IsActive && cluster.ClusterName == name,
+        var existingCluster = await _db.Clusters.IgnoreQueryFilters().FirstOrDefaultAsync(
+            cluster => cluster.ClusterName == name,
             cancellationToken);
-        if (duplicateExists)
+        if (existingCluster != null)
         {
+            if (!existingCluster.IsActive)
+            {
+                return Conflict(new { inactiveClusterId = existingCluster.Id });
+            }
+
             return Conflict("A cluster with that name already exists.");
         }
 
@@ -216,6 +221,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return NotFound();
         }
 
+        var duplicateExists = await _db.Clusters.AnyAsync(
+            item => item.Id != clusterId && item.IsActive && item.ClusterName == cluster.ClusterName,
+            cancellationToken);
+        if (duplicateExists)
+        {
+            return Conflict("A cluster with that name already exists.");
+        }
+
         cluster.IsActive = true;
         cluster.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
@@ -278,12 +291,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return Conflict("A department with that code already exists.");
         }
 
-        var isLevelFiveDepartmentCode = await _adminDirectoryDataService.IsLevelFiveDepartmentCodeAsync(
+        var isResolvedDepartmentCode = await _adminDirectoryDataService.IsResolvedDepartmentCodeAsync(
             departmentCode,
             cancellationToken);
-        if (!isLevelFiveDepartmentCode)
+        if (!isResolvedDepartmentCode)
         {
-            return ValidationProblem("Department code must exist in the current department data.");
+            return ValidationProblem("Department code must exist in the current faculty data.");
         }
 
         if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: true, out var workflowMode))

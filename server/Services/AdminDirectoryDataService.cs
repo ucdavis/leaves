@@ -243,12 +243,13 @@ public sealed class AdminDirectoryDataService : IAdminDirectoryDataService
             .ToList();
     }
 
-    public Task<bool> IsLevelFiveDepartmentCodeAsync(string departmentCode, CancellationToken cancellationToken)
+    public Task<bool> IsResolvedDepartmentCodeAsync(string departmentCode, CancellationToken cancellationToken)
     {
-        return _db.EmployeeAccrualBalances
+        var normalizedCode = departmentCode.Trim();
+        return _db.CurrentFacultyWithAccrual
             .AsNoTracking()
-            .AnyAsync(balance => balance.Level5Dept != null &&
-                                 balance.Level5Dept.Trim() == departmentCode,
+            .AnyAsync(faculty => faculty.ResolvedReportingDepartmentCode != null &&
+                                 faculty.ResolvedReportingDepartmentCode.Trim() == normalizedCode,
                 cancellationToken);
     }
 

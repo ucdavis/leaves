@@ -14,6 +14,55 @@ namespace Server.Tests.Controllers;
 public class AdminDepartmentsControllerWorkflowTests
 {
     [Fact]
+    public async Task CreateCluster_with_a_deactivated_matching_name_returns_its_id_for_reactivation()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        db.Clusters.Add(new Cluster { Id = 1, ClusterName = "Cluster", IsActive = false });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.CreateCluster(
+            new AdminDepartmentsController.CreateClusterRequest("Cluster"),
+            CancellationToken.None);
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Which;
+        conflict.Value.Should().BeEquivalentTo(new { inactiveClusterId = 1 });
+    }
+
+    [Fact]
+    public async Task ReactivateCluster_with_an_active_matching_name_returns_a_conflict()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        db.Clusters.AddRange(
+            new Cluster { Id = 1, ClusterName = "Cluster" },
+            new Cluster { Id = 2, ClusterName = "Cluster", IsActive = false });
+        await db.SaveChangesAsync();
+
+        var controller = new AdminDepartmentsController(
+            db,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var result = await controller.ReactivateCluster(2, CancellationToken.None);
+
+        result.Should().BeOfType<ConflictObjectResult>();
+        (await db.Clusters.IgnoreQueryFilters().SingleAsync(cluster => cluster.Id == 2))
+            .IsActive.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task CreateDepartment_without_a_cluster_returns_a_validation_error()
     {
         await using var db = TestDbContextFactory.CreateInMemory();

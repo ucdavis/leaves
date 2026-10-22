@@ -290,7 +290,7 @@ test('marks departments without faculty', async () => {
   ).toBeInTheDocument();
 });
 
-test('department creation requires a selected UCPath Level 5 department and prefills its name', async () => {
+test('department creation requires a selected resolved department and prefills its name', async () => {
   let saved: unknown;
   server.use(
     http.post('/api/admin/departments', async ({ request }) => {
@@ -356,6 +356,34 @@ test('department creation requires a cluster before it submits', async () => {
   expect(didSubmit).toBe(false);
 });
 
+test('cluster creation offers to reactivate a matching inactive cluster', async () => {
+  let reactivationRequests = 0;
+  server.use(
+    http.post('/api/admin/departments/clusters', () =>
+      HttpResponse.json({ inactiveClusterId: 2 }, { status: 409 })
+    ),
+    http.post('/api/admin/departments/clusters/2/reactivate', () => {
+      reactivationRequests += 1;
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  renderDepartments();
+
+  const clusterName = await screen.findByPlaceholderText('Arts and Humanities');
+  fireEvent.change(clusterName, { target: { value: 'Inactive cluster' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add cluster' }));
+
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Reactivate cluster' })
+  );
+
+  await waitFor(() => expect(reactivationRequests).toBe(1));
+  expect(clusterName).toHaveValue('');
+  expect(
+    screen.queryByRole('button', { name: 'Reactivate cluster' })
+  ).not.toBeInTheDocument();
+});
+
 test('department creation reports reactivation failures and clears the prompt after success', async () => {
   let reactivationAttempts = 0;
   let reactivationInput: unknown;
@@ -408,6 +436,51 @@ test('department creation reports reactivation failures and clears the prompt af
     ).not.toBeInTheDocument()
   );
   expect(departmentSelect).toHaveTextContent('Select a department');
+});
+
+test('changing the department selection clears a previous reactivation prompt', async () => {
+  server.use(
+    http.post('/api/admin/departments', () =>
+      HttpResponse.json({ inactiveDepartmentCode: 'PLS' }, { status: 409 })
+    )
+  );
+  renderDepartments(response, [
+    {
+      code: 'PLS',
+      currentFacultyCount: 3,
+      description: 'Plant Sciences',
+    },
+    {
+      code: 'ENT',
+      currentFacultyCount: 2,
+      description: 'Entomology',
+    },
+  ]);
+
+  const departmentSelect = await screen.findByLabelText('Department Code');
+  fireEvent.click(departmentSelect);
+  fireEvent.click(
+    await screen.findByRole('option', {
+      name: /PLS.*Plant Sciences.*3 faculty/,
+    })
+  );
+  fireEvent.change(getSelectField('Cluster'), { target: { value: '1' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
+
+  expect(
+    await screen.findByRole('button', { name: 'Reactivate department' })
+  ).toBeInTheDocument();
+
+  fireEvent.click(departmentSelect);
+  fireEvent.click(
+    await screen.findByRole('option', {
+      name: /ENT.*Entomology.*2 faculty/,
+    })
+  );
+
+  expect(
+    screen.queryByRole('button', { name: 'Reactivate department' })
+  ).not.toBeInTheDocument();
 });
 
 test.each([
