@@ -21,7 +21,7 @@ export function AccrualBalancePanel({
   });
 
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="font-bold text-primary">Leave Balances</h2>
         <span className="rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-base-content/70">
@@ -84,7 +84,7 @@ export function QuickActionsPanel({
   onReportLeave: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
       <h2 className="mb-5 font-bold text-primary">Quick Actions</h2>
       <button
         className={`${reportLeaveButtonClass} w-full btn-lg`}
@@ -111,7 +111,7 @@ export function RecentRequestsPanel({
   requests: FacultyLeaveRequest[];
 }) {
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
       <h2 className="mb-5 font-bold text-primary">Recent Requests</h2>
       <div className="divide-y divide-base-300">
         {requests.length > 0 ? (
@@ -143,7 +143,7 @@ function RecentRequestRow({
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0">
       <button
         className="flex min-w-0 items-start gap-3 text-left transition hover:text-primary"
         onClick={() => onSelectRequest(request)}
@@ -152,7 +152,7 @@ function RecentRequestRow({
         <div className="flex min-w-0 items-start gap-3">
           <span className={`mt-1 h-2.5 w-2.5 rounded-full ${tone.dot}`} />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold">
+            <div className="break-words text-sm font-bold">
               {request.leaveType}
             </div>
             <div className="text-xs text-base-content/70">
@@ -162,7 +162,7 @@ function RecentRequestRow({
         </div>
       </button>
       <div className="text-sm font-bold">{formatHours(request.totalHours)}</div>
-      <div className="flex items-center gap-3">
+      <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 xl:col-span-1 xl:justify-start">
         <RequestStatusBadge status={request.status} />
         {onShowInCalendar ? (
           <button
@@ -190,12 +190,7 @@ export function FacultyToast({
   }
 
   return (
-    <Toast
-      className="fixed right-6 top-6 z-50 max-w-xl"
-      icon={EnvelopeIcon}
-      onDismiss={onDismiss}
-      tone="success"
-    >
+    <Toast icon={EnvelopeIcon} onDismiss={onDismiss} tone="success">
       {message}
     </Toast>
   );

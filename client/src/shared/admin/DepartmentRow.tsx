@@ -28,7 +28,7 @@ export function DepartmentRow({
   return (
     <div className="bg-primary/5 border-l-4 border-primary pl-2">
       <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 break-words">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="w-full max-w-md text-lg font-bold uppercase tracking-wide text-primary">
               {department.name}
@@ -63,7 +63,7 @@ export function DepartmentRow({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 items-end">
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:items-end">
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-nowrap">
             <button
               className="btn btn-outline"

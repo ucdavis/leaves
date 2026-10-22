@@ -71,7 +71,7 @@ export function WarningModal({
       ref={dialogRef}
       tabIndex={-1}
     >
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-6 shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-4 shadow-2xl sm:p-6">
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-base-content" id={titleId}>
             {title}
@@ -96,7 +96,7 @@ export function WarningModal({
           </div>
         ) : null}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             className="btn btn-ghost"
             disabled={isSaving}

@@ -1,8 +1,5 @@
 import { CheckIcon } from '@heroicons/react/24/outline';
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-} from './approvalTypes.ts';
+import type { ApprovalDecision, ApprovalRequest } from './approvalTypes.ts';
 import {
   formatCompactHours,
   formatDateRange,
@@ -19,7 +16,7 @@ export function PendingApprovalsPanel({
   requests: ApprovalRequest[];
 }) {
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
       <h1 className="h2 mb-6 text-primary">Pending Approvals</h1>
       {requests.length > 0 ? (
         <div className="space-y-4">
@@ -92,7 +89,9 @@ function NoPendingApprovals() {
   return (
     <div className="flex min-h-52 flex-col items-center justify-center gap-4 text-center text-base-content/70">
       <CheckIcon className="h-12 w-12 stroke-[1.5]" />
-      <p className="text-base font-medium">No pending approvals. All caught up!</p>
+      <p className="text-base font-medium">
+        No pending approvals. All caught up!
+      </p>
     </div>
   );
 }

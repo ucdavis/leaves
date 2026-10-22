@@ -13,11 +13,7 @@ import {
 } from './roleAccess.ts';
 import { useUser } from './UserContext.tsx';
 
-export const AuthenticatedShell = ({
-  children,
-}: {
-  children: ReactNode;
-}) => {
+export const AuthenticatedShell = ({ children }: { children: ReactNode }) => {
   const user = useUser();
   const userName = user.isEmulating ? `Emulating (${user.name})` : user.name;
   const location = useRouterState({
@@ -63,13 +59,19 @@ export const AuthenticatedShell = ({
   const currentReturnUrl = `${location.pathname}${location.search}`;
   const userIdentity = (
     <>
-      <span className={user.isEmulating ? 'min-w-0' : 'hidden sm:block'}>
-        <span className="block text-sm font-semibold">{userName}</span>
+      <span
+        className={
+          user.isEmulating
+            ? 'min-w-0 max-w-32 sm:max-w-xs'
+            : 'hidden min-w-0 sm:block'
+        }
+      >
+        <span className="block truncate text-sm font-semibold">{userName}</span>
         <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
           SIGNED IN
         </span>
       </span>
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
         {initials || '?'}
       </span>
     </>
@@ -77,16 +79,20 @@ export const AuthenticatedShell = ({
 
   return (
     <div className="flex min-h-screen flex-col bg-base-200">
-      <header className="border-b border-primary/80 bg-primary text-primary-content shadow-sm py-6">
+      <header className="border-b border-primary/80 bg-primary text-primary-content shadow-sm py-4 sm:py-6">
         <div className="container">
           <div className="flex items-center justify-between gap-4">
-            <Link className="flex items-center gap-3" to="/">
-              <img alt="Leaves" className="h-10 w-10" src="/leaves-logo.svg" />
+            <Link className="flex min-w-0 items-center gap-2 sm:gap-3" to="/">
+              <img
+                alt="Leaves"
+                className="h-10 w-10 shrink-0"
+                src="/leaves-logo.svg"
+              />
               <div className="leading-tight">
                 <div className="text font-semibold uppercase text-secondary">
                   Leaves
                 </div>
-                <div className="text-sm text-primary-content/80 uppercase">
+                <div className="hidden text-sm text-primary-content/80 uppercase sm:block">
                   CAES Administrative workspace
                 </div>
               </div>
@@ -109,7 +115,10 @@ export const AuthenticatedShell = ({
                 </summary>
                 <ul className="menu dropdown-content z-30 mt-3 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
                   <li>
-                    <a className="rounded-xl px-3 py-3" href="/system/endemulate">
+                    <a
+                      className="rounded-xl px-3 py-3"
+                      href="/system/endemulate"
+                    >
                       End emulation
                     </a>
                   </li>
@@ -129,7 +138,7 @@ export const AuthenticatedShell = ({
           <div className="container flex gap-1 overflow-x-auto">
             {items.map((item) => (
               <Link
-                className="border-b-2 border-transparent px-5 py-4 text-sm font-semibold text-base-content/70 transition hover:text-base-content data-[status=active]:border-primary data-[status=active]:text-primary"
+                className="shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-4 sm:px-5 text-sm font-semibold text-base-content/70 transition hover:text-base-content data-[status=active]:border-primary data-[status=active]:text-primary"
                 key={item.to}
                 to={item.to}
               >

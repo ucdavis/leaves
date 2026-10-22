@@ -185,7 +185,7 @@ export function RequestDetailModal({
         <RequestDetailHeader request={request} />
         <RequestDetailGrid faculty={faculty} request={request} />
         <RequestNote note={request.note} />
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button className="btn btn-ghost" onClick={onClose} type="button">
             Close
           </button>
@@ -199,7 +199,7 @@ function RequestDetailHeader({ request }: { request: FacultyLeaveRequest }) {
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <div className="flex w-full items-start justify-between gap-4">
+    <div className="flex w-full flex-wrap items-start justify-between gap-4">
       <div className="flex items-center gap-2 font-bold">
         <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
         {request.leaveType}
@@ -242,7 +242,7 @@ function RequestDetailItem({ label, value }: { label: string; value: string }) {
       <dt className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         {label}
       </dt>
-      <dd className="mt-1 font-medium">{value}</dd>
+      <dd className="mt-1 break-words font-medium">{value}</dd>
     </div>
   );
 }
@@ -253,7 +253,9 @@ function RequestNote({ note }: { note?: string | null }) {
       <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         Note
       </div>
-      <p className="mt-2 text-sm">{note?.trim() || 'No note provided.'}</p>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+        {note?.trim() || 'No note provided.'}
+      </p>
     </div>
   );
 }
@@ -688,7 +690,7 @@ function LeaveRequestForm({
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
             <button
               className="btn btn-outline btn-primary min-w-24"
               onClick={onClose}

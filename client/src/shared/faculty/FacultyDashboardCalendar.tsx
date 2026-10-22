@@ -116,29 +116,29 @@ export function LeaveCalendar({
   const selectedEndDate = selectionEndDate ?? selectionStartDate;
 
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
+      <div className="mb-5 grid grid-cols-[auto_1fr] items-center gap-2 sm:flex sm:justify-between sm:gap-4">
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost btn-sm min-h-11"
           onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
           type="button"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Prev
         </button>
-        <h2 className="font-bold text-primary">
+        <h2 className="col-span-2 row-start-1 text-center font-bold text-primary">
           {monthFormatter.format(visibleMonth)}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <button
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-sm min-h-11"
             onClick={selectToday}
             type="button"
           >
             Today
           </button>
           <button
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-sm min-h-11"
             onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
             type="button"
           >
@@ -158,7 +158,7 @@ export function LeaveCalendar({
               : 'Select a date or date range to report leave.'}
           </span>
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm min-h-11"
             disabled={!selectionStartDate}
             onClick={() =>
               selectionStartDate &&
@@ -170,7 +170,7 @@ export function LeaveCalendar({
           </button>
           {selectionStartDate ? (
             <button
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm min-h-11"
               onClick={() => {
                 setSelectionStartDate(null);
                 setSelectionEndDate(null);
@@ -183,101 +183,113 @@ export function LeaveCalendar({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-7 border-l border-t border-base-300">
-        {weekdayLabels.map((label) => (
-          <div
-            className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
-            key={label}
-          >
-            {label}
-          </div>
-        ))}
-        {calendarDays.map((day, index) => {
-          const dayRequests = day
-            ? (requestsByDate.get(day.isoDate) ?? [])
-            : [];
-          const holiday = day && getUniversityHoliday(holidays, day.isoDate);
-          const isWeekend =
-            day && (day.date.getDay() === 0 || day.date.getDay() === 6);
-
-          return (
+      <p className="mb-2 text-xs text-base-content/70 sm:hidden">
+        Swipe horizontally to view all days and requests.
+      </p>
+      <div
+        aria-label="Monthly leave calendar"
+        className="overflow-x-auto overscroll-x-contain"
+        role="region"
+        tabIndex={0}
+      >
+        <div className="grid min-w-[42rem] grid-cols-7 border-l border-t border-base-300">
+          {weekdayLabels.map((label) => (
             <div
-              className={`relative min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
-                holiday
-                  ? 'bg-sky-100 hover:bg-sky-200'
-                  : isWeekend
-                    ? 'bg-base-300/50 hover:bg-base-300/70'
-                    : day
-                      ? 'hover:bg-base-200'
-                      : 'bg-base-200/40'
-              } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
-                day ? 'cursor-pointer' : ''
-              }`}
-              key={day?.isoDate ?? `blank-${index}`}
-              onClick={() => day && selectDate(day.isoDate)}
-              onKeyDown={(event) => {
-                if (!day || event.target !== event.currentTarget) {
-                  return;
-                }
-
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  selectDate(day.isoDate);
-                }
-              }}
-              role={day ? 'button' : undefined}
-              tabIndex={day ? 0 : -1}
+              className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
+              key={label}
             >
-              {day ? (
-                <>
-                  <div className="text-xs font-semibold">{day.dayOfMonth}</div>
-                  {holiday ? (
-                    <span className="pointer-events-none mt-1 block text-center text-[10px] font-bold leading-tight text-sky-800">
-                      {holiday.name}
-                    </span>
-                  ) : null}
-                  <div className={`${holiday ? 'mt-2' : 'mt-3'} space-y-1`}>
-                    {dayRequests.map((request) => {
-                      const tone = getLeaveTone(request.leaveType);
-                      const pending = isPendingRequest(request.status);
-
-                      return (
-                        <button
-                          aria-label={`View ${request.leaveType} request from ${formatDateRange(
-                            request.startDate,
-                            request.endDate
-                          )}`}
-                          className={`block min-h-11 w-full truncate rounded border-l-2 px-1.5 py-0.5 text-left text-[11px] font-semibold transition hover:opacity-90 ${tone.surface}`}
-                          key={request.id}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedRequest(request);
-                          }}
-                          style={
-                            pending
-                              ? {
-                                  backgroundImage:
-                                    'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 4px, transparent 4px 8px)',
-                                }
-                              : undefined
-                          }
-                          type="button"
-                        >
-                          {request.leaveType}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : null}
+              {label}
             </div>
-          );
-        })}
+          ))}
+          {calendarDays.map((day, index) => {
+            const dayRequests = day
+              ? (requestsByDate.get(day.isoDate) ?? [])
+              : [];
+            const holiday = day && getUniversityHoliday(holidays, day.isoDate);
+            const isWeekend =
+              day && (day.date.getDay() === 0 || day.date.getDay() === 6);
+
+            return (
+              <div
+                className={`relative min-w-0 min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
+                  holiday
+                    ? 'bg-sky-100 hover:bg-sky-200'
+                    : isWeekend
+                      ? 'bg-base-300/50 hover:bg-base-300/70'
+                      : day
+                        ? 'hover:bg-base-200'
+                        : 'bg-base-200/40'
+                } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
+                  day ? 'cursor-pointer' : ''
+                }`}
+                key={day?.isoDate ?? `blank-${index}`}
+                onClick={() => day && selectDate(day.isoDate)}
+                onKeyDown={(event) => {
+                  if (!day || event.target !== event.currentTarget) {
+                    return;
+                  }
+
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectDate(day.isoDate);
+                  }
+                }}
+                role={day ? 'button' : undefined}
+                tabIndex={day ? 0 : -1}
+              >
+                {day ? (
+                  <>
+                    <div className="text-xs font-semibold">
+                      {day.dayOfMonth}
+                    </div>
+                    {holiday ? (
+                      <span className="pointer-events-none mt-1 block break-words text-center text-[10px] font-bold leading-tight text-sky-800">
+                        {holiday.name}
+                      </span>
+                    ) : null}
+                    <div className={`${holiday ? 'mt-2' : 'mt-3'} space-y-1`}>
+                      {dayRequests.map((request) => {
+                        const tone = getLeaveTone(request.leaveType);
+                        const pending = isPendingRequest(request.status);
+
+                        return (
+                          <button
+                            aria-label={`View ${request.leaveType} request from ${formatDateRange(
+                              request.startDate,
+                              request.endDate
+                            )}`}
+                            className={`block min-h-11 w-full truncate rounded border-l-2 px-1.5 py-0.5 text-left text-[11px] font-semibold transition hover:opacity-90 ${tone.surface}`}
+                            key={request.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedRequest(request);
+                            }}
+                            style={
+                              pending
+                                ? {
+                                    backgroundImage:
+                                      'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 4px, transparent 4px 8px)',
+                                  }
+                                : undefined
+                            }
+                            type="button"
+                          >
+                            {request.leaveType}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-base-content/70">
         {calendarLegend.map((item) => (
-          <div className="flex items-center gap-2" key={item.label}>
+          <div className="flex items-center justify-end gap-2" key={item.label}>
             <span className={`h-3 w-3 rounded-sm border ${item.className}`} />
             {item.label}
           </div>

@@ -234,7 +234,7 @@ function AdminPeopleRouteContent() {
               },
             }}
             tableActions={
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <label className="sr-only" htmlFor="faculty-department-filter">
                   Filter faculty by department
                 </label>

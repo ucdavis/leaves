@@ -53,7 +53,9 @@ export function DepartmentSettingsModal({
   onDelete: () => Promise<void>;
   onRemoveRoutingEmail: (emailId: string) => Promise<void>;
   onSave: (
-    updates: Partial<Pick<AdminDepartment, 'approvalMode' | 'clusterId' | 'name'>>
+    updates: Partial<
+      Pick<AdminDepartment, 'approvalMode' | 'clusterId' | 'name'>
+    >
   ) => Promise<void>;
   onUpsertRoutingEmail: (email: {
     address: string;
@@ -300,7 +302,7 @@ export function DepartmentSettingsModal({
               >
                 Deactivate department
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   className="btn btn-ghost"
                   onClick={onClose}
@@ -330,7 +332,8 @@ export function DepartmentSettingsModal({
           title="Deactivate department?"
         >
           <span>
-            Deactivate <strong>{department.name}</strong>? Users will no longer be able to submit requests to this department.
+            Deactivate <strong>{department.name}</strong>? Users will no longer
+            be able to submit requests to this department.
           </span>
         </WarningModal>
       ) : null}

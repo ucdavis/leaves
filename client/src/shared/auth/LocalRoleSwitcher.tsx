@@ -82,11 +82,14 @@ export function LocalRoleSwitcher({
   }, [isOpen]);
 
   return (
-    <div className="dropdown dropdown-end" ref={containerRef}>
+    <div
+      className="dropdown dropdown-end min-w-0 max-w-[60%]"
+      ref={containerRef}
+    >
       <button
         aria-expanded={isOpen}
         aria-label={`Open local role switcher for ${displayName}`}
-        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
+        className="flex max-w-full cursor-pointer items-center gap-3 rounded-2xl border border-primary-content/10 bg-primary-content/5 px-3 py-2 text-left transition hover:bg-primary-content/10"
         onClick={() => setIsOpen((open) => !open)}
         type="button"
       >
@@ -98,7 +101,7 @@ export function LocalRoleSwitcher({
             {authLabel}
           </div>
         </div>
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary sm:hidden">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary sm:hidden">
           {getInitials(userName)}
         </span>
         <span className="hidden shrink-0 text-primary-content/70 sm:block">
@@ -107,7 +110,7 @@ export function LocalRoleSwitcher({
       </button>
 
       {isOpen ? (
-        <ul className="menu dropdown-content z-30 mt-3 w-80 rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
+        <ul className="menu dropdown-content z-30 mt-3 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 p-2 text-base-content shadow-2xl">
           {isEmulating ? (
             <li>
               <a
