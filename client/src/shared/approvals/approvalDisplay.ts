@@ -20,13 +20,6 @@ export function formatCompactHours(hours: number) {
 
 export function getLeaveTone(leaveType: LeaveCategory): Tone {
   switch (leaveType) {
-    case 'Compensatory Time':
-      return {
-        background: 'bg-slate-100',
-        border: 'border-slate-500',
-        legend: 'border-slate-500 bg-slate-100',
-        text: 'text-slate-700',
-      };
     case 'Sick Leave':
       return {
         background: 'bg-emerald-100',
@@ -65,10 +58,12 @@ export function getLeaveTone(leaveType: LeaveCategory): Tone {
   }
 }
 
-function formatDate(date: string) {
+export function formatDate(date: string) {
+  const value = date.length === 10 ? `${date}T00:00:00` : date;
+
   return new Intl.DateTimeFormat(undefined, {
     day: 'numeric',
     month: 'numeric',
     year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`));
+  }).format(new Date(value));
 }

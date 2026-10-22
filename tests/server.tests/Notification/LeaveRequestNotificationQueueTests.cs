@@ -8,11 +8,23 @@ namespace Server.Tests.Notification;
 public sealed class LeaveRequestNotificationQueueTests
 {
     [Fact]
-    public async Task QueueSubmissionAsync_queues_requester_confirmation_for_a_direct_submission()
+    public async Task QueueSubmissionAsync_queues_requester_and_routing_addresses_for_auto_approve()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var requester = CreateUser("requester@example.test");
         db.AppUsers.Add(requester);
+        db.Departments.Add(new Department
+        {
+            DepartmentCode = "123456",
+            DepartmentName = "Example Department",
+        });
+        await db.SaveChangesAsync();
+        db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = "123456",
+            ToEmail = "aggieservice@example.test",
+            UpdatedByAppUserId = requester.Id,
+        });
         await db.SaveChangesAsync();
 
         var request = CreateRequest(requester.Id, WorkflowMode.DirectSubmission);
@@ -23,14 +35,18 @@ public sealed class LeaveRequestNotificationQueueTests
         await queue.QueueSubmissionAsync(request, requester, CancellationToken.None);
         await db.SaveChangesAsync();
 
-        db.OutboundMessages.Should().ContainSingle(message =>
+        db.OutboundMessages.Should().Contain(message =>
             message.RecipientEmail == "requester@example.test" &&
             message.NotificationType == LeaveRequestNotificationTypes.AutoApproved &&
+            message.Status == OutboundMessageStatus.Pending);
+        db.OutboundMessages.Should().Contain(message =>
+            message.RecipientEmail == "aggieservice@example.test" &&
+            message.NotificationType == LeaveRequestNotificationTypes.FinalizedForRouting &&
             message.Status == OutboundMessageStatus.Pending);
     }
 
     [Fact]
-    public async Task QueueSubmissionAsync_queues_each_department_routing_recipient_for_approval()
+    public async Task QueueSubmissionAsync_does_not_queue_routing_recipients_for_required_approval()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var requester = CreateUser("requester@example.test");
@@ -65,17 +81,27 @@ public sealed class LeaveRequestNotificationQueueTests
         await queue.QueueSubmissionAsync(request, requester, CancellationToken.None);
         await db.SaveChangesAsync();
 
-        db.OutboundMessages.Should().HaveCount(2).And.OnlyContain(message =>
-            message.NotificationType == LeaveRequestNotificationTypes.SubmittedForApproval &&
-            message.Status == OutboundMessageStatus.Pending);
+        db.OutboundMessages.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task QueueDecision_queues_a_requester_decision_once()
+    public async Task QueueDecisionAsync_queues_requester_and_routing_addresses_once_when_approved()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var requester = CreateUser("requester@example.test");
         db.AppUsers.Add(requester);
+        db.Departments.Add(new Department
+        {
+            DepartmentCode = "123456",
+            DepartmentName = "Example Department",
+        });
+        await db.SaveChangesAsync();
+        db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = "123456",
+            ToEmail = "aggieservice@example.test",
+            UpdatedByAppUserId = requester.Id,
+        });
         await db.SaveChangesAsync();
 
         var request = CreateRequest(requester.Id, WorkflowMode.ApprovalRequired);
@@ -84,13 +110,16 @@ public sealed class LeaveRequestNotificationQueueTests
         await db.SaveChangesAsync();
 
         var queue = CreateQueue(db);
-        queue.QueueDecision(request, requester);
-        queue.QueueDecision(request, requester);
+        await queue.QueueDecisionAsync(request, requester, CancellationToken.None);
+        await queue.QueueDecisionAsync(request, requester, CancellationToken.None);
         await db.SaveChangesAsync();
 
         db.OutboundMessages.Should().ContainSingle(message =>
             message.NotificationType == LeaveRequestNotificationTypes.Approved &&
             message.RecipientEmail == "requester@example.test");
+        db.OutboundMessages.Should().ContainSingle(message =>
+            message.NotificationType == LeaveRequestNotificationTypes.FinalizedForRouting &&
+            message.RecipientEmail == "aggieservice@example.test");
     }
 
     private static LeaveRequestNotificationQueue CreateQueue(Server.Core.Data.AppDbContext db) =>

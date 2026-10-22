@@ -10,7 +10,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type {
   FacultyDashboardResponse,
@@ -62,6 +62,7 @@ export function LeaveCalendar({
   onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
 }) {
+  const calendarRef = useRef<HTMLElement>(null);
   const { data: holidays = [] } = useQuery(universityHolidaysQueryOptions());
   const holidayCoverageEnd = getUniversityHolidayCoverageEnd(holidays);
   const visibleRequests = useMemo(
@@ -73,6 +74,7 @@ export function LeaveCalendar({
     [focusDate, visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
+  const [focusedDate, setFocusedDate] = useState<string | null>(focusDate ?? null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
@@ -89,7 +91,14 @@ export function LeaveCalendar({
     [visibleRequests]
   );
 
+  useEffect(() => {
+    if (focusDate) {
+      calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [focusDate]);
+
   const selectDate = (date: string) => {
+    setFocusedDate(null);
     setSelectedDate(date);
     if (!onReportLeave) {
       return;
@@ -108,6 +117,7 @@ export function LeaveCalendar({
     const today = format(new Date(), 'yyyy-MM-dd');
 
     setVisibleMonth(startOfMonth(new Date()));
+    setFocusedDate(null);
     setSelectedDate(today);
     setSelectionStartDate(today);
     setSelectionEndDate(null);
@@ -116,7 +126,10 @@ export function LeaveCalendar({
   const selectedEndDate = selectionEndDate ?? selectionStartDate;
 
   return (
-    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
+    <section
+      className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6"
+      ref={calendarRef}
+    >
       <div className="mb-5 grid grid-cols-[auto_1fr] items-center gap-2 sm:flex sm:justify-between sm:gap-4">
         <button
           className="btn btn-ghost btn-sm min-h-11"
@@ -194,35 +207,39 @@ export function LeaveCalendar({
       >
         <div className="grid min-w-[42rem] grid-cols-7 border-l border-t border-base-300">
           {weekdayLabels.map((label) => (
-            <div
-              className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
-              key={label}
-            >
-              {label}
-            </div>
-          ))}
-          {calendarDays.map((day, index) => {
-            const dayRequests = day
-              ? (requestsByDate.get(day.isoDate) ?? [])
-              : [];
-            const holiday = day && getUniversityHoliday(holidays, day.isoDate);
-            const isWeekend =
-              day && (day.date.getDay() === 0 || day.date.getDay() === 6);
+  <div
+    className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
+    key={label}
+  >
+    {label}
+  </div>
+))}
 
-            return (
-              <div
-                className={`relative min-w-0 min-h-24 border-b border-r border-base-300 p-2 text-left align-top transition ${
-                  holiday
-                    ? 'bg-sky-100 hover:bg-sky-200'
-                    : isWeekend
-                      ? 'bg-base-300/50 hover:bg-base-300/70'
-                      : day
-                        ? 'hover:bg-base-200'
-                        : 'bg-base-200/40'
-                } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
-                  day ? 'cursor-pointer' : ''
-                }`}
-                key={day?.isoDate ?? `blank-${index}`}
+{calendarDays.map((day, index) => {
+  const dayRequests = day
+    ? (requestsByDate.get(day.isoDate) ?? [])
+    : [];
+  const holiday = day && getUniversityHoliday(holidays, day.isoDate);
+  const isWeekend =
+    day && (day.date.getDay() === 0 || day.date.getDay() === 6);
+
+  return (
+    <div
+      aria-current={focusedDate === day?.isoDate ? "date" : undefined}
+      className={`relative min-h-24 min-w-0 border-b border-r border-base-300 p-2 text-left align-top transition ${
+        holiday
+          ? "bg-sky-100 hover:bg-sky-200"
+          : isWeekend
+            ? "bg-base-300/50 hover:bg-base-300/70"
+            : day
+              ? "hover:bg-base-200"
+              : "bg-base-200/40"
+      } ${selectedDate === day?.isoDate ? "ring-2 ring-primary ring-inset" : ""} ${
+        focusedDate === day?.isoDate
+          ? "ring-2 ring-primary/60 ring-inset"
+          : ""
+      } ${day ? "cursor-pointer" : ""}`}
+      key={day?.isoDate ?? `blank-${index}`}
                 onClick={() => day && selectDate(day.isoDate)}
                 onKeyDown={(event) => {
                   if (!day || event.target !== event.currentTarget) {
@@ -304,7 +321,6 @@ export function LeaveCalendar({
 
       {selectedRequest ? (
         <RequestDetailModal
-          faculty={faculty}
           onClose={() => setSelectedRequest(null)}
           request={selectedRequest}
         />

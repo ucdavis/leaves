@@ -46,11 +46,7 @@ export type AdminDepartmentsPageData = {
 };
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
-  if (mode === 'approval' || mode === 'auto') {
-    return mode;
-  }
-
-  return 'notification';
+  return mode === 'approval' ? 'approval' : 'auto';
 }
 
 function normalizeDepartmentData(
@@ -229,9 +225,7 @@ export async function updateAdminDepartment({
 }: {
   departmentId: string;
   signal?: AbortSignal;
-  updates: Partial<
-    Pick<AdminDepartment, 'approvalMode' | 'chairUserId' | 'clusterId' | 'name'>
-  >;
+  updates: UpdateAdminDepartmentInput;
 }) {
   const chairUserIdWasProvided = Object.hasOwn(updates, 'chairUserId');
   const clusterIdWasProvided = Object.hasOwn(updates, 'clusterId');
@@ -241,6 +235,7 @@ export async function updateAdminDepartment({
     {
       body: JSON.stringify({
         approvalMode: updates.approvalMode,
+        approvePendingRequests: updates.approvePendingRequests ?? false,
         chairUserId: updates.chairUserId,
         chairUserIdSet: chairUserIdWasProvided,
         clusterId: updates.clusterId ? Number(updates.clusterId) : null,
@@ -249,6 +244,26 @@ export async function updateAdminDepartment({
       }),
       method: 'PATCH',
     },
+    signal
+  );
+}
+
+export type UpdateAdminDepartmentInput = Partial<
+  Pick<AdminDepartment, 'approvalMode' | 'chairUserId' | 'clusterId' | 'name'>
+> & {
+  approvePendingRequests?: boolean;
+};
+
+export async function getAdminDepartmentPendingApprovalCount({
+  departmentId,
+  signal,
+}: {
+  departmentId: string;
+  signal?: AbortSignal;
+}) {
+  return await fetchJson<{ pendingRequestCount: number }>(
+    `/api/admin/departments/${encodeURIComponent(departmentId)}/pending-request-count`,
+    {},
     signal
   );
 }

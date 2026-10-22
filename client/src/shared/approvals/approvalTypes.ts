@@ -21,6 +21,10 @@ export type CalendarFaculty = {
 };
 
 export type CalendarLeave = {
+  approvalMethod?: 'ApprovalRequired' | 'DirectSubmission';
+  decision?: string | null;
+  decisionBy?: string | null;
+  decisionComment?: string | null;
   endDate: string;
   facultyId: string;
   id: number;
@@ -31,7 +35,6 @@ export type CalendarLeave = {
 };
 
 export type LeaveCategory =
-  | 'Compensatory Time'
   | 'FMLA'
   | 'Professional Development'
   | 'Sabbatical'

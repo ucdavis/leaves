@@ -20,7 +20,7 @@ const clusterFormSchema = z.object({
 });
 
 const departmentFormSchema = z.object({
-  approvalMode: z.enum(['notification', 'approval', 'auto']),
+  approvalMode: z.enum(['approval', 'auto']),
   clusterId: z.string(),
   code: z
     .string()
@@ -75,7 +75,7 @@ export function AdminDepartmentCreationPanel({
 
   const departmentForm = useAppForm({
     defaultValues: {
-      approvalMode: 'notification' as ApprovalMode,
+      approvalMode: 'auto' as ApprovalMode,
       clusterId: '',
       code: '',
       name: '',
@@ -202,11 +202,7 @@ export function AdminDepartmentCreationPanel({
                           label="Approval mode"
                           options={[
                             {
-                              label: 'Notification only',
-                              value: 'notification',
-                            },
-                            {
-                              label: 'Approval required',
+                              label: 'Required',
                               value: 'approval',
                             },
                             {

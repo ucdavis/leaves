@@ -31,11 +31,7 @@ export type AdminFacultyPageData = {
 };
 
 function normalizeApprovalMode(mode: string): ApprovalMode {
-  if (mode === 'approval' || mode === 'auto') {
-    return mode;
-  }
-
-  return 'notification';
+  return mode === 'approval' ? 'approval' : 'auto';
 }
 
 function normalizeDesignation(designation: string): AdminUser['designation'] {

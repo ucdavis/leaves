@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Core.Notification;
 using Server.Helpers;
 using Server.Services;
 
@@ -19,17 +20,23 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private readonly AdminDirectoryDataService _adminDirectoryDataService;
     private readonly AdminDirectoryService _adminDirectoryService;
     private readonly AppDbContext _db;
+    private readonly ILeaveRequestNotificationQueue _notificationQueue;
+    private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
     private readonly IUserService _userService;
 
     public AdminDepartmentsController(
         AppDbContext db,
         AdminDirectoryDataService adminDirectoryDataService,
         AdminDirectoryService adminDirectoryService,
+        ILeaveRequestNotificationQueue notificationQueue,
+        IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
         IUserService userService)
     {
         _db = db;
         _adminDirectoryDataService = adminDirectoryDataService;
         _adminDirectoryService = adminDirectoryService;
+        _notificationQueue = notificationQueue;
+        _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
         _userService = userService;
     }
 
@@ -212,6 +219,11 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return Conflict("A department with that code already exists.");
         }
 
+        if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: true, out var workflowMode))
+        {
+            return ValidationProblem("Approval mode must be auto or approval.");
+        }
+
         var now = DateTime.UtcNow;
         _db.Departments.Add(new Department
         {
@@ -221,9 +233,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             DepartmentName = departmentName,
             IsActive = true,
             UpdatedUtc = now,
-            WorkflowMode = request.ApprovalMode == "approval"
-                ? WorkflowMode.ApprovalRequired
-                : WorkflowMode.DirectSubmission,
+            WorkflowMode = workflowMode,
         });
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -263,22 +273,44 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             department.ClusterId = request.ClusterId;
         }
 
+        var approvedPendingRequests = false;
         if (!string.IsNullOrWhiteSpace(request.ApprovalMode))
         {
-            var workflowMode = request.ApprovalMode == "approval"
-                ? WorkflowMode.ApprovalRequired
-                : WorkflowMode.DirectSubmission;
-            if (
-                department.WorkflowMode == WorkflowMode.ApprovalRequired &&
-                workflowMode == WorkflowMode.DirectSubmission)
+            if (!TryGetWorkflowMode(request.ApprovalMode, defaultToAuto: false, out var workflowMode))
             {
-                await ApprovePendingRequestsAsync(
-                    department.DepartmentCode,
-                    DateTime.UtcNow,
-                    cancellationToken);
+                return ValidationProblem("Approval mode must be auto or approval.");
             }
 
-            department.WorkflowMode = workflowMode;
+            var pendingRequestCount = await _db.LeaveRequests.CountAsync(
+                leaveRequest =>
+                    leaveRequest.ReportingDepartmentCodeSnapshot == department.DepartmentCode &&
+                    leaveRequest.Status == LeaveRequestStatus.PendingApproval,
+                cancellationToken);
+            if (department.WorkflowMode == WorkflowMode.ApprovalRequired &&
+                workflowMode == WorkflowMode.DirectSubmission &&
+                pendingRequestCount > 0 &&
+                !request.ApprovePendingRequests)
+            {
+                return Conflict($"Switching to Auto-approve will approve all {pendingRequestCount} pending requests for this department. Confirm the change before saving.");
+            }
+
+            AppUser? actor = null;
+            if (workflowMode == WorkflowMode.DirectSubmission && pendingRequestCount > 0)
+            {
+                actor = await GetAuthenticatedAppUserAsync(cancellationToken);
+                if (actor == null)
+                {
+                    return ValidationProblem("The authenticated admin must have an AppUser row before pending requests can be approved.");
+                }
+            }
+
+            var now = DateTime.UtcNow;
+            approvedPendingRequests = await ApplyWorkflowModeToPendingRequestsAsync(
+                department,
+                workflowMode,
+                actor,
+                now,
+                cancellationToken);
         }
 
         if (request.ChairUserIdSet)
@@ -295,6 +327,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         department.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (approvedPendingRequests)
+        {
+            _emailDeliveryWakeSignal.Signal();
+        }
+
         return NoContent();
     }
 
@@ -401,22 +439,22 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return NoContent();
     }
 
-    private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken)
+    private async Task<int?> GetAuthenticatedAppUserId(CancellationToken cancellationToken) =>
+        (await GetAuthenticatedAppUserAsync(cancellationToken))?.Id;
+
+    private async Task<AppUser?> GetAuthenticatedAppUserAsync(CancellationToken cancellationToken)
     {
         if (!User.TryGetUserId(out var userId) || !Guid.TryParse(userId, out var entraObjectId))
         {
             return null;
         }
 
-        var appUserId = await _db.AppUsers
-            .AsNoTracking()
-            .Where(user => user.EntraObjectId == entraObjectId)
-            .Select(user => (int?)user.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var appUser = await _db.AppUsers
+            .FirstOrDefaultAsync(user => user.EntraObjectId == entraObjectId, cancellationToken);
 
-        if (appUserId != null)
+        if (appUser != null)
         {
-            return appUserId;
+            return appUser;
         }
 
         await _userService.EnsureUserProfileAsync(
@@ -425,27 +463,89 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             cancellationToken: cancellationToken);
 
         return await _db.AppUsers
-            .AsNoTracking()
-            .Where(user => user.EntraObjectId == entraObjectId)
-            .Select(user => (int?)user.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(user => user.EntraObjectId == entraObjectId, cancellationToken);
     }
 
-    private async Task ApprovePendingRequestsAsync(
-        string departmentCode,
-        DateTime now,
+    private async Task<bool> ApplyWorkflowModeToPendingRequestsAsync(
+        Department department,
+        WorkflowMode workflowMode,
+        AppUser? actor,
+        DateTime nowUtc,
         CancellationToken cancellationToken)
     {
         var pendingRequests = await _db.LeaveRequests
             .Where(request =>
-                request.ReportingDepartmentCodeSnapshot == departmentCode &&
+                request.ReportingDepartmentCodeSnapshot == department.DepartmentCode &&
                 request.Status == LeaveRequestStatus.PendingApproval)
             .ToListAsync(cancellationToken);
 
+        department.WorkflowMode = workflowMode;
         foreach (var request in pendingRequests)
         {
+            request.WorkflowModeSnapshot = workflowMode;
+            request.UpdatedUtc = nowUtc;
+        }
+
+        if (workflowMode != WorkflowMode.DirectSubmission || pendingRequests.Count == 0)
+        {
+            return false;
+        }
+
+        if (actor == null)
+        {
+            throw new InvalidOperationException("An AppUser actor is required to approve pending leave requests.");
+        }
+
+        var requesterIds = pendingRequests.Select(request => request.AppUserId).Distinct().ToArray();
+        var requesters = await _db.AppUsers
+            .Where(user => requesterIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
+
+        foreach (var request in pendingRequests)
+        {
+            if (!requesters.TryGetValue(request.AppUserId, out var requester))
+            {
+                continue;
+            }
+
             request.Status = LeaveRequestStatus.Approved;
-            request.UpdatedUtc = now;
+            _db.LeaveRequestActions.Add(new LeaveRequestAction
+            {
+                LeaveRequestId = request.Id,
+                ActionType = LeaveRequestActionType.Approved,
+                ActorAppUserId = actor.Id,
+                ActorIamId = actor.IamId,
+                ActionAt = nowUtc,
+                Comment = "Approved because the department approval mode changed to Auto-approve.",
+                ReasonCode = LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange,
+                IsSelfAction = false,
+            });
+            await _notificationQueue.QueueDecisionAsync(request, requester, cancellationToken);
+        }
+
+        return true;
+    }
+
+    private static bool TryGetWorkflowMode(
+        string? approvalMode,
+        bool defaultToAuto,
+        out WorkflowMode workflowMode)
+    {
+        switch (approvalMode?.Trim().ToLowerInvariant())
+        {
+            case null:
+            case "":
+                workflowMode = defaultToAuto ? WorkflowMode.DirectSubmission : default;
+                return defaultToAuto;
+            case "approval":
+                workflowMode = WorkflowMode.ApprovalRequired;
+                return true;
+            case "auto":
+                workflowMode = WorkflowMode.DirectSubmission;
+                return true;
+            default:
+                workflowMode = default;
+                return false;
         }
     }
 
@@ -619,9 +719,30 @@ public sealed class AdminDepartmentsController : ApiControllerBase
                (sqlException.Number == 2601 || sqlException.Number == 2627);
     }
 
+    [HttpGet("{departmentCode}/pending-request-count")]
+    public async Task<IActionResult> GetPendingRequestCount(
+        string departmentCode,
+        CancellationToken cancellationToken)
+    {
+        var departmentExists = await _db.Departments.AnyAsync(
+            department => department.DepartmentCode == departmentCode,
+            cancellationToken);
+        if (!departmentExists)
+        {
+            return NotFound();
+        }
+
+        var pendingRequestCount = await _db.LeaveRequests.CountAsync(
+            request =>
+                request.ReportingDepartmentCodeSnapshot == departmentCode &&
+                request.Status == LeaveRequestStatus.PendingApproval,
+            cancellationToken);
+        return Ok(new { pendingRequestCount });
+    }
+
     public sealed record CreateClusterRequest(string? Name);
     public sealed record UpdateClusterRequest(string? Name, string? CaoUserId, bool CaoUserIdSet);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
-    public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, string? ChairUserId, bool ChairUserIdSet);
+    public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, bool ApprovePendingRequests, string? ChairUserId, bool ChairUserIdSet);
     public sealed record UpsertRoutingEmailRequest(string? Address);
 }

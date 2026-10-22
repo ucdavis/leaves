@@ -150,7 +150,7 @@ public class EmployeeAccrualBalanceTests
         new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 10, "Vacation", 160.00m, 0.00m, 8.00m, 0.00m, 168.00m, 240.00m, "001700", "Professor", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
         new("66510837", "lwilson@fake.ucdavis.edu", "Lena Wilson", "2026-06-30", "40002345", 20, "Sick Leave", 272.00m, 0.00m, 8.00m, 0.00m, 280.00m, 0.00m, "001700", "Professor", "001700", "Professor", "030045", "ANIMAL SCIENCE"),
         new("36190428", "apatel@fake.ucdavis.edu", "Asha Patel", "2026-06-30", "40003456", 10, "Vacation", 210.00m, 8.00m, 10.00m, 0.00m, 212.00m, 240.00m, "000245", "Department Chair", "000245", "Department Chair", "030045", "ANIMAL SCIENCE"),
-        new("17628405", "sbaker@fake.ucdavis.edu", "Sofia Baker", "2026-07-12", "40004567", 50, "Compensatory Time", 18.00m, 0.00m, 2.00m, 0.00m, 20.00m, 80.00m, "006257", "Agricultural Technician", "006257", "Agricultural Technician", "030000", "AGR & ENV SCI DEANS OFFICE"),
+        new("17628405", "sbaker@fake.ucdavis.edu", "Sofia Baker", "2026-07-12", "40004567", 10, "Vacation", 18.00m, 0.00m, 2.00m, 0.00m, 20.00m, 80.00m, "006257", "Agricultural Technician", "006257", "Agricultural Technician", "030000", "AGR & ENV SCI DEANS OFFICE"),
     ];
 
     private sealed record EmployeeAccrualBalanceSeed(

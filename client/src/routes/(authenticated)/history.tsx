@@ -165,7 +165,6 @@ function HistoryContent({
       ) : null}
       {selectedRequest ? (
         <RequestDetailModal
-          faculty={data.faculty}
           onClose={() => onRequestSelected(null)}
           request={selectedRequest}
         />

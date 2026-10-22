@@ -80,7 +80,23 @@ export function RequestHistoryTable({
         cell: ({ getValue }) => (
           <RequestStatusBadge status={getValue<string>()} />
         ),
-        header: 'Status',
+        header: 'Decision',
+      },
+      {
+        accessorKey: 'decisionComment',
+        cell: ({ row }) => {
+          const comment = row.original.approvalMethod === 'DirectSubmission'
+            ? undefined
+            : row.original.decisionComment?.trim();
+          return comment ? (
+            <span className="block max-w-64 truncate" title={comment}>
+              {comment}
+            </span>
+          ) : (
+            <span className="text-base-content/55">—</span>
+          );
+        },
+        header: 'Comment',
       },
       ...(onShowInCalendar
         ? [

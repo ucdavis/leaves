@@ -171,11 +171,9 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
 }
 
 export function RequestDetailModal({
-  faculty,
   onClose,
   request,
 }: {
-  faculty: FacultyDashboardResponse['faculty'];
   onClose: () => void;
   request: FacultyLeaveRequest;
 }) {
@@ -183,9 +181,11 @@ export function RequestDetailModal({
     <Modal onClose={onClose} title="Request Detail">
       <div className="space-y-5">
         <RequestDetailHeader request={request} />
-        <RequestDetailGrid faculty={faculty} request={request} />
+        <RequestDetailGrid request={request} />
         <RequestNote note={request.note} />
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <DecisionComments request={request} />
+        
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"">
           <button className="btn btn-ghost" onClick={onClose} type="button">
             Close
           </button>
@@ -209,16 +209,13 @@ function RequestDetailHeader({ request }: { request: FacultyLeaveRequest }) {
   );
 }
 
-function RequestDetailGrid({
-  faculty,
-  request,
-}: {
-  faculty: FacultyDashboardResponse['faculty'];
-  request: FacultyLeaveRequest;
-}) {
+function RequestDetailGrid({ request }: { request: FacultyLeaveRequest }) {
   return (
     <dl className="grid gap-5 text-sm sm:grid-cols-2">
-      <RequestDetailItem label="Faculty" value={faculty.name} />
+      <RequestDetailItem
+        label="Approval method"
+        value={getApprovalMethod(request)}
+      />
       <RequestDetailItem label="Department" value={request.departmentName} />
       <RequestDetailItem
         label="Date(s)"
@@ -232,8 +229,34 @@ function RequestDetailGrid({
         label="Submitted"
         value={formatDate(request.submittedAt)}
       />
+      {request.decision ? (
+        <>
+          {!isAutoApproved(request) ? (
+            <RequestDetailItem
+              label="Decided by"
+              value={request.decisionBy ?? 'Unknown approver'}
+            />
+          ) : null}
+          {!isAutoApproved(request) && request.decisionAt ? (
+            <RequestDetailItem
+              label="Decided on"
+              value={formatDate(request.decisionAt)}
+            />
+          ) : null}
+        </>
+      ) : null}
     </dl>
   );
+}
+
+function getApprovalMethod(request: FacultyLeaveRequest) {
+  return isAutoApproved(request)
+    ? 'Auto-approved'
+    : 'Chair/CAO review';
+}
+
+function isAutoApproved(request: FacultyLeaveRequest) {
+  return request.approvalMethod === 'DirectSubmission';
 }
 
 function RequestDetailItem({ label, value }: { label: string; value: string }) {
@@ -255,6 +278,23 @@ function RequestNote({ note }: { note?: string | null }) {
       </div>
       <p className="mt-2 whitespace-pre-wrap break-words text-sm">
         {note?.trim() || 'No note provided.'}
+      </p>
+    </div>
+  );
+}
+
+function DecisionComments({ request }: { request: FacultyLeaveRequest }) {
+  if (!request.decision || isAutoApproved(request)) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg bg-base-200 p-4">
+      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+        Comments
+      </div>
+      <p className="mt-2 whitespace-pre-wrap text-sm">
+        {request.decisionComment?.trim() || 'No decision comment provided.'}
       </p>
     </div>
   );

@@ -31,6 +31,8 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     private const string CaoRole = "CAO";
     private const string ChairRole = "Chair";
     private const int RecentRequestsLimit = 24;
+    private const string VacationLeaveTypeKey = "Vacation";
+    private const string VacationLeaveTypeLabel = "Vacation";
     private const string FamilyCareLeaveTypeKey = "FamilyCare";
     private const string ProfessionalDevelopmentLeaveTypeLabel = "Professional Development";
     private const string SabbaticalLeaveTypeLabel = "Sabbatical";
@@ -236,6 +238,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
 
         var request = await _db.LeaveRequests
             .AsNoTracking()
+            .Include(leaveRequest => leaveRequest.Actions)
             .Include(leaveRequest => leaveRequest.Days)
             .Where(leaveRequest => leaveRequest.AppUserId == appUser.Id && leaveRequest.Id == leaveRequestId)
             .SingleOrDefaultAsync(cancellationToken);
@@ -325,6 +328,16 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 "Only current faculty with accrual records can submit leave requests.");
         }
 
+        var accrualBalances = await GetCurrentFacultyAccrualBalancesAsync(iamId, cancellationToken);
+        if (!IsVacationAvailable(employee, accrualBalances) &&
+            (IsVacationLeaveType(leaveType) ||
+                (payLeaveType != null && IsVacationLeaveType(payLeaveType))))
+        {
+            return CreateLeaveRequestResult.Invalid(
+                IsVacationLeaveType(leaveType) ? "leaveTypeId" : "payLeaveTypeId",
+                "Vacation is not available for your current appointment.");
+        }
+
         var department = await ResolveReportingDepartmentAsync(employee, cancellationToken);
         if (department == null)
         {
@@ -348,9 +361,9 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             ReportingDepartmentCodeSnapshot = department.DepartmentCode,
             ReportingDepartmentNameSnapshot = department.DepartmentName,
             StartDate = request.StartDate,
-            Status = department.WorkflowMode == WorkflowMode.ApprovalRequired
-                ? LeaveRequestStatus.PendingApproval
-                : LeaveRequestStatus.Approved,
+            Status = department.WorkflowMode == WorkflowMode.DirectSubmission
+                ? LeaveRequestStatus.Approved
+                : LeaveRequestStatus.PendingApproval,
             SubmittedAt = submittedAt,
             TotalHours = request.TotalHours,
             WorkflowModeSnapshot = department.WorkflowMode,
@@ -507,7 +520,14 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         int pendingCount,
         int approvedCount)
     {
-        var balanceSummary = BuildBalanceSummary(accrualBalances);
+        var vacationAvailable = IsVacationAvailable(employee, accrualBalances);
+        var visibleAccrualBalances = accrualBalances
+            .Where(balance => vacationAvailable || !IsVacationBalance(balance))
+            .ToList();
+        var visibleLeaveTypes = leaveTypes
+            .Where(leaveType => vacationAvailable || !IsVacationLeaveType(leaveType))
+            .ToList();
+        var balanceSummary = BuildBalanceSummary(visibleAccrualBalances);
 
         return new FacultyDashboardResponse(
             Faculty: new FacultyProfileResponse(
@@ -526,7 +546,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                 ApprovedRequests: approvedCount,
                 AvailableBalanceHours: balanceSummary.AvailableBalanceHours,
                 AccrualsApproachingCap: balanceSummary.AccrualsApproachingCap),
-            AccrualBalances: accrualBalances
+            AccrualBalances: visibleAccrualBalances
                 .Select(balance => new FacultyAccrualBalanceResponse(
                     TypeLabel: balance.TypeLabel,
                     CalculatedBalance: balance.CalculatedBal,
@@ -537,7 +557,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
                     HasDivergentPositionBalances: balance.HasDivergentPositionBalances))
                 .ToList(),
             RecentRequests: requests,
-            LeaveTypes: BuildLeaveTypeResponses(leaveTypes));
+            LeaveTypes: BuildLeaveTypeResponses(visibleLeaveTypes));
     }
 
     private async Task<List<FacultyLeaveRequestResponse>> GetLeaveRequestsAsync(
@@ -547,6 +567,7 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
     {
         IQueryable<LeaveRequest> query = _db.LeaveRequests
             .AsNoTracking()
+            .Include(request => request.Actions)
             .Include(request => request.Days)
             .Where(request => request.AppUserId == appUserId)
             .OrderByDescending(request => request.SubmittedAt)
@@ -569,9 +590,21 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .AsNoTracking()
             .Where(type => leaveTypeIds.Contains(type.Id))
             .ToDictionaryAsync(type => type.Id, cancellationToken);
+        var decisionActorIds = requests
+            .SelectMany(request => request.Actions)
+            .Select(action => action.ActorAppUserId)
+            .Distinct()
+            .ToArray();
+        var decisionActorsById = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => decisionActorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
 
         return requests
-            .Select(request => CreateFacultyLeaveRequestResponse(request, leaveTypesById))
+            .Select(request => CreateFacultyLeaveRequestResponse(
+                request,
+                leaveTypesById,
+                decisionActorsById))
             .ToList();
     }
 
@@ -589,12 +622,25 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             .Where(type => leaveTypeIds.Contains(type.Id))
             .ToDictionaryAsync(type => type.Id, cancellationToken);
 
-        return CreateFacultyLeaveRequestResponse(request, leaveTypesById);
+        var decisionActorIds = request.Actions
+            .Select(action => action.ActorAppUserId)
+            .Distinct()
+            .ToArray();
+        var decisionActorsById = await _db.AppUsers
+            .AsNoTracking()
+            .Where(user => decisionActorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
+
+        return CreateFacultyLeaveRequestResponse(
+            request,
+            leaveTypesById,
+            decisionActorsById);
     }
 
     private static FacultyLeaveRequestResponse CreateFacultyLeaveRequestResponse(
         LeaveRequest request,
-        IReadOnlyDictionary<int, LeaveType> leaveTypesById)
+        IReadOnlyDictionary<int, LeaveType> leaveTypesById,
+        IReadOnlyDictionary<int, AppUser> decisionActorsById)
     {
         var leaveTypeName = leaveTypesById.TryGetValue(request.LeaveTypeId, out var leaveType)
             ? leaveType.DisplayName
@@ -603,6 +649,8 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             leaveTypesById.TryGetValue(request.PayLeaveTypeId.Value, out var payLeaveType)
                 ? payLeaveType.DisplayName
                 : null;
+
+        var decisionAction = request.Actions.SingleOrDefault();
 
         return new FacultyLeaveRequestResponse(
             Id: request.Id,
@@ -619,8 +667,26 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
             SubmittedAt: request.SubmittedAt,
             WorkflowMode: request.WorkflowModeSnapshot.ToString(),
             DepartmentName: request.ReportingDepartmentNameSnapshot,
-            Note: request.Note);
+            Note: request.Note,
+            Decision: decisionAction?.ActionType.ToString(),
+            ApprovalMethod: GetApprovalMethod(request, decisionAction),
+            DecisionBy: decisionAction == null
+                ? null
+                : decisionActorsById.TryGetValue(decisionAction.ActorAppUserId, out var actor)
+                    ? actor.DisplayName ?? decisionAction.ActorIamId
+                    : decisionAction.ActorIamId,
+            DecisionAt: decisionAction?.ActionAt,
+            DecisionComment: decisionAction?.Comment);
     }
+
+    private static string GetApprovalMethod(
+        LeaveRequest request,
+        LeaveRequestAction? action) =>
+        request.WorkflowModeSnapshot == WorkflowMode.DirectSubmission ||
+        action?.ReasonCode == LeaveRequestActionReasonCodes.AutoApprovedAfterWorkflowChange ||
+        action?.Comment == "Approved because the department approval mode changed to Auto-approve."
+            ? "DirectSubmission"
+            : "ApprovalRequired";
 
     private async Task<List<LeaveType>> GetLeaveTypesAsync(CancellationToken cancellationToken)
     {
@@ -802,6 +868,31 @@ public sealed class FacultyDashboardService : IFacultyDashboardService
         return new FacultyBalanceSummary(availableBalanceHours, accrualsApproachingCap);
     }
 
+    internal static bool IsVacationAvailable(
+        CurrentFacultyWithAccrual? employee,
+        IReadOnlyCollection<CurrentFacultyAccrualBalance> accrualBalances)
+    {
+        return employee?.JobCodeDescription?.Contains("FY", StringComparison.OrdinalIgnoreCase) == true ||
+            accrualBalances.Any(balance =>
+                IsVacationBalance(balance) && balance.CalculatedBal > 0);
+    }
+
+    private static bool IsVacationBalance(CurrentFacultyAccrualBalance balance) =>
+        string.Equals(
+            balance.TypeLabel.Trim(),
+            VacationLeaveTypeLabel,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsVacationLeaveType(LeaveType leaveType) =>
+        string.Equals(
+            leaveType.LeaveTypeKey,
+            VacationLeaveTypeKey,
+            StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(
+            GetCanonicalLeaveTypeLabel(leaveType),
+            VacationLeaveTypeLabel,
+            StringComparison.OrdinalIgnoreCase);
+
     private static string NormalizeIamId(string value) => value.Trim();
 
     private static string GetCanonicalLeaveTypeLabel(LeaveType leaveType)
@@ -888,7 +979,12 @@ public sealed record FacultyLeaveRequestResponse(
     DateTime SubmittedAt,
     string WorkflowMode,
     string DepartmentName,
-    string? Note);
+    string? Note,
+    string? Decision,
+    string ApprovalMethod,
+    string? DecisionBy,
+    DateTime? DecisionAt,
+    string? DecisionComment);
 
 public sealed record FacultyLeaveTypeResponse(
     int Id,

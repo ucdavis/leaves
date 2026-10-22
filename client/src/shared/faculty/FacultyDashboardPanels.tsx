@@ -143,7 +143,7 @@ function RecentRequestRow({
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <div className="-mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded px-2 py-3 transition hover:bg-base-200 first:pt-0 last:pb-0 xl:grid-cols-[minmax(0,1fr)_auto_auto]">
       <button
         className="flex min-w-0 items-start gap-3 text-left transition hover:text-primary"
         onClick={() => onSelectRequest(request)}
@@ -321,7 +321,7 @@ export function formatWorkflowModeLabel(
   workflowMode: string | null | undefined
 ) {
   if (workflowMode === 'ApprovalRequired') {
-    return 'Approval required';
+    return 'Required';
   }
 
   if (workflowMode === 'DirectSubmission') {

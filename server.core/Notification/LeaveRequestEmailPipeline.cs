@@ -12,16 +12,16 @@ namespace Server.Core.Notification;
 
 public static class LeaveRequestNotificationTypes
 {
-    public const string SubmittedForApproval = "LeaveRequestSubmittedForApproval";
     public const string AutoApproved = "LeaveRequestAutoApproved";
     public const string Approved = "LeaveRequestApproved";
     public const string Denied = "LeaveRequestDenied";
+    public const string FinalizedForRouting = "LeaveRequestFinalizedForRouting";
 }
 
 public interface ILeaveRequestNotificationQueue
 {
     Task QueueSubmissionAsync(LeaveRequest request, AppUser requester, CancellationToken cancellationToken);
-    void QueueDecision(LeaveRequest request, AppUser requester);
+    Task QueueDecisionAsync(LeaveRequest request, AppUser requester, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -50,24 +50,17 @@ public sealed class LeaveRequestNotificationQueue : ILeaveRequestNotificationQue
     {
         if (request.WorkflowModeSnapshot == WorkflowMode.ApprovalRequired)
         {
-            var routingEmails = await _db.DepartmentEmailRoutings
-                .AsNoTracking()
-                .Where(routing => routing.DepartmentCode == request.ReportingDepartmentCodeSnapshot && routing.IsActive)
-                .Select(routing => routing.ToEmail)
-                .ToListAsync(cancellationToken);
-
-            foreach (var recipient in routingEmails.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                Queue(request, recipient, LeaveRequestNotificationTypes.SubmittedForApproval);
-            }
-
             return;
         }
 
         Queue(request, requester.Email, LeaveRequestNotificationTypes.AutoApproved);
+        await QueueRoutingAsync(request, cancellationToken);
     }
 
-    public void QueueDecision(LeaveRequest request, AppUser requester)
+    public async Task QueueDecisionAsync(
+        LeaveRequest request,
+        AppUser requester,
+        CancellationToken cancellationToken)
     {
         var notificationType = request.Status switch
         {
@@ -79,6 +72,25 @@ public sealed class LeaveRequestNotificationQueue : ILeaveRequestNotificationQue
         if (notificationType is not null)
         {
             Queue(request, requester.Email, notificationType);
+        }
+
+        if (request.Status == LeaveRequestStatus.Approved)
+        {
+            await QueueRoutingAsync(request, cancellationToken);
+        }
+    }
+
+    private async Task QueueRoutingAsync(LeaveRequest request, CancellationToken cancellationToken)
+    {
+        var routingEmails = await _db.DepartmentEmailRoutings
+            .AsNoTracking()
+            .Where(routing => routing.DepartmentCode == request.ReportingDepartmentCodeSnapshot && routing.IsActive)
+            .Select(routing => routing.ToEmail)
+            .ToListAsync(cancellationToken);
+
+        foreach (var recipient in routingEmails.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            Queue(request, recipient, LeaveRequestNotificationTypes.FinalizedForRouting);
         }
     }
 
@@ -362,13 +374,14 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         var dates = request.StartDate == request.EndDate
             ? request.StartDate.ToString("MMMM d, yyyy")
             : $"{request.StartDate:MMMM d, yyyy} through {request.EndDate:MMMM d, yyyy}";
+        var decisionComment = await _db.LeaveRequestActions
+            .AsNoTracking()
+            .Where(action => action.LeaveRequestId == request.Id)
+            .Select(action => action.Comment)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return message.NotificationType switch
         {
-            LeaveRequestNotificationTypes.SubmittedForApproval => new LeaveRequestEmailNotification(
-                "Leave request awaiting approval",
-                "Leave request awaiting approval",
-                $"{requesterName} submitted a {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours)."),
             LeaveRequestNotificationTypes.AutoApproved => new LeaveRequestEmailNotification(
                 "Leave request approved",
                 "Your leave request was approved",
@@ -376,13 +389,31 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
             LeaveRequestNotificationTypes.Approved => new LeaveRequestEmailNotification(
                 "Leave request approved",
                 "Your leave request was approved",
-                $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved."),
+                WithDecisionComment(
+                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                    decisionComment)),
             LeaveRequestNotificationTypes.Denied => new LeaveRequestEmailNotification(
                 "Leave request denied",
                 "Your leave request was denied",
-                $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was denied."),
+                WithDecisionComment(
+                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was denied.",
+                    decisionComment)),
+            LeaveRequestNotificationTypes.FinalizedForRouting => new LeaveRequestEmailNotification(
+                "Leave request finalized",
+                "Leave request finalized",
+                WithDecisionComment(
+                    $"{requesterName}'s {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                    decisionComment)),
             _ => null,
         };
+    }
+
+    private static string WithDecisionComment(string message, string? comment)
+    {
+        var trimmedComment = comment?.Trim();
+        return string.IsNullOrWhiteSpace(trimmedComment)
+            ? message
+            : $"{message}\n\nComment: {trimmedComment}";
     }
 
     private Task<bool> MarkSentAsync(ClaimedOutboundMessage message, DateTime nowUtc, CancellationToken cancellationToken)
