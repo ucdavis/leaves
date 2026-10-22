@@ -185,7 +185,7 @@ export function RequestDetailModal({
         <RequestNote note={request.note} />
         <DecisionComments request={request} />
         
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button className="btn btn-ghost" onClick={onClose} type="button">
             Close
           </button>

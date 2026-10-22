@@ -13,7 +13,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type {
-  FacultyDashboardResponse,
   FacultyLeaveRequest,
 } from '@/queries/faculty.ts';
 import { universityHolidaysQueryOptions } from '@/queries/universityHolidays.ts';
@@ -52,12 +51,10 @@ export const calendarLegend = [
 export const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function LeaveCalendar({
-  faculty,
   focusDate,
   onReportLeave,
   requests,
 }: {
-  faculty: FacultyDashboardResponse['faculty'];
   focusDate?: string;
   onReportLeave?: (startDate: string, endDate: string) => void;
   requests: FacultyLeaveRequest[];
@@ -74,7 +71,9 @@ export function LeaveCalendar({
     [focusDate, visibleRequests]
   );
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
-  const [focusedDate, setFocusedDate] = useState<string | null>(focusDate ?? null);
+  const [focusedDate, setFocusedDate] = useState<string | null>(
+    focusDate ?? null
+  );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<FacultyLeaveRequest | null>(null);
@@ -93,7 +92,10 @@ export function LeaveCalendar({
 
   useEffect(() => {
     if (focusDate) {
-      calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      calendarRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     }
   }, [focusDate]);
 
@@ -207,39 +209,39 @@ export function LeaveCalendar({
       >
         <div className="grid min-w-[42rem] grid-cols-7 border-l border-t border-base-300">
           {weekdayLabels.map((label) => (
-  <div
-    className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
-    key={label}
-  >
-    {label}
-  </div>
-))}
+            <div
+              className="border-b border-r border-base-300 bg-base-200 py-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-base-content/70"
+              key={label}
+            >
+              {label}
+            </div>
+          ))}
 
-{calendarDays.map((day, index) => {
-  const dayRequests = day
-    ? (requestsByDate.get(day.isoDate) ?? [])
-    : [];
-  const holiday = day && getUniversityHoliday(holidays, day.isoDate);
-  const isWeekend =
-    day && (day.date.getDay() === 0 || day.date.getDay() === 6);
+          {calendarDays.map((day, index) => {
+            const dayRequests = day
+              ? (requestsByDate.get(day.isoDate) ?? [])
+              : [];
+            const holiday = day && getUniversityHoliday(holidays, day.isoDate);
+            const isWeekend =
+              day && (day.date.getDay() === 0 || day.date.getDay() === 6);
 
-  return (
-    <div
-      aria-current={focusedDate === day?.isoDate ? "date" : undefined}
-      className={`relative min-h-24 min-w-0 border-b border-r border-base-300 p-2 text-left align-top transition ${
-        holiday
-          ? "bg-sky-100 hover:bg-sky-200"
-          : isWeekend
-            ? "bg-base-300/50 hover:bg-base-300/70"
-            : day
-              ? "hover:bg-base-200"
-              : "bg-base-200/40"
-      } ${selectedDate === day?.isoDate ? "ring-2 ring-primary ring-inset" : ""} ${
-        focusedDate === day?.isoDate
-          ? "ring-2 ring-primary/60 ring-inset"
-          : ""
-      } ${day ? "cursor-pointer" : ""}`}
-      key={day?.isoDate ?? `blank-${index}`}
+            return (
+              <div
+                aria-current={focusedDate === day?.isoDate ? 'date' : undefined}
+                className={`relative min-h-24 min-w-0 border-b border-r border-base-300 p-2 text-left align-top transition ${
+                  holiday
+                    ? 'bg-sky-100 hover:bg-sky-200'
+                    : isWeekend
+                      ? 'bg-base-300/50 hover:bg-base-300/70'
+                      : day
+                        ? 'hover:bg-base-200'
+                        : 'bg-base-200/40'
+                } ${selectedDate === day?.isoDate ? 'ring-2 ring-primary ring-inset' : ''} ${
+                  focusedDate === day?.isoDate
+                    ? 'ring-2 ring-primary/60 ring-inset'
+                    : ''
+                } ${day ? 'cursor-pointer' : ''}`}
+                key={day?.isoDate ?? `blank-${index}`}
                 onClick={() => day && selectDate(day.isoDate)}
                 onKeyDown={(event) => {
                   if (!day || event.target !== event.currentTarget) {

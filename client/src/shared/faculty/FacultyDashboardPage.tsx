@@ -75,7 +75,6 @@ export function FacultyDashboardPage({
 
       <div className="mx-auto mt-6">
         <LeaveCalendar
-          faculty={data.faculty}
           focusDate={calendarDate}
           key={calendarDate ?? 'dashboard-calendar'}
           onReportLeave={
