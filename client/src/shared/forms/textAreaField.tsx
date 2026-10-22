@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useFieldContext } from './formContext.tsx';
 import { FieldWrapper } from './fieldWrapper.tsx';
 
@@ -18,14 +19,19 @@ export function TextAreaField({
 }: TextAreaFieldProps) {
   const field = useFieldContext<string>();
   const hasError = field.state.meta.errors.length > 0;
+  const textareaId = useId();
+  const descriptionId = hasError ? `${textareaId}-error` : undefined;
 
   return (
-    <FieldWrapper label={label} required={required}>
+    <FieldWrapper controlId={textareaId} label={label} required={required}>
       <textarea
+        aria-describedby={descriptionId}
+        aria-invalid={hasError}
         aria-required={required}
         className={`${textareaClassName ?? 'textarea textarea-bordered w-full'} ${
           hasError ? 'textarea-error' : ''
         }`}
+        id={textareaId}
         onBlur={field.handleBlur}
         onChange={(e) => field.handleChange(e.target.value)}
         placeholder={placeholder ?? `Enter ${label.toLowerCase()}`}

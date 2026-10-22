@@ -55,7 +55,7 @@ export function LeaveOverviewCalendar({
   const days = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
 
   return (
-    <section className="rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="h2 text-primary">
@@ -67,20 +67,20 @@ export function LeaveOverviewCalendar({
         </span>
       </div>
 
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 grid grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-4">
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost btn-sm min-h-11 px-2 sm:px-3"
           onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
           type="button"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Prev
         </button>
-        <h2 className="font-bold text-primary">
+        <h2 className="text-center font-bold text-primary">
           {monthFormatter.format(visibleMonth)}
         </h2>
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost btn-sm min-h-11 px-2 sm:px-3"
           onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
           type="button"
         >
@@ -89,16 +89,24 @@ export function LeaveOverviewCalendar({
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-base-300">
+      <p className="mb-2 text-xs text-base-content/70">
+        Scroll horizontally to view all dates.
+      </p>
+      <div
+        aria-label="Faculty leave overview"
+        className="overflow-x-auto overscroll-x-contain rounded-lg border border-base-300"
+        role="region"
+        tabIndex={0}
+      >
         <table className="table-fixed border-collapse text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-52 border-r border-base-300 bg-base-200 px-3 py-3 text-left text-xs font-bold uppercase text-base-content/65">
+              <th className="sticky left-0 z-10 min-w-32 w-32 sm:min-w-52 sm:w-52 border-r border-base-300 bg-base-200 px-3 py-3 text-left text-xs font-bold uppercase text-base-content/70">
                 Faculty
               </th>
               {days.map((day) => (
                 <th
-                  className={`w-9 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/60 last:border-r-0 ${getUniversityHoliday(holidays, day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
+                  className={`min-w-11 w-11 border-r border-base-300 px-0 py-3 text-center text-xs font-medium text-base-content/70 last:border-r-0 ${getUniversityHoliday(holidays, day.isoDate) ? 'bg-sky-100 text-sky-800' : isWeekend(day.date) ? 'bg-base-300/50' : 'bg-base-200'}`}
                   key={day.isoDate}
                   title={getUniversityHoliday(holidays, day.isoDate)?.name}
                 >
@@ -129,13 +137,13 @@ export function LeaveOverviewCalendar({
 
       <CalendarLegend />
 
-      <p className="mt-4 text-sm text-base-content/65">
+      <p className="mt-4 text-sm text-base-content/70">
         {holidayCoverageEnd
           ? `Holiday dates are currently available through ${format(parseISO(holidayCoverageEnd), 'MMMM d, yyyy')}.`
           : 'Holiday data is temporarily unavailable, so holidays are not shown in this calendar.'}
       </p>
 
-      <p className="mt-5 text-sm text-base-content/65">
+      <p className="mt-5 text-sm text-base-content/70">
         Click a faculty member&apos;s name to open their dashboard.
       </p>
     </section>
@@ -161,7 +169,7 @@ function CalendarFacultyRow({
 
   return (
     <tr>
-      <th className="sticky left-0 z-10 border-r border-t border-base-300 bg-base-100 px-3 py-3 text-left">
+      <th className="sticky left-0 z-10 break-words border-r border-t border-base-300 bg-base-100 px-3 py-3 text-left">
         <button
           className="font-bold text-primary underline-offset-4 hover:underline"
           onClick={() => onSelectFaculty(facultyMember.id)}

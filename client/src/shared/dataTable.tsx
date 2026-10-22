@@ -75,7 +75,7 @@ export const DataTable = <TData extends object>({
           </g>
         </svg>
         <input
-          className="grow"
+          className="min-w-0 grow"
           onChange={(e) => table.setGlobalFilter(e.target.value)}
           placeholder={filterPlaceholder}
           type="text"
@@ -116,7 +116,7 @@ export const DataTable = <TData extends object>({
   const hasToolbar = toolbarItems.some((item) => item.content);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {hasToolbar ? (
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {toolbarItems.map((item, index) =>
@@ -136,7 +136,12 @@ export const DataTable = <TData extends object>({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
+      <div
+        aria-label="Data table"
+        className="overflow-x-auto overscroll-x-contain"
+        role="region"
+        tabIndex={0}
+      >
         <table
           className={['table table-zebra w-full', tableClassName]
             .filter(Boolean)
@@ -192,31 +197,31 @@ export const DataTable = <TData extends object>({
             })}
           </tbody>
         </table>
+      </div>
 
-        <div className="flex items-center justify-end gap-3 py-2">
-          {showPageCount ? (
-            <span aria-live="polite" className="text-sm text-base-content/70">
-              Page {table.getState().pagination.pageIndex + 1} of{' '}
-              {table.getPageCount()}
-            </span>
-          ) : null}
-          <button
-            className="btn btn-xs"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.previousPage()}
-            type="button"
-          >
-            Previous
-          </button>
-          <button
-            className="btn btn-xs"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.nextPage()}
-            type="button"
-          >
-            Next
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3 py-2">
+        {showPageCount ? (
+          <span aria-live="polite" className="text-sm text-base-content/70">
+            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            {table.getPageCount()}
+          </span>
+        ) : null}
+        <button
+          className="btn btn-sm min-h-11"
+          disabled={!table.getCanPreviousPage()}
+          onClick={() => table.previousPage()}
+          type="button"
+        >
+          Previous
+        </button>
+        <button
+          className="btn btn-sm min-h-11"
+          disabled={!table.getCanNextPage()}
+          onClick={() => table.nextPage()}
+          type="button"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

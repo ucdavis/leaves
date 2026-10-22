@@ -172,6 +172,9 @@ test('department roster includes faculty admins and CAOs, and excludes directory
   renderDepartments();
   expect(await screen.findByText('CAO: Staff current CAO')).toBeInTheDocument();
   expect(screen.getByText('3 active users')).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Edit Test department chair' })
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Linked users' }));
   const roster = await screen.findByRole('table');
   for (const role of ['faculty', 'admin', 'cao']) {

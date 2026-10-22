@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Server.Core.Data;
+using Server.Core.Domain;
 
 namespace Server.Tests.Data;
 
@@ -87,6 +88,27 @@ public class DbInitializerTests
         (await db.AppUsers.CountAsync()).Should().BeGreaterThan(0);
         (await db.People.CountAsync()).Should().BeGreaterThan(0);
         (await db.LeaveTypes.CountAsync()).Should().Be(5);
+    }
+
+    [Fact]
+    public async Task InitializeAsyncWithDevelopmentSeedDoesNotDuplicatePaddedDepartmentCode()
+    {
+        await using var db = CreateUninitializedInMemoryContext();
+        await db.Database.EnsureCreatedAsync();
+        db.Departments.Add(new Department
+        {
+            DepartmentCode = $"{DevelopmentSeedData.TestDepartmentCode} ",
+            DepartmentName = DevelopmentSeedData.TestDepartmentName,
+        });
+        await db.SaveChangesAsync();
+
+        var initializer = new DbInitializer(db, NullLogger<DbInitializer>.Instance);
+
+        await initializer.InitializeAsync(includeDevSeed: true);
+
+        (await db.Departments.CountAsync()).Should().Be(3);
+        (await db.Departments.CountAsync(department =>
+            department.DepartmentCode.Trim() == DevelopmentSeedData.TestDepartmentCode)).Should().Be(1);
     }
 
     private static AppDbContext CreateUninitializedInMemoryContext()

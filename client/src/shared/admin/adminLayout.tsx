@@ -23,7 +23,7 @@ export function AdminLayout() {
       <section className="py-8">
         <div className="container">
           <nav className="overflow-x-auto">
-            <div className="inline-flex bg-base-100 border border-primary/10 min-w-full gap-2 rounded-sm p-1">
+            <div className="grid grid-cols-2 sm:flex bg-base-100 border border-primary/10 min-w-full gap-2 rounded-sm p-1">
               {adminTabs.map((tab) => {
                 const isActive =
                   tab.to === '/admin'
@@ -34,7 +34,7 @@ export function AdminLayout() {
                 return (
                   <Link
                     activeOptions={{ exact: tab.to === '/admin' }}
-                    className={`admin-tab flex flex-1 items-center justify-center gap-2 rounded-sm px-4 py-3 text-center font-semibold transition ${
+                    className={`admin-tab flex min-w-0 flex-1 items-center justify-center gap-2 rounded-sm px-4 py-3 text-center font-semibold transition ${
                       isActive
                         ? 'bg-primary text-primary-content'
                         : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'

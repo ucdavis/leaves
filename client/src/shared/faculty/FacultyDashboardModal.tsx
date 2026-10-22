@@ -79,21 +79,21 @@ export function Modal({
       ref={dialogRef}
       tabIndex={-1}
     >
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-base-100 shadow-2xl outline-none">
-        <div className="flex items-center justify-between border-b border-base-300 px-6 py-4">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-base-100 shadow-2xl outline-none">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4">
           <h2 className="text-lg font-bold text-primary" id={titleId}>
             {title}
           </h2>
           <button
             aria-label="Close"
-            className="btn btn-ghost btn-sm btn-circle"
+            className="btn btn-ghost btn-circle h-11 w-11 shrink-0"
             onClick={onClose}
             type="button"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-6">
+        <div className="min-h-0 overflow-y-auto overscroll-y-contain p-4 sm:p-6">
           {children}
         </div>
       </div>

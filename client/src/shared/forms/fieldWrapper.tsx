@@ -4,6 +4,7 @@ import { getValidationErrorMessage } from './validationError.ts';
 
 interface FieldWrapperProps {
   children: ReactNode;
+  controlId: string;
   helperText?: string;
   label: string;
   required?: boolean;
@@ -15,6 +16,7 @@ interface FieldWrapperProps {
  */
 export function FieldWrapper({
   children,
+  controlId,
   helperText,
   label,
   required,
@@ -25,26 +27,26 @@ export function FieldWrapper({
 
   return (
     <div className={wrapperClassName ?? 'form-control w-full'}>
-      <label className="label">
-        <span className="label-text font-medium">
+      <label className="label" htmlFor={controlId}>
+        <span className="label-text font-medium text-base-content">
           {label}
           {required ? <span className="text-error"> *</span> : null}
         </span>
       </label>
       {children}
       {hasError && (
-        <label className="label">
+        <p className="label" id={`${controlId}-error`}>
           <span className="label-text-alt text-error" role="alert">
             {field.state.meta.errors.map(getValidationErrorMessage).join(', ')}
           </span>
-        </label>
+        </p>
       )}
       {!hasError && helperText ? (
-        <label className="label">
+        <p className="label" id={`${controlId}-help`}>
           <span className="label-text-alt text-base-content/70">
             {helperText}
           </span>
-        </label>
+        </p>
       ) : null}
       {field.state.meta.isValidating && (
         <span className="loading loading-spinner loading-xs ml-2"></span>

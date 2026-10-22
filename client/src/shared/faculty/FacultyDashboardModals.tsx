@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-form';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
 import {
@@ -184,7 +184,8 @@ export function RequestDetailModal({
         <RequestDetailGrid request={request} />
         <RequestNote note={request.note} />
         <DecisionComments request={request} />
-        <div className="flex justify-end gap-3">
+        
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button className="btn btn-ghost" onClick={onClose} type="button">
             Close
           </button>
@@ -198,7 +199,7 @@ function RequestDetailHeader({ request }: { request: FacultyLeaveRequest }) {
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <div className="flex w-full items-start justify-between gap-4">
+    <div className="flex w-full flex-wrap items-start justify-between gap-4">
       <div className="flex items-center gap-2 font-bold">
         <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
         {request.leaveType}
@@ -261,10 +262,10 @@ function isAutoApproved(request: FacultyLeaveRequest) {
 function RequestDetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+      <dt className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         {label}
       </dt>
-      <dd className="mt-1 font-medium">{value}</dd>
+      <dd className="mt-1 break-words font-medium">{value}</dd>
     </div>
   );
 }
@@ -272,10 +273,12 @@ function RequestDetailItem({ label, value }: { label: string; value: string }) {
 function RequestNote({ note }: { note?: string | null }) {
   return (
     <div className="rounded-lg bg-base-200 p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
+      <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
         Note
       </div>
-      <p className="mt-2 text-sm">{note?.trim() || 'No note provided.'}</p>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+        {note?.trim() || 'No note provided.'}
+      </p>
     </div>
   );
 }
@@ -344,6 +347,8 @@ function LeaveRequestForm({
   onSubmitted: () => void;
   onTitleChange: (title: string) => void;
 }) {
+  const leaveTypeSelectId = useId();
+  const leaveTypeErrorId = `${leaveTypeSelectId}-error`;
   const queryClient = useQueryClient();
   const { data: holidays = [], isPending: isLoadingHolidays } = useQuery(
     universityHolidaysQueryOptions()
@@ -491,17 +496,24 @@ function LeaveRequestForm({
             <form.AppField name="leaveTypeId">
               {(field) => (
                 <div className="form-control w-full">
-                  <label className="label">
+                  <label className="label" htmlFor={leaveTypeSelectId}>
                     <span className="label-text font-medium">
                       Type of Leave
                       <span className="text-error"> *</span>
                     </span>
                   </label>
                   <select
+                    aria-describedby={
+                      field.state.meta.errors.length > 0
+                        ? leaveTypeErrorId
+                        : undefined
+                    }
+                    aria-invalid={field.state.meta.errors.length > 0}
                     aria-required
                     className={`select select-bordered w-full ${
                       field.state.meta.errors.length > 0 ? 'select-error' : ''
                     }`}
+                    id={leaveTypeSelectId}
                     onBlur={field.handleBlur}
                     onChange={(event) => {
                       const nextLeaveTypeId = event.target.value;
@@ -531,13 +543,13 @@ function LeaveRequestForm({
                     ))}
                   </select>
                   {field.state.meta.errors.length > 0 ? (
-                    <label className="label">
+                    <p className="label" id={leaveTypeErrorId}>
                       <span className="label-text-alt text-error" role="alert">
                         {field.state.meta.errors
                           .map(getValidationErrorMessage)
                           .join(', ')}
                       </span>
-                    </label>
+                    </p>
                   ) : null}
                 </div>
               )}
@@ -691,7 +703,7 @@ function LeaveRequestForm({
               <form.AppField name="totalHours">
                 {(field) => (
                   <field.TextField
-                    label="Hours per day"
+                    label={usesDateRange ? 'Hours per day' : 'Hours'}
                     placeholder="e.g., 8"
                     required
                   />
@@ -718,7 +730,7 @@ function LeaveRequestForm({
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
             <button
               className="btn btn-outline btn-primary min-w-24"
               onClick={onClose}
