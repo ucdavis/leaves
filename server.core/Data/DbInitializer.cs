@@ -419,10 +419,12 @@ public class DbInitializer : IDbInitializer
             .Select(department => department.DepartmentCode)
             .ToListAsync(ct);
 
-        var existing = existingCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existing = existingCodes
+            .Select(NormalizeKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var missingDepartments = DevDepartments
-            .Where(department => !existing.Contains(department.DepartmentCode))
+            .Where(department => !existing.Contains(NormalizeKey(department.DepartmentCode)))
             .Select(department => new Department
             {
                 DepartmentCode = department.DepartmentCode,

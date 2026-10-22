@@ -653,7 +653,7 @@ function ClusterCaoEditor({
         <span>CAO: {currentCaoName ?? 'Add CAO'}</span>
         <button
           aria-label="Edit CAO"
-          className="inline-flex items-center text-primary hover:text-primary/80"
+          className="inline-flex h-11 w-11 items-center justify-center text-primary hover:text-primary/80"
           onClick={onEdit}
           type="button"
         >

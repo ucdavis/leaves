@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useFieldContext } from './formContext.tsx';
 import { FieldWrapper } from './fieldWrapper.tsx';
 
@@ -22,14 +23,28 @@ export function SelectField({
 }: SelectFieldProps) {
   const field = useFieldContext<string>();
   const hasError = field.state.meta.errors.length > 0;
+  const selectId = useId();
+  const descriptionId = hasError
+    ? `${selectId}-error`
+    : helperText
+      ? `${selectId}-help`
+      : undefined;
 
   return (
-    <FieldWrapper helperText={helperText} label={label} required={required}>
+    <FieldWrapper
+      controlId={selectId}
+      helperText={helperText}
+      label={label}
+      required={required}
+    >
       <select
+        aria-describedby={descriptionId}
+        aria-invalid={hasError}
         aria-required={required}
         className={`${selectClassName ?? 'select select-bordered w-full'} ${
           hasError ? 'select-error' : ''
         }`}
+        id={selectId}
         onBlur={field.handleBlur}
         onChange={(e) => field.handleChange(e.target.value)}
         value={field.state.value || ''}

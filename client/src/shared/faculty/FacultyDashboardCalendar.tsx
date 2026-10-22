@@ -247,7 +247,7 @@ export function LeaveCalendar({
                             request.startDate,
                             request.endDate
                           )}`}
-                          className={`block w-full truncate rounded border-l-2 px-1.5 py-0.5 text-left text-[11px] font-semibold transition hover:opacity-90 ${tone.surface}`}
+                          className={`block min-h-11 w-full truncate rounded border-l-2 px-1.5 py-0.5 text-left text-[11px] font-semibold transition hover:opacity-90 ${tone.surface}`}
                           key={request.id}
                           onClick={(event) => {
                             event.stopPropagation();

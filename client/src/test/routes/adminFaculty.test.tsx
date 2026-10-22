@@ -96,6 +96,9 @@ test('loads everyone with current department overrides separately', async () => 
   expect(
     await screen.findByText('Active faculty with override')
   ).toBeInTheDocument();
+  expect(
+    screen.getByRole('combobox', { name: 'Filter faculty by department' })
+  ).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole('checkbox', {
       name: 'Show Current Department Overrides',

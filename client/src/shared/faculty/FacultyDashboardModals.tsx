@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-form';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { z } from 'zod';
 import { HttpError } from '@/lib/api.ts';
 import {
@@ -305,6 +305,7 @@ function LeaveRequestForm({
   onSubmitted: () => void;
   onTitleChange: (title: string) => void;
 }) {
+  const leaveTypeSelectId = useId();
   const queryClient = useQueryClient();
   const { data: holidays = [], isPending: isLoadingHolidays } = useQuery(
     universityHolidaysQueryOptions()
@@ -452,7 +453,7 @@ function LeaveRequestForm({
             <form.AppField name="leaveTypeId">
               {(field) => (
                 <div className="form-control w-full">
-                  <label className="label">
+                  <label className="label" htmlFor={leaveTypeSelectId}>
                     <span className="label-text font-medium">
                       Type of Leave
                       <span className="text-error"> *</span>
@@ -463,6 +464,7 @@ function LeaveRequestForm({
                     className={`select select-bordered w-full ${
                       field.state.meta.errors.length > 0 ? 'select-error' : ''
                     }`}
+                    id={leaveTypeSelectId}
                     onBlur={field.handleBlur}
                     onChange={(event) => {
                       const nextLeaveTypeId = event.target.value;

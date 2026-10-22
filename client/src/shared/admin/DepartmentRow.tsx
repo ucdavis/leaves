@@ -50,13 +50,13 @@ export function DepartmentRow({
             <span>·</span>
             <span>{chairName ? `Chair: ${chairName}` : 'Add chair'}</span>
             <button
-              className="inline-flex items-center text-primary hover:text-primary/80"
+              aria-label={`Edit ${department.name} chair`}
+              className="inline-flex h-11 w-11 items-center justify-center text-primary hover:text-primary/80"
               onClick={onOpenRoster}
               type="button"
             >
               <PencilSquareIcon
                 aria-hidden="true"
-                aria-label="Edit ${department.name} chair"
                 className="h-4 w-4 shrink-0"
               />
             </button>

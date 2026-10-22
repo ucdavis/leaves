@@ -117,8 +117,12 @@ function HistoryContent({
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-lg font-bold text-primary">Request History</h1>
           <div className="flex flex-col gap-3 sm:flex-row">
+            <label className="sr-only" htmlFor="request-history-type-filter">
+              Filter requests by leave type
+            </label>
             <select
               className="select select-bordered min-w-52"
+              id="request-history-type-filter"
               onChange={(event) => onSelectedTypeChange(event.target.value)}
               value={selectedType}
             >

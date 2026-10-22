@@ -212,7 +212,7 @@ export function RequestStatusBadge({ status }: { status: string }) {
   if (normalized.includes('approved')) {
     className = 'bg-success/15 text-success';
   } else if (normalized.includes('pending')) {
-    className = 'bg-warning/15 text-warning';
+    className = 'bg-warning/20 text-base-content';
   } else if (normalized.includes('denied')) {
     className = 'bg-error/15 text-error';
   }
