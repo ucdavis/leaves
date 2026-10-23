@@ -15,6 +15,7 @@ namespace Server.Controllers;
 public sealed class AdminDepartmentsController : ApiControllerBase
 {
     private const int ClusterNameMaxLength = 100;
+    private const string DefaultRequestNotificationEmail = "aggieservice@example.test";
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
     private readonly AdminDirectoryDataService _adminDirectoryDataService;
@@ -224,6 +225,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Approval mode must be auto or approval.");
         }
 
+        var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (adminUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before departments can be created.");
+        }
+
         var now = DateTime.UtcNow;
         _db.Departments.Add(new Department
         {
@@ -234,6 +241,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             IsActive = true,
             UpdatedUtc = now,
             WorkflowMode = workflowMode,
+        });
+        _db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = departmentCode,
+            IsActive = true,
+            ToEmail = DefaultRequestNotificationEmail,
+            UpdatedByAppUserId = adminUserId.Value,
+            UpdatedUtc = now,
         });
 
         await _db.SaveChangesAsync(cancellationToken);

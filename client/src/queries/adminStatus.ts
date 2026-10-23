@@ -7,6 +7,7 @@ export type AdminStatusSnapshot = {
     approachingVacationCap: number;
     facultyAtVacationCap: number;
     pendingRequests: number;
+    undeliveredEmails: number;
   };
 };
 
