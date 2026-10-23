@@ -47,8 +47,8 @@ public class RazorMjmlNotificationRendererTests
         html.Should().Contain("https://example.test/apple-touch.png");
         html.Should().Contain("Render Test");
         html.Should().Contain("Request details");
-        html.Should().Contain("Name: Test Faculty");
-        html.Should().Contain("Email: faculty@example.test");
+        html.Should().Contain("<strong>Name:</strong> Test Faculty");
+        html.Should().Contain("<strong>Email:</strong> faculty@example.test");
         html.Should().NotContain("<mjml");
     }
 
