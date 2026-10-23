@@ -52,8 +52,20 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             secondWorkerResult.ClaimedCount.Should().Be(BatchSize);
             secondWorkerResult.SentCount.Should().Be(BatchSize);
             slowDelivery.DeliveredTo.Should().Equal("first@example.test");
-            slowDelivery.DeliveredMessages.Should().ContainSingle(message =>
-                message.Contains("Comment: Coverage confirmed.", StringComparison.Ordinal));
+            slowDelivery.DeliveredSubjects.Should().Equal("Leave request approved");
+            var routingMessage = slowDelivery.DeliveredMessages.Should().ContainSingle().Subject;
+            routingMessage.Should().ContainAll(
+                "Request ID:",
+                "Name: Requesting Faculty",
+                "Email: requester@example.test",
+                "Department: Example Department",
+                "Leave type: Vacation",
+                "FMLA pay type: Sick Leave",
+                "Date(s): September 14, 2026",
+                "Total hours: 8",
+                "Note: Coverage confirmed with my team.",
+                "Approved by: Approving Chair",
+                "Approval comment: Coverage confirmed.");
             otherDelivery.DeliveredTo.Should().Equal(
                 Enumerable.Range(2, BatchSize - 1).Select(index => $"queued-{index:D2}@example.test")
                     .Append("expired@example.test"));
@@ -101,12 +113,24 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             DisplayName = "Requesting Faculty",
             FirstLoginUtc = nowUtc,
         };
+        var approver = new AppUser
+        {
+            EntraObjectId = Guid.NewGuid(),
+            IamId = "approver1",
+            DisplayName = "Approving Chair",
+            FirstLoginUtc = nowUtc,
+        };
         var leaveType = new LeaveType
         {
             LeaveTypeKey = "vacation",
             DisplayName = "Vacation",
         };
-        db.AddRange(requester, leaveType);
+        var payLeaveType = new LeaveType
+        {
+            LeaveTypeKey = "sick",
+            DisplayName = "Sick Leave",
+        };
+        db.AddRange(requester, approver, leaveType, payLeaveType);
         await db.SaveChangesAsync();
 
         var request = new LeaveRequest
@@ -114,6 +138,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             AppUserId = requester.Id,
             IamId = requester.IamId,
             LeaveTypeId = leaveType.Id,
+            PayLeaveTypeId = payLeaveType.Id,
+            Note = "Coverage confirmed with my team.",
             Status = LeaveRequestStatus.Approved,
             StartDate = new DateOnly(2026, 9, 14),
             EndDate = new DateOnly(2026, 9, 14),
@@ -129,14 +155,18 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         {
             LeaveRequestId = request.Id,
             ActionType = LeaveRequestActionType.Approved,
-            ActorAppUserId = requester.Id,
-            ActorIamId = requester.IamId,
+            ActorAppUserId = approver.Id,
+            ActorIamId = approver.IamId,
             ActionAt = nowUtc,
             Comment = "Coverage confirmed.",
         });
         await db.SaveChangesAsync();
 
-        db.OutboundMessages.Add(CreateMessage(request.Id, "first@example.test", nowUtc));
+        db.OutboundMessages.Add(CreateMessage(
+            request.Id,
+            "first@example.test",
+            nowUtc,
+            notificationType: LeaveRequestNotificationTypes.Approved));
         db.OutboundMessages.AddRange(
             Enumerable.Range(2, 49)
                 .Select(index => CreateMessage(request.Id, $"queued-{index:D2}@example.test", nowUtc)));
@@ -144,10 +174,15 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
         await db.SaveChangesAsync();
     }
 
-    private static OutboundMessage CreateMessage(int requestId, string recipientEmail, DateTime nowUtc, DateTime? lockedUntilUtc = null) => new()
+    private static OutboundMessage CreateMessage(
+        int requestId,
+        string recipientEmail,
+        DateTime nowUtc,
+        DateTime? lockedUntilUtc = null,
+        string notificationType = LeaveRequestNotificationTypes.Approved) => new()
     {
         LeaveRequestId = requestId,
-        NotificationType = LeaveRequestNotificationTypes.Approved,
+        NotificationType = notificationType,
         RecipientEmail = recipientEmail,
         DedupeKey = $"leave-request:{requestId}:{recipientEmail}",
         Status = OutboundMessageStatus.Pending,
@@ -172,6 +207,8 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
 
         public List<string> DeliveredMessages { get; } = [];
 
+        public List<string> DeliveredSubjects { get; } = [];
+
         public Task SendStarted => _sendStarted.Task;
 
         public void ReleaseSend() => _release.TrySetResult();
@@ -186,6 +223,7 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             var recipient = recipients.To.Single();
             DeliveredTo.Add(recipient);
             DeliveredMessages.Add(message);
+            DeliveredSubjects.Add(subject);
 
             if (!string.Equals(recipient, _blockedRecipient, StringComparison.OrdinalIgnoreCase))
             {

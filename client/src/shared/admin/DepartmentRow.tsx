@@ -42,8 +42,8 @@ export function DepartmentRow({
             <span>·</span>
             <span>
               {department.routingEmails.length > 0
-                ? `${department.routingEmails.length} routing emails`
-                : 'No email configured'}
+                ? `${department.routingEmails.length} notification emails`
+                : 'No notification email configured'}
             </span>
             <span>·</span>
             <span>{chairName ? `Chair: ${chairName}` : 'Add chair'}</span>

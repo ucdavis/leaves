@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Server.Controllers;
+using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Core.Notification;
 using Server.Services;
@@ -12,6 +13,37 @@ namespace Server.Tests.Controllers;
 
 public class AdminDepartmentsControllerWorkflowTests
 {
+    [Fact]
+    public async Task CreateDepartment_adds_the_default_request_notification_email()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var admin = new AppUser
+        {
+            EntraObjectId = Guid.NewGuid(),
+            IamId = "admin",
+            FirstLoginUtc = DateTime.UtcNow,
+        };
+        db.AppUsers.Add(admin);
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, admin);
+
+        var result = await controller.CreateDepartment(
+            new AdminDepartmentsController.CreateDepartmentRequest(
+                ApprovalMode: "approval",
+                ClusterId: null,
+                Code: "DEPT",
+                Name: "Department"),
+            CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+        var routingEmail = db.DepartmentEmailRoutings.Should().ContainSingle().Subject;
+        routingEmail.DepartmentCode.Should().Be("DEPT");
+        routingEmail.ToEmail.Should().Be("aggieservice@example.test");
+        routingEmail.IsActive.Should().BeTrue();
+        routingEmail.UpdatedByAppUserId.Should().Be(admin.Id);
+    }
+
     [Fact]
     public async Task UpdateDepartment_to_auto_approve_immediately_approves_each_pending_request_after_confirmation()
     {
@@ -63,27 +95,7 @@ public class AdminDepartmentsControllerWorkflowTests
         db.LeaveRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var queue = new LeaveRequestNotificationQueue(
-            db,
-            NullLogger<LeaveRequestNotificationQueue>.Instance);
-        var controller = new AdminDepartmentsController(
-            db,
-            new AdminDirectoryDataService(db),
-            new AdminDirectoryService(new AdminDirectoryDataService(db)),
-            queue,
-            new EmailDeliveryWakeSignal(),
-            null!)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new ClaimsPrincipal(new ClaimsIdentity([
-                        new Claim(ClaimTypes.NameIdentifier, admin.EntraObjectId.ToString()),
-                    ], "test")),
-                },
-            },
-        };
+        var controller = CreateController(db, admin);
 
         var unconfirmedResult = await controller.UpdateDepartment(
             department.DepartmentCode,
@@ -121,10 +133,36 @@ public class AdminDepartmentsControllerWorkflowTests
         action.ActorIamId.Should().Be(admin.IamId);
         db.OutboundMessages.Should().ContainSingle(message =>
             message.LeaveRequestId == request.Id &&
+            message.RecipientEmail == "faculty@example.test" &&
             message.NotificationType == LeaveRequestNotificationTypes.Approved);
         db.OutboundMessages.Should().ContainSingle(message =>
             message.LeaveRequestId == request.Id &&
             message.RecipientEmail == "aggieservice@example.test" &&
-            message.NotificationType == LeaveRequestNotificationTypes.FinalizedForRouting);
+            message.NotificationType == LeaveRequestNotificationTypes.Approved);
+    }
+
+    private static AdminDepartmentsController CreateController(AppDbContext db, AppUser admin)
+    {
+        var queue = new LeaveRequestNotificationQueue(
+            db,
+            NullLogger<LeaveRequestNotificationQueue>.Instance);
+        return new AdminDepartmentsController(
+            db,
+            new AdminDirectoryDataService(db),
+            new AdminDirectoryService(new AdminDirectoryDataService(db)),
+            queue,
+            new EmailDeliveryWakeSignal(),
+            null!)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([
+                        new Claim(ClaimTypes.NameIdentifier, admin.EntraObjectId.ToString()),
+                    ], "test")),
+                },
+            },
+        };
     }
 }

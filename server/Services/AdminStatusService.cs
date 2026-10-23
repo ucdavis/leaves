@@ -61,7 +61,8 @@ public sealed class AdminStatusService
                 Issues: new AdminIssuesResponse(
                     ApproachingVacationCap: vacationRows.Count(row => IsAffirmative(row.ApproachingMax)),
                     FacultyAtVacationCap: vacationRows.Count(row => row.CalculatedBal >= row.AccrualLimit),
-                    PendingRequests: statusData.PendingRequestCount)));
+                    PendingRequests: statusData.PendingRequestCount,
+                    UndeliveredEmails: statusData.UndeliveredEmailCount)));
     }
 
     private static bool IsAffirmative(string? value)
@@ -116,4 +117,5 @@ public sealed record AdminStatusSnapshotResponse(
 public sealed record AdminIssuesResponse(
     int ApproachingVacationCap,
     int FacultyAtVacationCap,
-    int PendingRequests);
+    int PendingRequests,
+    int UndeliveredEmails);

@@ -2,10 +2,14 @@ namespace Server.Core.Notification;
 
 public abstract class NotificationTemplateModelBase
 {
+    public static string DefaultLogoUrl => "/apple-touch.png";
+
     public string AppName { get; init; } = string.Empty;
+    public string? AppHomeUrl { get; init; }
     public string ButtonText { get; init; } = string.Empty;
     public string ButtonUrl { get; init; } = string.Empty;
     public string? LayoutWidth { get; init; }
+    public string? LogoUrl { get; init; } = DefaultLogoUrl;
 }
 
 public sealed class DefaultNotificationTemplateModel : NotificationTemplateModelBase

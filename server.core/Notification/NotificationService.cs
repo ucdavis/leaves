@@ -73,17 +73,19 @@ public sealed class NotificationService : INotificationService
         var appName = string.IsNullOrWhiteSpace(_notificationOptions.DefaultAppName)
             ? _smtpOptions.FromName
             : _notificationOptions.DefaultAppName;
+        var appBaseUri = TryGetAppBaseUri(_notificationOptions.BaseUrl);
+        var appHomeUrl = appBaseUri?.ToString().TrimEnd('/');
 
+        var paragraphs = SplitIntoParagraphs(message);
         var model = new DefaultNotificationTemplateModel
         {
             AppName = appName,
+            AppHomeUrl = appHomeUrl,
             Header = header,
-            Paragraphs =
-            [
-                message,
-            ],
-            ButtonText = string.IsNullOrWhiteSpace(_notificationOptions.BaseUrl) ? string.Empty : _notificationOptions.DefaultButtonText,
-            ButtonUrl = _notificationOptions.BaseUrl,
+            LogoUrl = BuildAppAssetUrl(appBaseUri, "/apple-touch.png") ?? NotificationTemplateModelBase.DefaultLogoUrl,
+            Paragraphs = paragraphs,
+            ButtonText = appBaseUri is null ? string.Empty : _notificationOptions.DefaultButtonText,
+            ButtonUrl = appHomeUrl ?? string.Empty,
         };
 
         var textBody = $"{header}{Environment.NewLine}{Environment.NewLine}{message}";
@@ -99,6 +101,40 @@ public sealed class NotificationService : INotificationService
             TextBody = textBody,
             HtmlBody = htmlBody,
         }, cancellationToken);
+    }
+
+    private static IReadOnlyList<string> SplitIntoParagraphs(string message) =>
+        message.Split(
+            [Environment.NewLine + Environment.NewLine],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static Uri? TryGetAppBaseUri(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return null;
+        }
+
+        return uri;
+    }
+
+    private static string? BuildAppAssetUrl(Uri? appBaseUri, string assetPath)
+    {
+        if (appBaseUri is null)
+        {
+            return null;
+        }
+
+        var builder = new UriBuilder(appBaseUri)
+        {
+            Path = $"{appBaseUri.AbsolutePath.TrimEnd('/')}/{assetPath.TrimStart('/')}",
+            Query = string.Empty,
+            Fragment = string.Empty,
+        };
+
+        return builder.Uri.ToString();
     }
 
     public async Task SendTableAsync(

@@ -34,16 +34,21 @@ public class RazorMjmlNotificationRendererTests
         var html = await renderer.RenderAsync("/Views/Emails/DefaultNotification_mjml.cshtml", new DefaultNotificationTemplateModel
         {
             AppName = "Template App",
+            AppHomeUrl = "https://example.test",
             Header = "Render Test",
+            LogoUrl = "https://example.test/apple-touch.png",
             Paragraphs =
             [
-                "This is a rendered email body.",
+                "Request details\nName: Test Faculty\nEmail: faculty@example.test",
             ],
         });
 
         html.Should().Contain("Template App");
+        html.Should().Contain("https://example.test/apple-touch.png");
         html.Should().Contain("Render Test");
-        html.Should().Contain("This is a rendered email body.");
+        html.Should().Contain("Request details");
+        html.Should().Contain("Name: Test Faculty");
+        html.Should().Contain("Email: faculty@example.test");
         html.Should().NotContain("<mjml");
     }
 

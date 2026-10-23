@@ -35,7 +35,9 @@ public class NotificationServiceTests
 
         var model = (DefaultNotificationTemplateModel)notificationRenderer.Model!;
         model.AppName.Should().Be("Notification Center");
+        model.AppHomeUrl.Should().Be("https://example.test");
         model.Header.Should().Be("Notification header");
+        model.LogoUrl.Should().Be("https://example.test/apple-touch.png");
         model.Paragraphs.Should().Contain("Notification message");
         model.ButtonText.Should().Be("Review notification");
         model.ButtonUrl.Should().Be("https://example.test");
@@ -79,8 +81,31 @@ public class NotificationServiceTests
 
         var model = notificationRenderer.Model.Should().BeOfType<DefaultNotificationTemplateModel>().Subject;
         model.AppName.Should().Be("Fallback App Name");
+        model.AppHomeUrl.Should().BeNull();
+        model.LogoUrl.Should().Be("/apple-touch.png");
         model.ButtonText.Should().BeEmpty();
         model.ButtonUrl.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SendAsync_renders_each_blank_line_separated_detail_as_a_paragraph()
+    {
+        var emailService = new CaptureEmailService();
+        var notificationRenderer = new CaptureNotificationRenderer();
+        var service = new NotificationService(
+            emailService,
+            notificationRenderer,
+            Options.Create(new NotificationOptions()),
+            Options.Create(new SmtpOptions()));
+
+        await service.SendAsync(
+            new EmailRecipients { To = ["person@example.com"] },
+            "Subject",
+            "Header",
+            $"First detail{Environment.NewLine}Name: one{Environment.NewLine}{Environment.NewLine}Second detail");
+
+        var model = notificationRenderer.Model.Should().BeOfType<DefaultNotificationTemplateModel>().Subject;
+        model.Paragraphs.Should().Equal("First detail\nName: one", "Second detail");
     }
 
     [Fact]

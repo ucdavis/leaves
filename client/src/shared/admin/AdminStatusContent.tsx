@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { AdminStatusSnapshot } from '@/queries/adminStatus.ts';
 import type { AdminDataSource } from '@/shared/admin/adminData.ts';
 import {
   freshnessStatusBadgeColors,
@@ -6,14 +7,6 @@ import {
   statusTextColors,
 } from '@/shared/statusColors.ts';
 import { AdminMetricCard } from './AdminMetricCard.tsx';
-
-type StatusSnapshot = {
-  issues: {
-    approachingVacationCap: number;
-    facultyAtVacationCap: number;
-    pendingRequests: number;
-  };
-};
 
 const dataSourceCopy: Record<
   string,
@@ -49,7 +42,7 @@ export function AdminStatusContent({
   dataSources: AdminDataSource[];
   departmentCount: number;
   departmentsMissingChairs: number;
-  statusSnapshot: StatusSnapshot;
+  statusSnapshot: AdminStatusSnapshot;
 }) {
   return (
     <div className="space-y-6">
@@ -101,6 +94,11 @@ export function AdminStatusContent({
               count={statusSnapshot.issues.pendingRequests}
               label="Requests awaiting approval"
               tone="warning"
+            />
+            <IssueRow
+              count={statusSnapshot.issues.undeliveredEmails}
+              label="Failed Email deliveries"
+              tone="error"
             />
           </div>
         </AdminSectionCard>
