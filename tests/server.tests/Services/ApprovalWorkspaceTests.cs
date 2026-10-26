@@ -1,12 +1,79 @@
 using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Server.Core.Data;
 using Server.Core.Domain;
+using Server.Core.Notification;
 using Server.Services;
 
 namespace Server.Tests.Services;
 
 public class ApprovalWorkspaceTests
 {
+    [Fact]
+    public async Task Approval_commits_every_recipient_before_waking_email_delivery()
+    {
+        await using var db = TestDbContextFactory.CreateInMemory();
+        var approver = new AppUser { IamId = "approver", EntraObjectId = Guid.NewGuid() };
+        var requester = new AppUser
+        {
+            IamId = "requester",
+            EntraObjectId = Guid.NewGuid(),
+            Email = "requester@example.test",
+        };
+        db.AppUsers.AddRange(approver, requester);
+        db.Departments.Add(new Department { DepartmentCode = "DEPT", DepartmentName = "Department" });
+        await db.SaveChangesAsync();
+        db.DepartmentChairAssignments.Add(new DepartmentChairAssignment
+        {
+            DepartmentCode = "DEPT",
+            IamId = approver.IamId,
+            EffectiveStartDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
+            CreatedByAppUserId = approver.Id,
+        });
+        db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = "DEPT",
+            ToEmail = "routing@example.test",
+            UpdatedByAppUserId = approver.Id,
+        });
+        db.LeaveRequests.Add(new LeaveRequest
+        {
+            AppUserId = requester.Id,
+            IamId = requester.IamId,
+            LeaveTypeId = 1,
+            Status = LeaveRequestStatus.PendingApproval,
+            StartDate = new DateOnly(2026, 10, 1),
+            EndDate = new DateOnly(2026, 10, 1),
+            TotalHours = 8,
+            ReportingDepartmentCodeSnapshot = "DEPT",
+            ReportingDepartmentNameSnapshot = "Department",
+            WorkflowModeSnapshot = WorkflowMode.ApprovalRequired,
+            SubmittedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        var wakeSignal = new CommitCheckingWakeSignal(db);
+        var queue = new LeaveRequestNotificationQueue(db, NullLogger<LeaveRequestNotificationQueue>.Instance);
+        var service = new ApprovalWorkspaceService(null!, db, queue, wakeSignal);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(ClaimTypes.NameIdentifier, approver.EntraObjectId.ToString()),
+            new Claim(ClaimTypes.Role, "Chair"),
+        ], "test"));
+
+        var result = await service.SubmitDecisionAsync(
+            principal,
+            db.LeaveRequests.Single().Id,
+            new SubmitApprovalDecisionRequest("approved", null),
+            CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        wakeSignal.SignalCount.Should().Be(1);
+        wakeSignal.SawSavedEmailRows.Should().BeTrue();
+        db.OutboundMessages.Should().ContainSingle(message => message.RecipientEmail == "requester@example.test");
+        db.OutboundMessages.Should().ContainSingle(message => message.RecipientEmail == "routing@example.test");
+    }
+
     [Theory]
     [InlineData("Chair")]
     [InlineData("CAO")]
@@ -104,5 +171,21 @@ public class ApprovalWorkspaceTests
     private sealed class DirectoryStub(AdminDirectoryData data) : IAdminDirectoryDataService
     {
         public Task<AdminDirectoryData> LoadDirectoryDataAsync(CancellationToken cancellationToken) => Task.FromResult(data);
+    }
+
+    private sealed class CommitCheckingWakeSignal(AppDbContext db) : IEmailDeliveryWakeSignal
+    {
+        public int SignalCount { get; private set; }
+
+        public bool SawSavedEmailRows { get; private set; }
+
+        public void Signal()
+        {
+            SignalCount++;
+            SawSavedEmailRows = db.OutboundMessages.Count() == 2 &&
+                db.ChangeTracker.Entries<OutboundMessage>().All(entry => entry.State == EntityState.Unchanged);
+        }
+
+        public ValueTask WaitAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 }

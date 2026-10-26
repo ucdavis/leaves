@@ -134,6 +134,47 @@ public sealed class LeaveRequestNotificationQueueTests
             message.RecipientEmail == "leave-admin@example.test");
     }
 
+    [Fact]
+    public async Task QueueDecisionAsync_deduplicates_the_requester_and_skips_invalid_routing_addresses()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var requester = CreateUser("requester@example.test");
+        db.AppUsers.Add(requester);
+        db.Departments.Add(new Department
+        {
+            DepartmentCode = "123456",
+            DepartmentName = "Example Department",
+        });
+        await db.SaveChangesAsync();
+        db.DepartmentEmailRoutings.AddRange(
+            new DepartmentEmailRouting
+            {
+                DepartmentCode = "123456",
+                ToEmail = "requester@example.test",
+                UpdatedByAppUserId = requester.Id,
+            },
+            new DepartmentEmailRouting
+            {
+                DepartmentCode = "123456",
+                ToEmail = "not-an-email",
+                UpdatedByAppUserId = requester.Id,
+            });
+        await db.SaveChangesAsync();
+
+        var request = CreateRequest(requester.Id, WorkflowMode.ApprovalRequired);
+        request.Status = LeaveRequestStatus.Approved;
+        db.LeaveRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        await CreateQueue(db).QueueDecisionAsync(request, requester, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        db.OutboundMessages.Should().ContainSingle(message =>
+            message.RecipientEmail == "requester@example.test" &&
+            message.NotificationType == LeaveRequestNotificationTypes.Approved);
+        db.OutboundMessages.Should().NotContain(message => message.RecipientEmail == "not-an-email");
+    }
+
     private static LeaveRequestNotificationQueue CreateQueue(Server.Core.Data.AppDbContext db) =>
         new(db, NullLogger<LeaveRequestNotificationQueue>.Instance);
 
