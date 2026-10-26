@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Core.Notification;
@@ -22,6 +23,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private readonly AppDbContext _db;
     private readonly ILeaveRequestNotificationQueue _notificationQueue;
     private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
+    private readonly DepartmentNotificationOptions _departmentNotificationOptions;
     private readonly IUserService _userService;
 
     public AdminDepartmentsController(
@@ -30,6 +32,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         AdminDirectoryService adminDirectoryService,
         ILeaveRequestNotificationQueue notificationQueue,
         IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
+        IOptions<DepartmentNotificationOptions> departmentNotificationOptions,
         IUserService userService)
     {
         _db = db;
@@ -37,6 +40,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         _adminDirectoryService = adminDirectoryService;
         _notificationQueue = notificationQueue;
         _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
+        _departmentNotificationOptions = departmentNotificationOptions.Value;
         _userService = userService;
     }
 
@@ -224,6 +228,12 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem("Approval mode must be auto or approval.");
         }
 
+        var adminUserId = await GetAuthenticatedAppUserId(cancellationToken);
+        if (adminUserId == null)
+        {
+            return ValidationProblem("The authenticated admin must have an AppUser row before departments can be created.");
+        }
+
         var now = DateTime.UtcNow;
         _db.Departments.Add(new Department
         {
@@ -234,6 +244,14 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             IsActive = true,
             UpdatedUtc = now,
             WorkflowMode = workflowMode,
+        });
+        _db.DepartmentEmailRoutings.Add(new DepartmentEmailRouting
+        {
+            DepartmentCode = departmentCode,
+            IsActive = true,
+            ToEmail = _departmentNotificationOptions.DefaultRoutingEmail,
+            UpdatedByAppUserId = adminUserId.Value,
+            UpdatedUtc = now,
         });
 
         await _db.SaveChangesAsync(cancellationToken);

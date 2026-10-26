@@ -1,0 +1,13 @@
+@model Server.Core.Notification.LeaveRequestDetailRow
+
+<tr>
+  <td style="width:36%;padding:12px 12px 12px 0;@(Model.IsFinalRow ? "border-bottom:none;" : "border-bottom:1px solid #dfe7f1;") color:#5d6b82;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;vertical-align:middle;">
+    @Model.Label
+  </td>
+  <td style="padding:12px 0;@(Model.IsFinalRow ? "border-bottom:none;" : "border-bottom:1px solid #dfe7f1;") color:#172033;vertical-align:middle;">
+    @foreach (var line in Model.Value.Split(Environment.NewLine, StringSplitOptions.None))
+    {
+      <div>@line</div>
+    }
+  </td>
+</tr>

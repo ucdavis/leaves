@@ -12,10 +12,8 @@ namespace Server.Core.Notification;
 
 public static class LeaveRequestNotificationTypes
 {
-    public const string AutoApproved = "LeaveRequestAutoApproved";
     public const string Approved = "LeaveRequestApproved";
     public const string Denied = "LeaveRequestDenied";
-    public const string FinalizedForRouting = "LeaveRequestFinalizedForRouting";
 }
 
 public interface ILeaveRequestNotificationQueue
@@ -53,7 +51,7 @@ public sealed class LeaveRequestNotificationQueue : ILeaveRequestNotificationQue
             return;
         }
 
-        Queue(request, requester.Email, LeaveRequestNotificationTypes.AutoApproved);
+        Queue(request, requester.Email, LeaveRequestNotificationTypes.Approved);
         await QueueRoutingAsync(request, cancellationToken);
     }
 
@@ -90,7 +88,7 @@ public sealed class LeaveRequestNotificationQueue : ILeaveRequestNotificationQue
 
         foreach (var recipient in routingEmails.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            Queue(request, recipient, LeaveRequestNotificationTypes.FinalizedForRouting);
+            Queue(request, recipient, LeaveRequestNotificationTypes.Approved);
         }
     }
 
@@ -219,11 +217,10 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                     continue;
                 }
 
-                await _notificationService.SendAsync(
+                await _notificationService.SendLeaveRequestAsync(
                     new EmailRecipients { To = [message.RecipientEmail] },
                     notification.Subject,
-                    notification.Header,
-                    notification.Message,
+                    notification.Content,
                     lease.CancellationToken);
 
                 if (lease.HasLostOwnership)
@@ -369,52 +366,92 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         var leaveType = await _db.LeaveTypes
             .AsNoTracking()
             .SingleOrDefaultAsync(type => type.Id == request.LeaveTypeId, cancellationToken);
+        var payLeaveType = request.PayLeaveTypeId is null
+            ? null
+            : await _db.LeaveTypes
+                .AsNoTracking()
+                .SingleOrDefaultAsync(type => type.Id == request.PayLeaveTypeId.Value, cancellationToken);
         var requesterName = requester?.DisplayName ?? request.IamId;
         var leaveTypeName = leaveType?.DisplayName ?? "leave";
         var dates = request.StartDate == request.EndDate
             ? request.StartDate.ToString("MMMM d, yyyy")
             : $"{request.StartDate:MMMM d, yyyy} through {request.EndDate:MMMM d, yyyy}";
-        var decisionComment = await _db.LeaveRequestActions
+        var decisionAction = await _db.LeaveRequestActions
             .AsNoTracking()
             .Where(action => action.LeaveRequestId == request.Id)
-            .Select(action => action.Comment)
             .FirstOrDefaultAsync(cancellationToken);
+        var decisionComment = decisionAction?.Comment;
+        var approverName = decisionAction is null
+            ? null
+            : await _db.AppUsers
+                .AsNoTracking()
+                .Where(user => user.Id == decisionAction.ActorAppUserId)
+                .Select(user => user.DisplayName)
+                .SingleOrDefaultAsync(cancellationToken);
 
         return message.NotificationType switch
         {
-            LeaveRequestNotificationTypes.AutoApproved => new LeaveRequestEmailNotification(
-                "Leave request approved",
-                "Your leave request was approved",
-                $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was automatically approved."),
             LeaveRequestNotificationTypes.Approved => new LeaveRequestEmailNotification(
                 "Leave request approved",
-                "Your leave request was approved",
-                WithDecisionComment(
-                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                BuildLeaveRequestEmailContent(
+                    request,
+                    requesterName,
+                    requester?.Email,
+                    leaveTypeName,
+                    payLeaveType?.DisplayName,
+                    dates,
+                    "Approved",
+                    decisionAction is null
+                        ? "Automatically approved"
+                        : approverName ?? decisionAction.ActorIamId,
                     decisionComment)),
             LeaveRequestNotificationTypes.Denied => new LeaveRequestEmailNotification(
                 "Leave request denied",
-                "Your leave request was denied",
-                WithDecisionComment(
-                    $"Your {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was denied.",
-                    decisionComment)),
-            LeaveRequestNotificationTypes.FinalizedForRouting => new LeaveRequestEmailNotification(
-                "Leave request finalized",
-                "Leave request finalized",
-                WithDecisionComment(
-                    $"{requesterName}'s {leaveTypeName} request for {dates} ({request.TotalHours:0.##} hours) was approved.",
+                BuildLeaveRequestEmailContent(
+                    request,
+                    requesterName,
+                    requester?.Email,
+                    leaveTypeName,
+                    payLeaveType?.DisplayName,
+                    dates,
+                    "Denied",
+                    approverName ?? decisionAction?.ActorIamId ?? "Not provided",
                     decisionComment)),
             _ => null,
         };
     }
 
-    private static string WithDecisionComment(string message, string? comment)
+    private static LeaveRequestEmailContent BuildLeaveRequestEmailContent(
+        LeaveRequest request,
+        string requesterName,
+        string? requesterEmail,
+        string leaveTypeName,
+        string? payLeaveTypeName,
+        string dates,
+        string status,
+        string decidedBy,
+        string? decisionComment)
     {
-        var trimmedComment = comment?.Trim();
-        return string.IsNullOrWhiteSpace(trimmedComment)
-            ? message
-            : $"{message}\n\nComment: {trimmedComment}";
+        var isApproved = string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase);
+        return new LeaveRequestEmailContent(
+            Header: isApproved ? "Leave Request Approved" : "Leave Request Denied",
+            RequesterName: requesterName,
+            RequesterEmail: DisplayOptionalValue(requesterEmail),
+            Department: request.ReportingDepartmentNameSnapshot,
+            LeaveType: leaveTypeName,
+            PayLeaveType: payLeaveTypeName,
+            Dates: dates,
+            TotalHours: request.TotalHours.ToString("0.##"),
+            Note: DisplayOptionalValue(request.Note),
+            Status: status,
+            DecidedBy: decidedBy,
+            DecisionComment: DisplayOptionalValue(decisionComment),
+            RequestId: request.Id.ToString(),
+            IsApproved: isApproved);
     }
+
+    private static string DisplayOptionalValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not provided" : value.Trim();
 
     private Task<bool> MarkSentAsync(ClaimedOutboundMessage message, DateTime nowUtc, CancellationToken cancellationToken)
     {
@@ -593,5 +630,5 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
 
     private sealed record FailureResult(bool Updated, bool IsDeadLetter);
 
-    private sealed record LeaveRequestEmailNotification(string Subject, string Header, string Message);
+    private sealed record LeaveRequestEmailNotification(string Subject, LeaveRequestEmailContent Content);
 }

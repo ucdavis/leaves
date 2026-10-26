@@ -6,5 +6,4 @@ public sealed class NotificationOptions
 
     public string BaseUrl { get; init; } = string.Empty;
     public string DefaultAppName { get; init; } = string.Empty;
-    public string DefaultButtonText { get; init; } = "Open the application";
 }

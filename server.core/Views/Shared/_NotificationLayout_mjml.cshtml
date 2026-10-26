@@ -2,13 +2,31 @@
 <!doctype html>
 <mjml>
   <mj-head>
-    <mj-preview>@Model.AppName notification</mj-preview>
+    <mj-preview>@(ViewData["EmailPreview"] ?? $"{Model.AppName} notification")</mj-preview>
+    <mj-style>
+      .notification-copy div, .notification-details td {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      @@media only screen and (max-width:480px) {
+        .notification-content > table > tbody > tr > td,
+        .notification-action > table > tbody > tr > td {
+          padding-left: 20px !important;
+          padding-right: 20px !important;
+        }
+
+        .notification-title div {
+          font-size: 24px !important;
+        }
+      }
+    </mj-style>
     <mj-attributes>
       <mj-all font-family="Helvetica, Arial, sans-serif" />
       <mj-text color="#172033" font-size="16px" line-height="1.65" />
-      <mj-button background-color="#0047ba"
+      <mj-button background-color="#003a5d"
                  color="#ffffff"
-             border-radius="8px"
+                 border-radius="6px"
                  font-size="16px"
                  font-weight="600"
                  inner-padding="14px 30px" />
@@ -16,25 +34,50 @@
   </mj-head>
   <mj-body background-color="#eef3f8"
            width="@(string.IsNullOrWhiteSpace(Model.LayoutWidth) ? "600px" : Model.LayoutWidth)">
-    <mj-section padding-top="40px" padding-bottom="16px">
+    <mj-section padding="32px 24px 20px 24px">
       <mj-column>
-        <mj-text align="center"
-                 font-size="28px"
-                 font-weight="700"
-                 color="#172033"
-                 padding="0px">
-          @Model.AppName
-        </mj-text>
+        <mj-table cellpadding="0" cellspacing="0" padding="0px" role="presentation">
+          <tr>
+            @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+            {
+              <td style="padding:0 12px 0 0;vertical-align:middle;width:40px;">
+                @if (!string.IsNullOrWhiteSpace(Model.AppHomeUrl))
+                {
+                  <a href="@Model.AppHomeUrl" style="display:block;text-decoration:none;">
+                    <img alt="@Model.AppName" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
+                  </a>
+                }
+                else
+                {
+                  <img alt="@Model.AppName" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
+                }
+              </td>
+            }
+            <td style="padding:0;vertical-align:middle;">
+              <div style="color:#003a5d;font-size:25px;font-weight:700;line-height:1.15;">
+                @if (!string.IsNullOrWhiteSpace(Model.AppHomeUrl))
+                {
+                  <a href="@Model.AppHomeUrl" style="color:#003a5d;text-decoration:none;">@Model.AppName</a>
+                }
+                else
+                {
+                  @Model.AppName
+                }
+              </div>
+              <div style="color:#5d6b82;font-size:12px;font-weight:700;letter-spacing:1.6px;line-height:1.5;text-transform:uppercase;">
+                Notification
+              </div>
+            </td>
+          </tr>
+        </mj-table>
       </mj-column>
     </mj-section>
 
-    <mj-section background-color="#ffffff"
+    <mj-wrapper background-color="#ffffff"
                 border-radius="20px"
                 padding="0px">
-      <mj-column padding="0px">
-        @RenderBody()
-      </mj-column>
-    </mj-section>
+      @RenderBody()
+    </mj-wrapper>
 
     <mj-section padding-top="16px" padding-bottom="32px">
       <mj-column>

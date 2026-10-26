@@ -18,6 +18,9 @@ public sealed class AdminStatusDataService
         var pendingRequestCount = await _db.LeaveRequests
             .AsNoTracking()
             .CountAsync(request => request.Status == LeaveRequestStatus.PendingApproval, cancellationToken);
+        var undeliveredEmailCount = await _db.OutboundMessages
+            .AsNoTracking()
+            .CountAsync(message => message.Status == OutboundMessageStatus.DeadLetter, cancellationToken);
         var latestPeoplePromotionAt = await _db.People
             .Select(person => person.PromotedAt)
             .MaxAsync(cancellationToken);
@@ -31,7 +34,8 @@ public sealed class AdminStatusDataService
             CurrentFacultyAccrualBalances: currentAccrualBalances,
             LatestAccrualUpdatedAt: latestAccrualUpdatedAt,
             LatestPeoplePromotionAt: latestPeoplePromotionAt,
-            PendingRequestCount: pendingRequestCount);
+            PendingRequestCount: pendingRequestCount,
+            UndeliveredEmailCount: undeliveredEmailCount);
     }
 }
 
@@ -39,4 +43,5 @@ public sealed record AdminStatusData(
     IReadOnlyList<CurrentFacultyAccrualBalance> CurrentFacultyAccrualBalances,
     DateTime? LatestAccrualUpdatedAt,
     DateTime? LatestPeoplePromotionAt,
-    int PendingRequestCount);
+    int PendingRequestCount,
+    int UndeliveredEmailCount);

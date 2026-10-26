@@ -231,8 +231,12 @@ export function DepartmentSettingsModal({
 
             <div className="mt-6 rounded-2xl bg-base-200 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-secondary">
-                Routing emails
+                Request notification emails
               </h3>
+              <p className="mt-2 text-sm leading-6 text-base-content/70">
+                These addresses receive notification of approved leave
+                requests for this department.
+              </p>
 
               <div className="mt-4 space-y-3">
                 {department.routingEmails.map((email) => (
@@ -282,7 +286,7 @@ export function DepartmentSettingsModal({
                       {(field) => (
                         <field.TextField
                           inputClassName="input input-bordered w-full bg-base-100"
-                          label="Add routing email"
+                          label="Add request notification email"
                           placeholder="email@ucdavis.edu"
                           type="email"
                         />

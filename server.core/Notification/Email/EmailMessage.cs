@@ -9,4 +9,5 @@ public sealed class EmailMessage
     public string TextBody { get; init; } = string.Empty;
 
     public string HtmlBody { get; init; } = string.Empty;
+
 }
