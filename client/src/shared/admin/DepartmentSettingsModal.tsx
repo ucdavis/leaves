@@ -234,7 +234,7 @@ export function DepartmentSettingsModal({
                 Request notification emails
               </h3>
               <p className="mt-2 text-sm leading-6 text-base-content/70">
-                These addresses receive notifcation of approved leave
+                These addresses receive notification of approved leave
                 requests for this department.
               </p>
 
