@@ -52,8 +52,8 @@ export function FacultyDashboardPage({
           />
         </div>
       ) : (
-        <div className="mx-auto grid gap-5 lg:grid-cols-2 py-8">
-          <div className="space-y-5">
+        <div className="mx-auto grid gap-5 lg:grid-cols-2 py-4 lg:py-8">
+          <div className="min-w-0 space-y-5">
             <QuickActionsPanel
               data={data}
               onReportLeave={() => setReportModalOpen(true)}
@@ -75,7 +75,6 @@ export function FacultyDashboardPage({
 
       <div className="mx-auto mt-6">
         <LeaveCalendar
-          faculty={data.faculty}
           focusDate={calendarDate}
           key={calendarDate ?? 'dashboard-calendar'}
           onReportLeave={
@@ -124,7 +123,7 @@ function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
     );
   });
   return (
-    <section className="rounded-[1.1rem] border border-[#d8d2c7] bg-white p-6 shadow-[0_2px_10px_rgba(33,24,14,0.08)]">
+    <section className="min-w-0 break-words rounded-[1.1rem] border border-[#d8d2c7] bg-white p-6 shadow-[0_2px_10px_rgba(33,24,14,0.08)]">
       <div className="min-w-0">
         <h1 className="text-[1.7rem] leading-tight font-bold text-[#123a73]">
           {data.faculty.name}
@@ -157,7 +156,7 @@ function ReadOnlyFacultyHeader({ data }: { data: FacultyDashboardResponse }) {
             <ReadOnlyBalanceRow balance={balance} key={balance.typeLabel} />
           ))
         ) : (
-          <div className="text-sm text-base-content/60">
+          <div className="text-sm text-base-content/70">
             No current accrual balances are available.
           </div>
         )}

@@ -88,7 +88,7 @@ export function AdminModalFrame({
       tabIndex={-1}
     >
       <div
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-6 shadow-2xl outline-none ${
+        className={`max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-4 shadow-2xl sm:p-6 outline-none ${
           maxWidthClassName ?? 'max-w-2xl'
         }`}
       >
@@ -119,8 +119,6 @@ function getFocusableElements(container: HTMLElement) {
     .filter((element) => !element.hasAttribute('disabled'));
 }
 
-function isFocusableElement(
-  element: Element | null
-): element is HTMLElement {
+function isFocusableElement(element: Element | null): element is HTMLElement {
   return element !== null && 'focus' in element;
 }

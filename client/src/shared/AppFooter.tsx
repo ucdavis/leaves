@@ -8,7 +8,7 @@ export function AppFooter() {
         <GoldLeaves />
       </div>
 
-      <div className="flex flex-1 justify-center">
+      <div className="flex flex-1 justify-center px-4">
         <div className="flex flex-col">
           <a
             className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -16,7 +16,11 @@ export function AppFooter() {
             rel="noopener noreferrer"
             target="_blank"
           >
-            <img alt="CA&ES wordmark" className="w-76" src="/caes.svg" />
+            <img
+              alt="CA&ES wordmark"
+              className="w-76 max-w-full"
+              src="/caes.svg"
+            />
           </a>
           <p className="mt-2 text-center text-sm text-base-content/70">
             created by

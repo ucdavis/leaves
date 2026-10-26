@@ -19,7 +19,7 @@ export function AdminMetricCard({
   const labelClassName =
     variant === 'summary'
       ? 'card-stat-label'
-      : 'text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50';
+      : 'text-xs font-semibold uppercase tracking-[0.2em] text-base-content/70';
   const valueClassName =
     variant === 'summary'
       ? 'card-stat-value'

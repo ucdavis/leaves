@@ -234,9 +234,13 @@ function AdminPeopleRouteContent() {
               },
             }}
             tableActions={
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <label className="sr-only" htmlFor="faculty-department-filter">
+                  Filter faculty by department
+                </label>
                 <select
                   className="select select-bordered w-full sm:w-64"
+                  id="faculty-department-filter"
                   onChange={(event) =>
                     setFilterDepartmentId(event.target.value)
                   }

@@ -5,28 +5,31 @@ import { useAppForm } from '@/shared/forms/formContext.tsx';
 import { statusSurfaceColors } from '@/shared/statusColors.ts';
 import { AdminModalFrame } from './AdminModalFrame.tsx';
 
-const userFormSchema = z.object({
-  departmentOverrideEndDate: z.string(),
-  departmentOverrideId: z.string(),
-  departmentOverrideStartDate: z.string(),
-}).refine(
-  (value) =>
-    !value.departmentOverrideId.trim() ||
-    !!value.departmentOverrideStartDate.trim(),
-  {
-    message: 'Start date is required when adding a department override.',
-    path: ['departmentOverrideStartDate'],
-  }
-).refine(
-  (value) =>
-    !value.departmentOverrideEndDate.trim() ||
-    !value.departmentOverrideStartDate.trim() ||
-    value.departmentOverrideEndDate > value.departmentOverrideStartDate,
-  {
-    message: 'End date must be after the start date.',
-    path: ['departmentOverrideEndDate'],
-  }
-);
+const userFormSchema = z
+  .object({
+    departmentOverrideEndDate: z.string(),
+    departmentOverrideId: z.string(),
+    departmentOverrideStartDate: z.string(),
+  })
+  .refine(
+    (value) =>
+      !value.departmentOverrideId.trim() ||
+      !!value.departmentOverrideStartDate.trim(),
+    {
+      message: 'Start date is required when adding a department override.',
+      path: ['departmentOverrideStartDate'],
+    }
+  )
+  .refine(
+    (value) =>
+      !value.departmentOverrideEndDate.trim() ||
+      !value.departmentOverrideStartDate.trim() ||
+      value.departmentOverrideEndDate > value.departmentOverrideStartDate,
+    {
+      message: 'End date must be after the start date.',
+      path: ['departmentOverrideEndDate'],
+    }
+  );
 
 export type AdminUserModalValues = z.infer<typeof userFormSchema>;
 
@@ -115,7 +118,7 @@ export function AdminUserModal({
             </div>
           ) : null}
 
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button className="btn btn-ghost" onClick={onClose} type="button">
               Cancel
             </button>
