@@ -110,7 +110,7 @@ function ApprovalRequestCard({
             value={comment}
           />
           <div className="mt-1">
-            <div className="text-right text-xs text-base-content/55">
+            <div className="text-right text-xs text-base-content/70">
               {comment.length}/2000
             </div>
             {commentError ? (
