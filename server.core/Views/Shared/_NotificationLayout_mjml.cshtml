@@ -2,21 +2,22 @@
 <!doctype html>
 <mjml>
   <mj-head>
-    <mj-preview>@Model.AppName notification</mj-preview>
+    <mj-preview>@(ViewData["EmailPreview"] ?? $"{Model.AppName} notification")</mj-preview>
     <mj-style>
-      .notification-title div {
-        overflow-wrap: normal !important;
-        word-break: normal !important;
+      .notification-copy div, .notification-details td {
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       @@media only screen and (max-width:480px) {
-        .notification-title div {
-          font-size: 22px !important;
+        .notification-content > table > tbody > tr > td,
+        .notification-action > table > tbody > tr > td {
+          padding-left: 20px !important;
+          padding-right: 20px !important;
         }
 
-        .notification-title div .notification-title-content {
-          display: inline-block !important;
-          max-width: 230px !important;
+        .notification-title div {
+          font-size: 24px !important;
         }
       }
     </mj-style>
@@ -25,13 +26,13 @@
       <mj-text color="#172033" font-size="16px" line-height="1.65" />
       <mj-button background-color="#003a5d"
                  color="#ffffff"
-             border-radius="8px"
+                 border-radius="6px"
                  font-size="16px"
                  font-weight="600"
                  inner-padding="14px 30px" />
     </mj-attributes>
   </mj-head>
-  <mj-body background-color="#fafafa"
+  <mj-body background-color="#eef3f8"
            width="@(string.IsNullOrWhiteSpace(Model.LayoutWidth) ? "600px" : Model.LayoutWidth)">
     <mj-section padding="32px 24px 20px 24px">
       <mj-column>
@@ -43,12 +44,12 @@
                 @if (!string.IsNullOrWhiteSpace(Model.AppHomeUrl))
                 {
                   <a href="@Model.AppHomeUrl" style="display:block;text-decoration:none;">
-                    <img alt="Leaves" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
+                    <img alt="@Model.AppName" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
                   </a>
                 }
                 else
                 {
-                  <img alt="Leaves" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
+                  <img alt="@Model.AppName" src="@Model.LogoUrl" width="40" style="border:0;display:block;height:auto;width:40px;" />
                 }
               </td>
             }
@@ -72,22 +73,11 @@
       </mj-column>
     </mj-section>
 
-    <mj-section background-color="#003a5d"
-                border-radius="12px 12px 0px 0px"
+    <mj-wrapper background-color="#ffffff"
+                border-radius="20px"
                 padding="0px">
-      <mj-column padding="0px">
-        <mj-spacer height="5px" />
-      </mj-column>
-    </mj-section>
-
-    <mj-section background-color="#ffffff"
-                border="1px solid #dfe7f1"
-                border-radius="0px 0px 12px 12px"
-                padding="0px">
-      <mj-column padding="0px">
-        @RenderBody()
-      </mj-column>
-    </mj-section>
+      @RenderBody()
+    </mj-wrapper>
 
     <mj-section padding-top="16px" padding-bottom="32px">
       <mj-column>

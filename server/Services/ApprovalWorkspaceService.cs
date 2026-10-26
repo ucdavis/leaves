@@ -108,6 +108,8 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
 
         var pendingRequests = scopedLeaveRequests
             .Where(request => request.Status == LeaveRequestStatus.PendingApproval)
+            .OrderBy(request => request.SubmittedAt)
+            .ThenBy(request => request.Id)
             .Select(request => new ApprovalWorkspaceRequestResponse(
                 DepartmentName: request.ReportingDepartmentNameSnapshot,
                 EndDate: request.EndDate.ToString("yyyy-MM-dd"),

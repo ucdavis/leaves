@@ -6,46 +6,71 @@ public abstract class NotificationTemplateModelBase
 
     public string AppName { get; init; } = string.Empty;
     public string? AppHomeUrl { get; init; }
-    public string ButtonText { get; init; } = string.Empty;
-    public string ButtonUrl { get; init; } = string.Empty;
     public string? LayoutWidth { get; init; }
     public string? LogoUrl { get; init; } = DefaultLogoUrl;
 }
 
-public sealed class DefaultNotificationTemplateModel : NotificationTemplateModelBase
+public sealed class LeaveRequestNotificationTemplateModel : NotificationTemplateModelBase
 {
     public string Header { get; init; } = string.Empty;
-    public IReadOnlyList<string> Paragraphs { get; init; } = [];
-
+    public required LeaveRequestEmailContent Content { get; init; }
 }
 
-public sealed class TableNotificationTemplateModel : NotificationTemplateModelBase
+public sealed record LeaveRequestEmailContent(
+    string Header,
+    string RequesterName,
+    string RequesterEmail,
+    string Department,
+    string LeaveType,
+    string? PayLeaveType,
+    string Dates,
+    string TotalHours,
+    string Note,
+    string Status,
+    string DecidedBy,
+    string DecisionComment,
+    string RequestId,
+    bool IsApproved)
 {
-    public string Header { get; init; } = string.Empty;
-    public string Message { get; init; } = string.Empty;
-    public string FirstColumnHeader { get; init; } = "Item";
-    public string SecondColumnHeader { get; init; } = "Details";
-    public string AmountColumnHeader { get; init; } = "Amount";
-    public IReadOnlyList<NotificationTableRow> Rows { get; init; } = [];
-    public string TotalLabel { get; init; } = "Total";
-    public decimal TotalAmount { get; init; }
-}
-
-public sealed class NotificationTableRow
-{
-    public string Title { get; init; } = string.Empty;
-    public string Details { get; init; } = string.Empty;
-    public decimal Amount { get; init; }
-}
-
-public sealed class NotificationButtonModel
-{
-    public NotificationButtonModel(string text, string url)
+    public string ToTextBody()
     {
-        Text = text;
-        Url = url;
-    }
+        var lines = new List<string>
+        {
+            Header,
+            string.Empty,
+            $"Name: {RequesterName}",
+            $"Email: {RequesterEmail}",
+            $"Department: {Department}",
+            $"Leave type: {LeaveType}",
+        };
 
-    public string Text { get; }
-    public string Url { get; }
+        if (!string.IsNullOrWhiteSpace(PayLeaveType))
+        {
+            lines.Add($"FMLA pay type: {PayLeaveType}");
+        }
+
+        lines.AddRange(
+        [
+            $"Date(s): {Dates}",
+            $"Total hours: {TotalHours}",
+            $"Note: {Note}",
+        ]);
+
+        if (IsApproved)
+        {
+            lines.Add($"Approved by: {DecidedBy}");
+            lines.Add($"Approval comment: {DecisionComment}");
+        }
+        else
+        {
+            lines.Add($"Status: {Status}");
+            lines.Add($"Decided by: {DecidedBy}");
+            lines.Add($"Comment: {DecisionComment}");
+        }
+
+        lines.Add($"Request ID: {RequestId}");
+        return string.Join(Environment.NewLine, lines);
+    }
 }
+
+public sealed record LeaveRequestDetailRow(string Label, string Value, bool IsFinalRow = false);

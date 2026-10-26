@@ -44,6 +44,7 @@ public class ApprovalWorkspaceTests
                 AppUserId = former.Id,
                 LeaveTypeId = 1,
                 Status = status,
+                SubmittedAt = new DateTime(2026, 1, 1).AddDays(id),
                 StartDate = new DateOnly(2026, 10, 1),
                 EndDate = new DateOnly(2026, 10, 2),
                 TotalHours = 16,
@@ -90,7 +91,7 @@ public class ApprovalWorkspaceTests
 
         workspace.Should().NotBeNull();
         workspace!.Faculty.Select(item => item.Id).Should().Equal("current");
-        workspace.PendingRequests.Select(item => item.Id).Should().BeEquivalentTo([1, 2]);
+        workspace.PendingRequests.Select(item => item.Id).Should().Equal(1, 2);
         workspace.PendingRequests.Single(item => item.Id == 1).FacultyName.Should().Be("Former Faculty");
         workspace.PendingRequests.Single(item => item.Id == 2).FacultyName.Should().Be("unnamed");
         workspace.Leaves.Where(item => item.Status == "Approved").Select(item => item.Id).Should().Equal(5);

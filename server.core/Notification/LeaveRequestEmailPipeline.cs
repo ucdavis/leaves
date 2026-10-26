@@ -217,11 +217,10 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                     continue;
                 }
 
-                await _notificationService.SendAsync(
+                await _notificationService.SendLeaveRequestAsync(
                     new EmailRecipients { To = [message.RecipientEmail] },
                     notification.Subject,
-                    notification.Header,
-                    notification.Message,
+                    notification.Content,
                     lease.CancellationToken);
 
                 if (lease.HasLostOwnership)
@@ -394,8 +393,7 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         {
             LeaveRequestNotificationTypes.Approved => new LeaveRequestEmailNotification(
                 "Leave request approved",
-                "Leave request approved",
-                BuildLeaveRequestDecisionMessage(
+                BuildLeaveRequestEmailContent(
                     request,
                     requesterName,
                     requester?.Email,
@@ -409,8 +407,7 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
                     decisionComment)),
             LeaveRequestNotificationTypes.Denied => new LeaveRequestEmailNotification(
                 "Leave request denied",
-                "Leave request denied",
-                BuildLeaveRequestDecisionMessage(
+                BuildLeaveRequestEmailContent(
                     request,
                     requesterName,
                     requester?.Email,
@@ -424,7 +421,7 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         };
     }
 
-    private static string BuildLeaveRequestDecisionMessage(
+    private static LeaveRequestEmailContent BuildLeaveRequestEmailContent(
         LeaveRequest request,
         string requesterName,
         string? requesterEmail,
@@ -435,52 +432,22 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
         string decidedBy,
         string? decisionComment)
     {
-        var requestDetails = new[]
-        {
-            "Request details",
-            $"Name: {requesterName}",
-            $"Email: {DisplayOptionalValue(requesterEmail)}",
-            $"Department: {request.ReportingDepartmentNameSnapshot}",
-        };
-        var leaveDetails = new List<string>
-        {
-            "Leave details",
-            $"Leave type: {leaveTypeName}",
-        };
-
-        if (!string.IsNullOrWhiteSpace(payLeaveTypeName))
-        {
-            leaveDetails.Add($"FMLA pay type: {payLeaveTypeName}");
-        }
-
-        leaveDetails.Add($"Date(s): {dates}");
-        leaveDetails.Add($"Total hours: {request.TotalHours:0.##}");
-        leaveDetails.Add($"Note: {DisplayOptionalValue(request.Note)}");
-
         var isApproved = string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase);
-        var decisionDetails = isApproved
-            ? new[]
-            {
-                "Approval details",
-                $"Approved by: {decidedBy}",
-                $"Approval comment: {DisplayOptionalValue(decisionComment)}",
-            }
-            : new[]
-            {
-                "Decision details",
-                $"Status: {status}",
-                $"Decided by: {decidedBy}",
-                $"Comment: {DisplayOptionalValue(decisionComment)}",
-            };
-
-        return string.Join(
-            $"{Environment.NewLine}{Environment.NewLine}",
-            [
-                string.Join(Environment.NewLine, requestDetails),
-                string.Join(Environment.NewLine, leaveDetails),
-                string.Join(Environment.NewLine, decisionDetails),
-                $"Request ID: {request.Id}",
-            ]);
+        return new LeaveRequestEmailContent(
+            Header: isApproved ? "Leave Request Approved" : "Leave Request Denied",
+            RequesterName: requesterName,
+            RequesterEmail: DisplayOptionalValue(requesterEmail),
+            Department: request.ReportingDepartmentNameSnapshot,
+            LeaveType: leaveTypeName,
+            PayLeaveType: payLeaveTypeName,
+            Dates: dates,
+            TotalHours: request.TotalHours.ToString("0.##"),
+            Note: DisplayOptionalValue(request.Note),
+            Status: status,
+            DecidedBy: decidedBy,
+            DecisionComment: DisplayOptionalValue(decisionComment),
+            RequestId: request.Id.ToString(),
+            IsApproved: isApproved);
     }
 
     private static string DisplayOptionalValue(string? value) =>
@@ -663,5 +630,5 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
 
     private sealed record FailureResult(bool Updated, bool IsDeadLetter);
 
-    private sealed record LeaveRequestEmailNotification(string Subject, string Header, string Message);
+    private sealed record LeaveRequestEmailNotification(string Subject, LeaveRequestEmailContent Content);
 }

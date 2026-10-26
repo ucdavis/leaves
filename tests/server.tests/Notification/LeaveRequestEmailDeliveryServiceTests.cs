@@ -213,16 +213,15 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
 
         public void ReleaseSend() => _release.TrySetResult();
 
-        public async Task SendAsync(
+        public async Task SendLeaveRequestAsync(
             EmailRecipients recipients,
             string subject,
-            string header,
-            string message,
+            LeaveRequestEmailContent content,
             CancellationToken cancellationToken = default)
         {
             var recipient = recipients.To.Single();
             DeliveredTo.Add(recipient);
-            DeliveredMessages.Add(message);
+            DeliveredMessages.Add(content.ToTextBody());
             DeliveredSubjects.Add(subject);
 
             if (!string.Equals(recipient, _blockedRecipient, StringComparison.OrdinalIgnoreCase))
@@ -233,16 +232,6 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
             _sendStarted.TrySetResult();
             await _release.Task.WaitAsync(cancellationToken);
         }
-
-        public Task SendTableAsync(
-            EmailRecipients recipients,
-            string subject,
-            string header,
-            string message,
-            IReadOnlyList<NotificationTableRow> rows,
-            decimal totalAmount,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
     private sealed class LeaseRenewalObserver
