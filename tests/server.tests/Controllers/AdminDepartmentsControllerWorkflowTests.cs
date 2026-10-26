@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Server.Controllers;
 using Server.Core.Data;
 using Server.Core.Domain;
@@ -26,7 +27,7 @@ public class AdminDepartmentsControllerWorkflowTests
         db.AppUsers.Add(admin);
         await db.SaveChangesAsync();
 
-        var controller = CreateController(db, admin);
+        var controller = CreateController(db, admin, "service@example.test");
 
         var result = await controller.CreateDepartment(
             new AdminDepartmentsController.CreateDepartmentRequest(
@@ -39,7 +40,7 @@ public class AdminDepartmentsControllerWorkflowTests
         result.Should().BeOfType<NoContentResult>();
         var routingEmail = db.DepartmentEmailRoutings.Should().ContainSingle().Subject;
         routingEmail.DepartmentCode.Should().Be("DEPT");
-        routingEmail.ToEmail.Should().Be("aggieservice@example.test");
+        routingEmail.ToEmail.Should().Be("service@example.test");
         routingEmail.IsActive.Should().BeTrue();
         routingEmail.UpdatedByAppUserId.Should().Be(admin.Id);
     }
@@ -141,7 +142,10 @@ public class AdminDepartmentsControllerWorkflowTests
             message.NotificationType == LeaveRequestNotificationTypes.Approved);
     }
 
-    private static AdminDepartmentsController CreateController(AppDbContext db, AppUser admin)
+    private static AdminDepartmentsController CreateController(
+        AppDbContext db,
+        AppUser admin,
+        string defaultRoutingEmail = "aggieservice@example.test")
     {
         var queue = new LeaveRequestNotificationQueue(
             db,
@@ -152,6 +156,10 @@ public class AdminDepartmentsControllerWorkflowTests
             new AdminDirectoryService(new AdminDirectoryDataService(db)),
             queue,
             new EmailDeliveryWakeSignal(),
+            Options.Create(new DepartmentNotificationOptions
+            {
+                DefaultRoutingEmail = defaultRoutingEmail,
+            }),
             null!)
         {
             ControllerContext = new ControllerContext

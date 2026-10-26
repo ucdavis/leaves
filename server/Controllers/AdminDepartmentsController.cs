@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Server.Core.Data;
 using Server.Core.Domain;
 using Server.Core.Notification;
@@ -15,7 +16,6 @@ namespace Server.Controllers;
 public sealed class AdminDepartmentsController : ApiControllerBase
 {
     private const int ClusterNameMaxLength = 100;
-    private const string DefaultRequestNotificationEmail = "aggieservice@example.test";
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
     private readonly AdminDirectoryDataService _adminDirectoryDataService;
@@ -23,6 +23,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private readonly AppDbContext _db;
     private readonly ILeaveRequestNotificationQueue _notificationQueue;
     private readonly IEmailDeliveryWakeSignal _emailDeliveryWakeSignal;
+    private readonly DepartmentNotificationOptions _departmentNotificationOptions;
     private readonly IUserService _userService;
 
     public AdminDepartmentsController(
@@ -31,6 +32,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         AdminDirectoryService adminDirectoryService,
         ILeaveRequestNotificationQueue notificationQueue,
         IEmailDeliveryWakeSignal emailDeliveryWakeSignal,
+        IOptions<DepartmentNotificationOptions> departmentNotificationOptions,
         IUserService userService)
     {
         _db = db;
@@ -38,6 +40,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         _adminDirectoryService = adminDirectoryService;
         _notificationQueue = notificationQueue;
         _emailDeliveryWakeSignal = emailDeliveryWakeSignal;
+        _departmentNotificationOptions = departmentNotificationOptions.Value;
         _userService = userService;
     }
 
@@ -246,7 +249,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         {
             DepartmentCode = departmentCode,
             IsActive = true,
-            ToEmail = DefaultRequestNotificationEmail,
+            ToEmail = _departmentNotificationOptions.DefaultRoutingEmail,
             UpdatedByAppUserId = adminUserId.Value,
             UpdatedUtc = now,
         });

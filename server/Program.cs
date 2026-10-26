@@ -57,6 +57,8 @@ try
     builder.Services.AddScoped<AdminRolesService>();
     builder.Services.AddScoped<AdminStatusDataService>();
     builder.Services.AddScoped<AdminStatusService>();
+    builder.Services.AddOptions<DepartmentNotificationOptions>()
+        .Bind(builder.Configuration.GetSection(DepartmentNotificationOptions.SectionName));
     builder.Services.AddScoped<IApprovalWorkspaceService, ApprovalWorkspaceService>();
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddHostedService<LeaveRequestEmailDeliveryBackgroundService>();
