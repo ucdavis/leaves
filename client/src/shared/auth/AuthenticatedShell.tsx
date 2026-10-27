@@ -47,6 +47,7 @@ export const AuthenticatedShell = ({ children }: { children: ReactNode }) => {
         ]
       : []),
     ...(isAdmin ? [{ label: 'Admin', to: '/admin' as const }] : []),
+    { label: 'Help', to: '/help' as const },
   ];
   const showSecondaryNav = !pathname.startsWith('/admin') || items.length > 1;
   const initials = user.name
