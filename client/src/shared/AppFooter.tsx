@@ -39,7 +39,7 @@ export function AppFooter() {
               rel="noopener noreferrer"
               target="_blank"
             >
-              Help
+              Contact support
             </a>
           </p>
         </div>

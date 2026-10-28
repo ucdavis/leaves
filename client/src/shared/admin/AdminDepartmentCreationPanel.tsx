@@ -81,6 +81,14 @@ export function AdminDepartmentCreationPanel({
     dialog.showModal();
   }, [inactiveDepartmentCode]);
 
+  function dismissInactiveDepartmentCodeDialog() {
+    const dialog = inactiveDepartmentCodeDialogRef.current;
+    if (dialog?.open) {
+      dialog.close();
+    }
+    setInactiveDepartmentCode(null);
+  }
+
   const clusterForm = useAppForm({
     defaultValues: {
       name: '',
@@ -274,15 +282,18 @@ export function AdminDepartmentCreationPanel({
           aria-labelledby="inactive-department-code-title"
           aria-modal="true"
           className="fixed inset-0 z-50 m-0 flex h-dvh w-dvw max-h-none max-w-none items-center justify-center border-0 bg-transparent p-4 backdrop:bg-slate-950/40"
-          onCancel={() => setInactiveDepartmentCode(null)}
+          onCancel={(event) => {
+            event.preventDefault();
+            dismissInactiveDepartmentCodeDialog();
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              setInactiveDepartmentCode(null);
+              dismissInactiveDepartmentCodeDialog();
             }
           }}
           ref={inactiveDepartmentCodeDialogRef}
         >
-          <div className="w-full max-w-lg rounded-[1.5rem] border border-base-300 bg-base-100 p-6 shadow-2xl">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-6 shadow-2xl">
             <h2
               className="text-xl font-semibold text-base-content"
               id="inactive-department-code-title"
@@ -297,7 +308,7 @@ export function AdminDepartmentCreationPanel({
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 className="btn btn-ghost"
-                onClick={() => setInactiveDepartmentCode(null)}
+                onClick={dismissInactiveDepartmentCodeDialog}
                 type="button"
               >
                 Dismiss

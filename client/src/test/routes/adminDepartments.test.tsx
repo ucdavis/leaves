@@ -13,7 +13,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { afterEach, beforeAll, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mswUtils.ts';
 import { adminDepartmentsQueryOptions } from '@/queries/adminDepartments.ts';
@@ -214,6 +214,11 @@ test('inactive department code opens a support prompt when adding a department',
   expect(
     within(dialog).getByRole('link', { name: 'Open Help Form' })
   ).toHaveAttribute('href', 'https://caeshelp.ucdavis.edu/?appname=Leaves');
+
+  const close = vi.spyOn(HTMLDialogElement.prototype, 'close');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+  expect(close).toHaveBeenCalledOnce();
+  close.mockRestore();
 });
 
 test.each([
