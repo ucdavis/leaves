@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import type { AdminCluster, ApprovalMode } from '@/shared/admin/adminData.ts';
 import type { CreateDepartmentInput } from '@/queries/adminDepartments.ts';
+import { HttpError } from '@/lib/api.ts';
 import { useAppForm } from '@/shared/forms/formContext.tsx';
 
 const DEPARTMENT_CODE_MAX_LENGTH = 10;
 const DEPARTMENT_NAME_MAX_LENGTH = 100;
 const CLUSTER_NAME_MAX_LENGTH = 100;
+const INACTIVE_DEPARTMENT_CODE_CONFLICT = 'inactive_department_code';
+const HELP_FORM_URL = 'https://caeshelp.ucdavis.edu/?appname=Leaves';
+
+function isInactiveDepartmentCodeConflict(error: unknown): boolean {
+  if (!(error instanceof HttpError) || !error.body || typeof error.body !== 'object') {
+    return false;
+  }
+
+  const body = error.body as { code?: unknown };
+  return body.code === INACTIVE_DEPARTMENT_CODE_CONFLICT;
+}
 
 const clusterFormSchema = z.object({
   name: z
@@ -53,6 +65,29 @@ export function AdminDepartmentCreationPanel({
 }) {
   const [clusterError, setClusterError] = useState<string | null>(null);
   const [departmentError, setDepartmentError] = useState<string | null>(null);
+  const [inactiveDepartmentCode, setInactiveDepartmentCode] = useState<
+    string | null
+  >(null);
+  const inactiveDepartmentCodeDialogRef = useRef<HTMLDialogElement | null>(
+    null
+  );
+
+  useEffect(() => {
+    const dialog = inactiveDepartmentCodeDialogRef.current;
+    if (!dialog || !inactiveDepartmentCode || dialog.open) {
+      return;
+    }
+
+    dialog.showModal();
+  }, [inactiveDepartmentCode]);
+
+  function dismissInactiveDepartmentCodeDialog() {
+    const dialog = inactiveDepartmentCodeDialogRef.current;
+    if (dialog?.open) {
+      dialog.close();
+    }
+    setInactiveDepartmentCode(null);
+  }
 
   const clusterForm = useAppForm({
     defaultValues: {
@@ -82,6 +117,7 @@ export function AdminDepartmentCreationPanel({
     },
     onSubmit: async ({ value }) => {
       setDepartmentError(null);
+      setInactiveDepartmentCode(null);
 
       try {
         await onCreateDepartment({
@@ -92,6 +128,11 @@ export function AdminDepartmentCreationPanel({
         });
         departmentForm.reset();
       } catch (error) {
+        if (isInactiveDepartmentCodeConflict(error)) {
+          setInactiveDepartmentCode(value.code.trim().toUpperCase());
+          return;
+        }
+
         setDepartmentError(formatError(error));
       }
     },
@@ -235,6 +276,55 @@ export function AdminDepartmentCreationPanel({
           </div>
         </div>
       </section>
+
+      {inactiveDepartmentCode ? (
+        <dialog
+          aria-labelledby="inactive-department-code-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 m-0 flex h-dvh w-dvw max-h-none max-w-none items-center justify-center border-0 bg-transparent p-4 backdrop:bg-slate-950/40"
+          onCancel={(event) => {
+            event.preventDefault();
+            dismissInactiveDepartmentCodeDialog();
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              dismissInactiveDepartmentCodeDialog();
+            }
+          }}
+          ref={inactiveDepartmentCodeDialogRef}
+        >
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[1.5rem] border border-base-300 bg-base-100 p-6 shadow-2xl">
+            <h2
+              className="text-xl font-semibold text-base-content"
+              id="inactive-department-code-title"
+            >
+              Department code is inactive
+            </h2>
+            <p className="mt-3 text-sm text-base-content/80">
+              The department code <strong>{inactiveDepartmentCode}</strong> is associated
+              with a de-activated department. Contact support to request
+              department reactivation.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="btn btn-ghost"
+                onClick={dismissInactiveDepartmentCodeDialog}
+                type="button"
+              >
+                Dismiss
+              </button>
+              <a
+                className="btn btn-primary"
+                href={HELP_FORM_URL}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Open Help Form
+              </a>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
     </>
   );
 }

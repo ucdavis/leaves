@@ -13,7 +13,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { afterEach, beforeAll, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mswUtils.ts';
 import { adminDepartmentsQueryOptions } from '@/queries/adminDepartments.ts';
@@ -181,6 +181,44 @@ test('department roster includes faculty admins and CAOs, and excludes directory
     expect(within(roster).getByText(`Faculty ${role}`)).toBeInTheDocument();
   }
   expect(within(roster).queryByText(/Staff/)).not.toBeInTheDocument();
+});
+
+test('inactive department code opens a support prompt when adding a department', async () => {
+  server.use(
+    http.post('/api/admin/departments', () =>
+      HttpResponse.json(
+        {
+          code: 'inactive_department_code',
+          message:
+            'This code is associated with an inactive department. Contact support to request reactivation.',
+        },
+        { status: 409 }
+      )
+    )
+  );
+  renderDepartments();
+
+  fireEvent.change(await screen.findByLabelText('Department code'), {
+    target: { value: 'former' },
+  });
+  fireEvent.change(screen.getByLabelText('Department name'), {
+    target: { value: 'Former department' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add department' }));
+
+  const dialog = await screen.findByRole('dialog');
+  expect(
+    within(dialog).getByText('Department code is inactive')
+  ).toBeInTheDocument();
+  expect(within(dialog).getByText('FORMER', { exact: false })).toBeInTheDocument();
+  expect(
+    within(dialog).getByRole('link', { name: 'Open Help Form' })
+  ).toHaveAttribute('href', 'https://caeshelp.ucdavis.edu/?appname=Leaves');
+
+  const close = vi.spyOn(HTMLDialogElement.prototype, 'close');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+  expect(close).toHaveBeenCalledOnce();
+  close.mockRestore();
 });
 
 test.each([

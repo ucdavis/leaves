@@ -18,6 +18,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     private const int ClusterNameMaxLength = 100;
     private const int DepartmentCodeMaxLength = 10;
     private const int DepartmentNameMaxLength = 100;
+    private const string InactiveDepartmentCodeConflictCode = "inactive_department_code";
     private readonly AdminDirectoryDataService _adminDirectoryDataService;
     private readonly AdminDirectoryService _adminDirectoryService;
     private readonly AppDbContext _db;
@@ -204,6 +205,15 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             return ValidationProblem($"Department name must be {DepartmentNameMaxLength} characters or fewer.");
         }
 
+        var duplicateNameExists = await HasActiveDepartmentWithNameAsync(
+            departmentName,
+            excludedDepartmentCode: null,
+            cancellationToken: cancellationToken);
+        if (duplicateNameExists)
+        {
+            return Conflict("An active department with that name already exists.");
+        }
+
         if (request.ClusterId.HasValue)
         {
             var cluster = await _db.Clusters.FirstOrDefaultAsync(
@@ -215,11 +225,21 @@ public sealed class AdminDepartmentsController : ApiControllerBase
             }
         }
 
-        var departmentExists = await _db.Departments.AnyAsync(
-            department => department.DepartmentCode == departmentCode,
-            cancellationToken);
-        if (departmentExists)
+        var existingDepartment = await _db.Departments
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                department => department.DepartmentCode == departmentCode,
+                cancellationToken);
+        if (existingDepartment != null)
         {
+            if (!existingDepartment.IsActive)
+            {
+                return Conflict(new InactiveDepartmentCodeConflictResponse(
+                    InactiveDepartmentCodeConflictCode,
+                    "This code is associated with a de-activated department. Contact support to request reactivation."));
+            }
+
             return Conflict("A department with that code already exists.");
         }
 
@@ -272,7 +292,22 @@ public sealed class AdminDepartmentsController : ApiControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            department.DepartmentName = request.Name.Trim();
+            var name = request.Name.Trim();
+            if (name.Length > DepartmentNameMaxLength)
+            {
+                return ValidationProblem($"Department name must be {DepartmentNameMaxLength} characters or fewer.");
+            }
+
+            var duplicateNameExists = await HasActiveDepartmentWithNameAsync(
+                name,
+                department.DepartmentCode,
+                cancellationToken: cancellationToken);
+            if (duplicateNameExists)
+            {
+                return Conflict("An active department with that name already exists.");
+            }
+
+            department.DepartmentName = name;
         }
 
         if (request.ClusterIdSet)
@@ -544,6 +579,22 @@ public sealed class AdminDepartmentsController : ApiControllerBase
         return true;
     }
 
+    private Task<bool> HasActiveDepartmentWithNameAsync(
+        string name,
+        string? excludedDepartmentCode,
+        CancellationToken cancellationToken)
+    {
+        var normalizedName = name.ToUpperInvariant();
+        return _db.Departments
+            .IgnoreQueryFilters()
+            .AnyAsync(
+                department =>
+                    department.IsActive &&
+                    department.DepartmentName.ToUpper() == normalizedName &&
+                    (excludedDepartmentCode == null || department.DepartmentCode != excludedDepartmentCode),
+                cancellationToken);
+    }
+
     private static bool TryGetWorkflowMode(
         string? approvalMode,
         bool defaultToAuto,
@@ -761,6 +812,7 @@ public sealed class AdminDepartmentsController : ApiControllerBase
     public sealed record CreateClusterRequest(string? Name);
     public sealed record UpdateClusterRequest(string? Name, string? CaoUserId, bool CaoUserIdSet);
     public sealed record CreateDepartmentRequest(string? ApprovalMode, int? ClusterId, string? Code, string? Name);
+    public sealed record InactiveDepartmentCodeConflictResponse(string Code, string Message);
     public sealed record UpdateDepartmentRequest(string? Name, int? ClusterId, bool ClusterIdSet, string? ApprovalMode, bool ApprovePendingRequests, string? ChairUserId, bool ChairUserIdSet);
     public sealed record UpsertRoutingEmailRequest(string? Address);
 }
