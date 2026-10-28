@@ -40,13 +40,13 @@ describe('help route', () => {
         })
       ).toHaveAttribute(
         'href',
-        'https://leaves.freshdesk.com/support/solutions'
+        'https://computing.caes.ucdavis.edu/documentation/leaves'
       );
       expect(
         within(helpFormCard!).getByRole('link', { name: 'Open Help Form' })
       ).toHaveAttribute(
         'href',
-        'https://leaves.freshdesk.com/support/tickets/new'
+        'https://caeshelp.ucdavis.edu/?appname=Leaves'
       );
     } finally {
       cleanup();
