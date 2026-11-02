@@ -74,21 +74,17 @@ public class UserService : IUserService
             ?? principal.FindFirst(ClaimTypes.Name)?.Value
             ?? principal.Identity?.Name;
 
-        var existingUser = await _dbContext.AppUsers
-            .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
-        var matchedPerson = await FindPersonByEmailAsync(email, cancellationToken);
-
-        var iamId =
-            NormalizeIamIdToken(matchedPerson?.IamId)
-            ?? ResolveIamIdFromClaims(principal)
-            ?? existingUser?.IamId;
+        var iamId = ResolveIamIdFromClaims(principal);
         if (string.IsNullOrWhiteSpace(iamId))
         {
             _logger.LogWarning(
-                "Skipping user provisioning for Entra object ID {EntraObjectId} because no IAM ID could be resolved.",
+                "Skipping user provisioning for Entra object ID {EntraObjectId} because the authenticated principal does not have an IAM ID.",
                 entraObjectId);
             return false;
         }
+
+        var existingUser = await _dbContext.AppUsers
+            .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
 
         if (existingUser == null && recordSignIn)
         {
@@ -102,13 +98,10 @@ public class UserService : IUserService
 
         var matchedPersonByIamId = await FindPersonByIamIdAsync(iamId, cancellationToken);
         var resolvedEmployeeId =
-            NormalizeEmployeeId(matchedPerson?.EmployeeId)
-            ?? NormalizeEmployeeId(matchedPersonByIamId?.EmployeeId)
+            NormalizeEmployeeId(matchedPersonByIamId?.EmployeeId)
             ?? existingUser?.EmployeeId;
-        var resolvedDisplayName = !string.IsNullOrWhiteSpace(matchedPerson?.FullName)
-            ? matchedPerson.FullName
-            : !string.IsNullOrWhiteSpace(matchedPersonByIamId?.FullName)
-                ? matchedPersonByIamId.FullName
+        var resolvedDisplayName = !string.IsNullOrWhiteSpace(matchedPersonByIamId?.FullName)
+            ? matchedPersonByIamId.FullName
             : displayName;
 
         var now = DateTime.UtcNow;
@@ -119,7 +112,7 @@ public class UserService : IUserService
             existingUser = new AppUser
             {
                 DisplayName = resolvedDisplayName,
-                Email = email ?? matchedPerson?.Email,
+                Email = email,
                 EmployeeId = resolvedEmployeeId,
                 EntraObjectId = entraObjectId,
                 FirstLoginUtc = now,
@@ -136,7 +129,7 @@ public class UserService : IUserService
             shouldSaveUser = ApplyExistingUserUpdates(
                 existingUser!,
                 resolvedDisplayName,
-                email ?? matchedPerson?.Email,
+                email,
                 iamId,
                 resolvedEmployeeId,
                 recordSignIn,
@@ -176,7 +169,7 @@ public class UserService : IUserService
                 if (ApplyExistingUserUpdates(
                     concurrentUser,
                     resolvedDisplayName,
-                    email ?? matchedPerson?.Email,
+                    email,
                     iamId,
                     resolvedEmployeeId,
                     recordSignIn,
@@ -425,23 +418,6 @@ public class UserService : IUserService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Person?> FindPersonByEmailAsync(string? email, CancellationToken cancellationToken)
-    {
-        var normalizedEmail = NormalizeEmail(email);
-        if (normalizedEmail == null)
-        {
-            return null;
-        }
-
-        var matches = await _dbContext.People
-            .Where(person => person.Email != null && person.Email.ToLower() == normalizedEmail)
-            .OrderByDescending(person => person.PromotedAt)
-            .ThenByDescending(person => person.ModifyDate)
-            .ToListAsync(cancellationToken);
-
-        return matches.FirstOrDefault();
-    }
-
     // if the user does not hace an entry in the people table employeeID is unknown
     private async Task<Person?> FindPersonByIamIdAsync(string? iamId, CancellationToken cancellationToken)
     {
@@ -458,12 +434,6 @@ public class UserService : IUserService
             .ToListAsync(cancellationToken);
 
         return matches.FirstOrDefault();
-    }
-
-    private static string? NormalizeEmail(string? email)
-    {
-        var normalized = email?.Trim().ToLowerInvariant();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
     private static string? NormalizeEmployeeId(string? employeeId)

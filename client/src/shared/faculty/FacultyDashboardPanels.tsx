@@ -143,7 +143,7 @@ function RecentRequestRow({
   const tone = getLeaveTone(request.leaveType);
 
   return (
-    <div className="-mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded px-2 py-3 transition hover:bg-base-200 first:pt-0 last:pb-0 xl:grid-cols-[minmax(0,1fr)_auto_auto]">
+    <div className="-mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded px-2 py-3 transition hover:bg-base-200 first:pt-0 last:pb-0 xl:grid-cols-[minmax(0,1fr)_5rem_10rem_9rem]">
       <button
         className="flex min-w-0 items-start gap-3 text-left transition hover:text-primary"
         onClick={() => onSelectRequest(request)}
@@ -162,8 +162,10 @@ function RecentRequestRow({
         </div>
       </button>
       <div className="text-sm font-bold">{formatHours(request.totalHours)}</div>
-      <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 xl:col-span-1 xl:justify-start">
-        <RequestStatusBadge status={request.status} />
+      <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 xl:col-span-1 xl:contents">
+        <div className="flex min-w-0 items-center xl:justify-center">
+          <RequestStatusBadge status={request.status} />
+        </div>
         {onShowInCalendar ? (
           <button
             className="btn btn-ghost btn-sm"

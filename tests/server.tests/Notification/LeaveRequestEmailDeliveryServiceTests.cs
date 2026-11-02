@@ -269,9 +269,9 @@ public sealed class LeaveRequestEmailDeliveryServiceTests
                 "FMLA pay type: Sick Leave",
                 "Date(s): September 14, 2026",
                 "Total hours: 8",
-                "Note: Coverage confirmed with my team.",
+                "Submission Comment: Coverage confirmed with my team.",
                 "Approved by: Approving Chair",
-                "Approval comment: Coverage confirmed.");
+                "Decision Comment: Coverage confirmed.");
             otherDelivery.DeliveredTo.Should().Equal(
                 Enumerable.Range(2, BatchSize - 1).Select(index => $"queued-{index:D2}@example.test")
                     .Append("expired@example.test"));

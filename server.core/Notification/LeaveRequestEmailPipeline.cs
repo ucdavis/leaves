@@ -442,16 +442,19 @@ public sealed class LeaveRequestEmailDeliveryService : ILeaveRequestEmailDeliver
             PayLeaveType: payLeaveTypeName,
             Dates: dates,
             TotalHours: request.TotalHours.ToString("0.##"),
-            Note: DisplayOptionalValue(request.Note),
+            Note: DisplayOptionalComment(request.Note),
             Status: status,
             DecidedBy: decidedBy,
-            DecisionComment: DisplayOptionalValue(decisionComment),
+            DecisionComment: DisplayOptionalComment(decisionComment),
             RequestId: request.Id.ToString(),
             IsApproved: isApproved);
     }
 
     private static string DisplayOptionalValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "Not provided" : value.Trim();
+
+    private static string DisplayOptionalComment(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "N/A" : value.Trim();
 
     private Task<bool> MarkSentAsync(ClaimedOutboundMessage message, DateTime nowUtc, CancellationToken cancellationToken)
     {

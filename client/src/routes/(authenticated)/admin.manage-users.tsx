@@ -36,6 +36,9 @@ export const Route = createFileRoute('/(authenticated)/admin/manage-users')({
             className="loading loading-spinner loading-lg text-primary"
           />
           <div>
+          <h2 className="text-lg font-semibold text-[var(--admin-blue)]">
+            Loading administrator data
+          </h2>
           </div>
         </div>
       </div>
@@ -201,7 +204,7 @@ function AdminUsersRoute() {
         const isRemovalDisabled = removeMutation.isPending || isLastActiveAdmin;
         const removeButton = (
           <button
-            className={`btn btn-ghost btn-sm ${
+            className={`btn btn-ghost btn-sm -ml-3 ${
               isRemovalDisabled
                 ? 'cursor-not-allowed text-slate-400'
                 : 'text-rose-700'

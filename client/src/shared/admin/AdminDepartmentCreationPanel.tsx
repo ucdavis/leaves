@@ -9,7 +9,7 @@ const DEPARTMENT_CODE_MAX_LENGTH = 10;
 const DEPARTMENT_NAME_MAX_LENGTH = 100;
 const CLUSTER_NAME_MAX_LENGTH = 100;
 const INACTIVE_DEPARTMENT_CODE_CONFLICT = 'inactive_department_code';
-const HELP_FORM_URL = 'https://caeshelp.ucdavis.edu/?appname=Leaves';
+const HELP_FORM_URL = 'https://aggieservice.ucdavis.edu/s/';
 
 function isInactiveDepartmentCodeConflict(error: unknown): boolean {
   if (!(error instanceof HttpError) || !error.body || typeof error.body !== 'object') {

@@ -63,7 +63,7 @@ function ApprovalRequestCard({
 
   const denyRequest = () => {
     if (!comment.trim()) {
-      setCommentError('A comment is required when denying a request.');
+      setCommentError('A decision comment is required when denying a request.');
       return;
     }
 
@@ -84,64 +84,71 @@ function ApprovalRequestCard({
           <span> · {formatCompactHours(request.totalHours)}</span>
         </div>
         <div className="mt-1 text-xs text-base-content/70">
-          {request.note ? `Note: ${request.note}` : request.departmentName}
+          {`Submission Comment: ${request.note?.trim() || 'N/A'}`}
         </div>
       </div>
-      <div className="sm:col-start-2">
-        <label className="form-control w-full">
-          <span className="label pb-1 text-xs font-semibold text-base-content/70">
-            Comment
-          </span>
-          <textarea
-            aria-describedby={commentError ? `comment-error-${request.id}` : undefined}
-            aria-invalid={Boolean(commentError)}
-            className="textarea textarea-bordered h-8 min-h-8 w-full resize-none overflow-y-hidden py-1 text-sm"
-            disabled={disabled}
-            maxLength={2000}
-            onChange={(event) => {
-              event.currentTarget.style.height = 'auto';
-              event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
-              setComment(event.target.value);
-              if (commentError) {
-                setCommentError(null);
+      <div className="sm:col-span-2 sm:col-start-2">
+        <div className="form-control w-full">
+          <label
+            className="label pb-1 text-xs font-semibold text-base-content/70"
+            htmlFor={`decision-comment-${request.id}`}
+          >
+            Decision Comment
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <textarea
+              aria-describedby={
+                commentError ? `comment-error-${request.id}` : undefined
               }
-            }}
-            placeholder="Add context for the faculty member and leave administrators"
-            value={comment}
-          />
+              aria-invalid={Boolean(commentError)}
+              className="textarea textarea-bordered h-8 min-h-8 w-full flex-1 resize-none overflow-y-hidden py-1 text-sm"
+              disabled={disabled}
+              id={`decision-comment-${request.id}`}
+              maxLength={2000}
+              onChange={(event) => {
+                event.currentTarget.style.height = 'auto';
+                event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+                setComment(event.target.value);
+                if (commentError) {
+                  setCommentError(null);
+                }
+              }}
+              placeholder="Add context for the faculty member and leave administrators"
+              value={comment}
+            />
+            <div className="flex flex-wrap gap-2 sm:flex-none">
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={disabled}
+                onClick={() => onDecision(request, 'approved', comment)}
+                type="button"
+              >
+                Approve
+              </button>
+              <button
+                className="btn btn-error btn-sm"
+                disabled={disabled}
+                onClick={denyRequest}
+                type="button"
+              >
+                Deny
+              </button>
+            </div>
+          </div>
           <div className="mt-1">
             <div className="text-right text-xs text-base-content/70">
               {comment.length}/2000
             </div>
             {commentError ? (
-              <div className="mt-1 text-sm text-error" id={`comment-error-${request.id}`}>
+              <div
+                className="mt-1 text-sm text-error"
+                id={`comment-error-${request.id}`}
+              >
                 {commentError}
               </div>
             ) : null}
           </div>
-        </label>
-      </div>
-      <div
-        className={`flex flex-wrap gap-2 sm:col-start-3 sm:justify-end ${
-          commentError ? 'sm:-translate-y-3' : ''
-        }`}
-      >
-        <button
-          className="btn btn-primary btn-sm"
-          disabled={disabled}
-          onClick={() => onDecision(request, 'approved', comment)}
-          type="button"
-        >
-          Approve
-        </button>
-        <button
-          className="btn btn-error btn-sm"
-          disabled={disabled}
-          onClick={denyRequest}
-          type="button"
-        >
-          Deny
-        </button>
+        </div>
       </div>
     </article>
   );

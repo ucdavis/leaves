@@ -82,22 +82,6 @@ export function RequestHistoryTable({
         ),
         header: 'Decision',
       },
-      {
-        accessorKey: 'decisionComment',
-        cell: ({ row }) => {
-          const comment = row.original.approvalMethod === 'DirectSubmission'
-            ? undefined
-            : row.original.decisionComment?.trim();
-          return comment ? (
-            <span className="block max-w-64 truncate" title={comment}>
-              {comment}
-            </span>
-          ) : (
-            <span className="text-base-content/55">—</span>
-          );
-        },
-        header: 'Comment',
-      },
       ...(onShowInCalendar
         ? [
             {
@@ -142,7 +126,11 @@ export function RequestHistoryTable({
         },
       }}
       showPageCount
-      tableClassName="table-zebra"
+      tableClassName={
+        onShowInCalendar
+          ? 'min-w-[62rem] table-fixed [&_th:nth-last-child(2)]:w-60 [&_th:last-child]:w-44'
+          : 'table-fixed'
+      }
     />
   );
 }

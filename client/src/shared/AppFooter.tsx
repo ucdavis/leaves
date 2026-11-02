@@ -35,7 +35,7 @@ export function AppFooter() {
             <span className="mx-2 text-base-content/40">|</span>
             <a
               className="underline"
-              href="https://caeshelp.ucdavis.edu/?appname=Leaves"
+              href="https://aggieservice.ucdavis.edu/s/"
               rel="noopener noreferrer"
               target="_blank"
             >

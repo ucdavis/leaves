@@ -213,7 +213,7 @@ test('inactive department code opens a support prompt when adding a department',
   expect(within(dialog).getByText('FORMER', { exact: false })).toBeInTheDocument();
   expect(
     within(dialog).getByRole('link', { name: 'Open Help Form' })
-  ).toHaveAttribute('href', 'https://caeshelp.ucdavis.edu/?appname=Leaves');
+  ).toHaveAttribute('href', 'https://aggieservice.ucdavis.edu/s/');
 
   const close = vi.spyOn(HTMLDialogElement.prototype, 'close');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Dismiss' }));

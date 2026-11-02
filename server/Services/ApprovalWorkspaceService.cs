@@ -205,7 +205,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         if (comment?.Length > 2000)
         {
             return ApprovalDecisionResult.Invalid(
-                "Comment must be 2,000 characters or fewer.",
+                "Decision comment must be 2,000 characters or fewer.",
                 "comment");
         }
 
@@ -224,7 +224,7 @@ public sealed class ApprovalWorkspaceService : IApprovalWorkspaceService
         if (status.Value == LeaveRequestStatus.Denied && comment == null)
         {
             return ApprovalDecisionResult.Invalid(
-                "Comment is required when denying a request.",
+                "Decision comment is required when denying a request.",
                 "comment");
         }
 

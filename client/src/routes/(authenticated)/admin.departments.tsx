@@ -218,7 +218,7 @@ function AdminDepartmentsRoute() {
                       <th>Name</th>
                       <th>Email</th>
                       <th>Role</th>
-                      <th>Department chair</th>
+                      <th className="text-center">Department chair</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -237,7 +237,7 @@ function AdminDepartmentsRoute() {
                           )}
                         </td>
                         <td>{user.role === 'chair' ? 'Chair' : 'Faculty'}</td>
-                        <td>
+                        <td className="text-center">
                           {selectedDepartment.chairUserId === user.id ? (
                             <span className="inline-flex items-center gap-2 text-sm font-semibold text-success">
                               <CheckCircleIcon
