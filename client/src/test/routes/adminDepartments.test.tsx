@@ -212,7 +212,7 @@ test('inactive department code opens a support prompt when adding a department',
   ).toBeInTheDocument();
   expect(within(dialog).getByText('FORMER', { exact: false })).toBeInTheDocument();
   expect(
-    within(dialog).getByRole('link', { name: 'Open Help Form' })
+    within(dialog).getByRole('link', { name: 'Contact Support' })
   ).toHaveAttribute('href', 'https://aggieservice.ucdavis.edu/s/');
 
   const close = vi.spyOn(HTMLDialogElement.prototype, 'close');

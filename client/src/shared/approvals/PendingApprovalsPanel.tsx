@@ -82,8 +82,9 @@ function ApprovalRequestCard({
           <span className={`font-bold ${tone.text}`}>{request.leaveType}</span>
           <span> · {formatDateRange(request.startDate, request.endDate)}</span>
           <span> · {formatCompactHours(request.totalHours)}</span>
+          <span> · {request.departmentName}</span>
         </div>
-        <div className="mt-1 text-xs text-base-content/70">
+        <div className="mt-1 text-xs text-base-content/85">
           {`Submission Comment: ${request.note?.trim() || 'N/A'}`}
         </div>
       </div>
