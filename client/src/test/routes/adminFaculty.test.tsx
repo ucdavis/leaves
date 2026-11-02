@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Route } from '@/routes/(authenticated)/admin.faculty.tsx';
@@ -13,11 +14,13 @@ afterEach(() => {
 });
 
 function facultyUser({
+  departmentId = 'DEPT',
   departmentOverrideId = '',
   id,
   isActiveInIam,
   name,
 }: {
+  departmentId?: string;
   departmentOverrideId?: string;
   id: string;
   isActiveInIam: boolean;
@@ -25,7 +28,7 @@ function facultyUser({
 }) {
   return {
     active: true,
-    departmentId: 'DEPT',
+    departmentId,
     departmentOverrideEndDate: null,
     departmentOverrideId,
     departmentOverrideStartDate: null,
@@ -42,7 +45,7 @@ function facultyUser({
   };
 }
 
-function renderRoute() {
+function renderRoute(departmentId = 'DEPT') {
   server.use(
     http.get('/api/admin/faculty', () =>
       HttpResponse.json({
@@ -59,6 +62,7 @@ function renderRoute() {
         ],
         facultyUsers: [
           facultyUser({
+            departmentId,
             departmentOverrideId: 'DEPT',
             id: 'faculty001',
             isActiveInIam: true,
@@ -114,4 +118,15 @@ test('loads everyone with current department overrides separately', async () => 
   expect(
     screen.queryByText('Active faculty with override')
   ).not.toBeInTheDocument();
+});
+
+test('explains that an unmapped department is not configured in Leaves', async () => {
+  renderRoute('EXTERNAL');
+
+  const notMapped = await screen.findByText('Not mapped');
+  await userEvent.setup().hover(notMapped);
+
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(
+    'Department is not configured in Leaves.'
+  );
 });

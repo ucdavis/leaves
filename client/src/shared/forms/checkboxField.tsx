@@ -18,14 +18,14 @@ export function CheckboxField({
   return (
     <div className="form-control w-full">
       <label
-        className={`flex items-start gap-3 text-sm text-base-content ${
+        className={`flex items-center gap-3 text-sm text-base-content ${
           disabled ? 'cursor-not-allowed opacity-60' : ''
         }`}
       >
         <input
           aria-invalid={hasError}
           checked={field.state.value}
-          className={`checkbox mt-0.5 ${hasError ? 'checkbox-error' : ''}`}
+          className={`checkbox ${hasError ? 'checkbox-error' : ''}`}
           disabled={disabled}
           onBlur={field.handleBlur}
           onChange={(event) => field.handleChange(event.target.checked)}

@@ -53,19 +53,19 @@ public sealed record LeaveRequestEmailContent(
         [
             $"Date(s): {Dates}",
             $"Total hours: {TotalHours}",
-            $"Note: {Note}",
+            $"Submission Comment: {Note}",
         ]);
 
         if (IsApproved)
         {
             lines.Add($"Approved by: {DecidedBy}");
-            lines.Add($"Approval comment: {DecisionComment}");
+            lines.Add($"Decision Comment: {DecisionComment}");
         }
         else
         {
             lines.Add($"Status: {Status}");
             lines.Add($"Decided by: {DecidedBy}");
-            lines.Add($"Comment: {DecisionComment}");
+            lines.Add($"Decision Comment: {DecisionComment}");
         }
 
         lines.Add($"Request ID: {RequestId}");

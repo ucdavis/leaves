@@ -46,6 +46,64 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task EnsureUserProfileAsync_uses_the_claim_IamId_when_email_matches_another_person()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        db.Set<Person>().AddRange(
+            new Person
+            {
+                IamId = "claimiam",
+                EmployeeId = "E12345",
+                Email = "correct-person@example.com",
+                FullName = "Claim Match Person",
+            },
+            new Person
+            {
+                IamId = "emailiam",
+                EmployeeId = "E99999",
+                Email = "shared@example.com",
+                FullName = "Email Match Person",
+            });
+        await db.SaveChangesAsync();
+
+        var service = new UserService(NullLogger<UserService>.Instance, db);
+        var userId = Guid.NewGuid();
+        var principal = CreatePrincipal(userId, email: "shared@example.com", iamId: "claimiam");
+
+        var provisioned = await service.EnsureUserProfileAsync(principal);
+
+        provisioned.Should().BeTrue();
+        var user = db.AppUsers.Single();
+        user.EntraObjectId.Should().Be(userId);
+        user.IamId.Should().Be("claimiam");
+        user.EmployeeId.Should().Be("E12345");
+        user.DisplayName.Should().Be("Claim Match Person");
+        user.Email.Should().Be("shared@example.com");
+    }
+
+    [Fact]
+    public async Task EnsureUserProfileAsync_corrects_an_existing_profile_to_the_claim_IamId()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var userId = Guid.NewGuid();
+        db.AppUsers.Add(new AppUser
+        {
+            EntraObjectId = userId,
+            IamId = "staleiam",
+            DisplayName = "Stale User",
+            FirstLoginUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var service = new UserService(NullLogger<UserService>.Instance, db);
+        var provisioned = await service.EnsureUserProfileAsync(
+            CreatePrincipal(userId, email: "person@example.com", iamId: "claimiam"));
+
+        provisioned.Should().BeTrue();
+        db.AppUsers.Single().IamId.Should().Be("claimiam");
+    }
+
+    [Fact]
     public async Task EnsureUserProfileAsync_returns_false_without_a_resolvable_IamId()
     {
         using var db = TestDbContextFactory.CreateInMemory();
@@ -58,6 +116,30 @@ public class UserServiceTests
 
         profileProvisioned.Should().BeFalse();
         db.AppUsers.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EnsureUserProfileAsync_falls_back_to_an_existing_profile_IamId_when_the_claim_is_missing()
+    {
+        using var db = TestDbContextFactory.CreateInMemory();
+        var userId = Guid.NewGuid();
+        db.AppUsers.Add(new AppUser
+        {
+            EntraObjectId = userId,
+            IamId = "storediam",
+            FirstLoginUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var service = new UserService(NullLogger<UserService>.Instance, db);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimConstants.ObjectId, userId.ToString())],
+            "Cookies"));
+
+        var profileProvisioned = await service.EnsureUserProfileAsync(principal);
+
+        profileProvisioned.Should().BeTrue();
+        db.AppUsers.Single().IamId.Should().Be("storediam");
     }
 
     [Fact]

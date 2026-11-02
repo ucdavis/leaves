@@ -80,7 +80,7 @@ function createLeaveRequestSchema(leaveTypeLabelById: Map<string, string>) {
       excludeUniversityHolidays: z.boolean(),
       excludeWeekends: z.boolean(),
       leaveTypeId: z.string().min(1, 'Select a leave type.'),
-      note: z.string().trim().max(1000, 'Note is too long.'),
+      note: z.string().trim().max(1000, 'Submission comment is too long.'),
       payLeaveTypeId: z.string(),
       startDate: z.string(),
       totalHours: z.string(),
@@ -274,10 +274,10 @@ function RequestNote({ note }: { note?: string | null }) {
   return (
     <div className="rounded-lg bg-base-200 p-4">
       <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/70">
-        Note
+        Submission Comment
       </div>
       <p className="mt-2 whitespace-pre-wrap break-words text-sm">
-        {note?.trim() || 'No note provided.'}
+        {note?.trim() || 'N/A'}
       </p>
     </div>
   );
@@ -291,10 +291,10 @@ function DecisionComments({ request }: { request: FacultyLeaveRequest }) {
   return (
     <div className="rounded-lg bg-base-200 p-4">
       <div className="text-xs font-bold uppercase tracking-[0.12em] text-base-content/60">
-        Comments
+        Decision Comment
       </div>
       <p className="mt-2 whitespace-pre-wrap text-sm">
-        {request.decisionComment?.trim() || 'No decision comment provided.'}
+        {request.decisionComment?.trim() || 'N/A'}
       </p>
     </div>
   );
@@ -714,7 +714,7 @@ function LeaveRequestForm({
             <form.AppField name="note">
               {(field) => (
                 <field.TextAreaField
-                  label="Note (optional)"
+                  label="Submission Comment (optional)"
                   placeholder="Any additional context..."
                 />
               )}

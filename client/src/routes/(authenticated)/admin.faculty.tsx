@@ -15,6 +15,7 @@ import {
 } from '@/shared/admin/adminFacultyData.tsx';
 import { DataTable } from '@/shared/dataTable.tsx';
 import { statusTextColors } from '@/shared/statusColors.ts';
+import { Tooltip } from '@/shared/Tooltip.tsx';
 
 export const Route = createFileRoute('/(authenticated)/admin/faculty')({
   component: AdminPeopleRoute,
@@ -124,16 +125,28 @@ function AdminPeopleRouteContent() {
     },
     {
       accessorKey: 'departmentName',
+      cell: ({ row }) =>
+        row.original.departmentName === 'Not mapped' ? (
+          <Tooltip content="Department is not configured in Leaves.">
+            <span>
+              Not mapped
+            </span>
+          </Tooltip>
+        ) : (
+          row.original.departmentName
+        ),
       header: 'Department',
     },
     {
       accessorKey: 'role',
       cell: ({ row }) => (
-        <span className="inline-flex rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-primary">
-          {getRoleLabel(row.original.role)}
-        </span>
+        <div className="flex justify-center">
+          <span className="inline-flex rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-primary">
+            {getRoleLabel(row.original.role)}
+          </span>
+        </div>
       ),
-      header: 'Role',
+      header: () => <div className="text-center">Role</div>,
     },
     {
       cell: ({ row }) => (

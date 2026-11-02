@@ -29,17 +29,17 @@
       }
       @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Date(s)", content.Dates))
       @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Total hours", content.TotalHours))
-      @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Note", content.Note))
+      @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Submission Comment", content.Note))
       @if (content.IsApproved)
       {
         @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Approved by", content.DecidedBy))
-        @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Approval comment", content.DecisionComment))
+        @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Decision Comment", content.DecisionComment))
       }
       else
       {
         @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Status", content.Status))
         @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Decided by", content.DecidedBy))
-        @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Comment", content.DecisionComment))
+        @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Decision Comment", content.DecisionComment))
       }
       @await Html.PartialAsync("/Views/Shared/_LeaveRequestDetailRow_mjml.cshtml", new Server.Core.Notification.LeaveRequestDetailRow("Request ID", content.RequestId, IsFinalRow: true))
     </mj-table>
