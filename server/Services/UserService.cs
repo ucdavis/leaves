@@ -74,17 +74,18 @@ public class UserService : IUserService
             ?? principal.FindFirst(ClaimTypes.Name)?.Value
             ?? principal.Identity?.Name;
 
-        var iamId = ResolveIamIdFromClaims(principal);
+        var existingUser = await _dbContext.AppUsers
+            .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
+
+        var iamId = ResolveIamIdFromClaims(principal)
+            ?? NormalizeIamIdToken(existingUser?.IamId);
         if (string.IsNullOrWhiteSpace(iamId))
         {
             _logger.LogWarning(
-                "Skipping user provisioning for Entra object ID {EntraObjectId} because the authenticated principal does not have an IAM ID.",
+                "Skipping user provisioning for Entra object ID {EntraObjectId} because no IAM ID could be resolved.",
                 entraObjectId);
             return false;
         }
-
-        var existingUser = await _dbContext.AppUsers
-            .SingleOrDefaultAsync(appUser => appUser.EntraObjectId == entraObjectId, cancellationToken);
 
         if (existingUser == null && recordSignIn)
         {

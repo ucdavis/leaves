@@ -119,14 +119,14 @@ public class UserServiceTests
     }
 
     [Fact]
-    public async Task EnsureUserProfileAsync_does_not_fall_back_to_an_existing_profile_IamId()
+    public async Task EnsureUserProfileAsync_falls_back_to_an_existing_profile_IamId_when_the_claim_is_missing()
     {
         using var db = TestDbContextFactory.CreateInMemory();
         var userId = Guid.NewGuid();
         db.AppUsers.Add(new AppUser
         {
             EntraObjectId = userId,
-            IamId = "existingiam",
+            IamId = "storediam",
             FirstLoginUtc = DateTime.UtcNow,
         });
         await db.SaveChangesAsync();
@@ -138,8 +138,8 @@ public class UserServiceTests
 
         var profileProvisioned = await service.EnsureUserProfileAsync(principal);
 
-        profileProvisioned.Should().BeFalse();
-        db.AppUsers.Single().IamId.Should().Be("existingiam");
+        profileProvisioned.Should().BeTrue();
+        db.AppUsers.Single().IamId.Should().Be("storediam");
     }
 
     [Fact]
