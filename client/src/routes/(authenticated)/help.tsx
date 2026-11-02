@@ -17,7 +17,7 @@ const supportResources: SupportLink[] = [
     description:
       'For questions, problems, or other help requests, contact AggieService.',
     href: 'https://aggieservice.ucdavis.edu/s/',
-    label: 'Site',
+    label: 'Help',
   },
 ];
 

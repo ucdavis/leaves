@@ -26,7 +26,7 @@ describe('help route', () => {
       const headings = screen.getAllByRole('heading', { level: 2 });
       expect(headings.map((heading) => heading.textContent)).toEqual([
         'Knowledge Base',
-        'Help Form',
+        'Help',
       ]);
 
       const knowledgeBaseCard = headings[0].closest('section');
@@ -43,10 +43,10 @@ describe('help route', () => {
         'https://computing.caes.ucdavis.edu/documentation/leaves'
       );
       expect(
-        within(helpFormCard!).getByRole('link', { name: 'Open Help Form' })
+        within(helpFormCard!).getByRole('link', { name: 'Open Help' })
       ).toHaveAttribute(
         'href',
-        'https://caeshelp.ucdavis.edu/?appname=Leaves'
+        'https://aggieservice.ucdavis.edu/s/'
       );
     } finally {
       cleanup();
